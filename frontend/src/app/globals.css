@@ -16,58 +16,82 @@
 /* ============================================
    CSS変数定義（Tailwind CSS 4形式）
    ============================================ */
-@theme {
-  /* カラーシステム - モダンでクールなテック系SaaSカラー */
-  --color-primary: #6366F1;
-  --color-primary-foreground: #ffffff;
+@layer base {
+  :root {
+    /* カラーシステム - モダンでクールなテック系SaaSカラー（HSL形式） */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
-  --color-secondary: #8B5CF6;
-  --color-secondary-foreground: #ffffff;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
 
-  --color-accent: #06B6D4;
-  --color-accent-foreground: #ffffff;
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 0 0% 100%;
 
-  --color-success: #10B981;
-  --color-success-foreground: #ffffff;
+    --accent: 189 94% 43%;
+    --accent-foreground: 0 0% 100%;
 
-  --color-warning: #F59E0B;
-  --color-warning-foreground: #000000;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
 
-  --color-destructive: #EF4444;
-  --color-destructive-foreground: #ffffff;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
 
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #62728a;
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
 
-  --color-card: #ffffff;
-  --color-card-foreground: #0a1628;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0a1628;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
-  --color-ring: #ff6b1a;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-  --color-background: #ffffff;
-  --color-foreground: #0a1628;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 243 75% 59%;
 
-  /* スペーシング（大きなタッチターゲット用） */
-  --spacing-18: 4.5rem; /* 72px */
-  --spacing-22: 5.5rem; /* 88px */
+    /* ボーダー半径 */
+    --radius: 0.75rem;
+  }
 
-  /* ボーダー半径 */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
 
-  /* アニメーション */
-  --animate-fade-in-up: fade-in-up 0.5s ease-out;
-  --animate-scale-in: scale-in 0.3s ease-out;
-  --animate-slide-in-left: slide-in-left 0.4s ease-out;
-  --animate-slide-in-right: slide-in-right 0.4s ease-out;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 189 94% 43%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --card: 224 71% 4%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 224 71% 4%;
+    --popover-foreground: 210 40% 98%;
+
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 243 75% 59%;
+  }
 }
 
 /* ============================================
@@ -185,42 +209,3 @@
   }
 }
 
-/* ============================================
-   ダークモード対応
-   ============================================ */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0f172a;
-    --color-foreground: #f1f5f9;
-    --color-card: #1e293b;
-    --color-card-foreground: #f1f5f9;
-    --color-popover: #1e293b;
-    --color-popover-foreground: #f1f5f9;
-    --color-muted: #334155;
-    --color-muted-foreground: #94a3b8;
-    --color-border: #334155;
-    --color-input: #334155;
-  }
-
-  .glass {
-    background: rgba(15, 23, 42, 0.8);
-  }
-}
-
-/* ダークモードクラスによる強制 */
-.dark {
-  --color-background: #0f172a;
-  --color-foreground: #f1f5f9;
-  --color-card: #1e293b;
-  --color-card-foreground: #f1f5f9;
-  --color-popover: #1e293b;
-  --color-popover-foreground: #f1f5f9;
-  --color-muted: #334155;
-  --color-muted-foreground: #94a3b8;
-  --color-border: #334155;
-  --color-input: #334155;
-}
-
-.dark .glass {
-  background: rgba(15, 23, 42, 0.8);
-}
