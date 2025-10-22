@@ -7,6 +7,9 @@ python-multipart==0.0.6
 supabase==2.0.3
 postgrest==0.13.0
 
+# Stripe
+stripe==7.4.0
+
 # 環境変数
 python-dotenv==1.0.0
 

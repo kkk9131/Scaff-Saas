@@ -6,10 +6,12 @@
 
 import time
 import logging
-from typing import Callable
-from fastapi import Request, Response
+from typing import Callable, Optional
+from fastapi import Request, Response, HTTPException, Header
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+from utils.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -160,3 +162,66 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
                     }
                 }
             )
+
+
+async def get_current_user(authorization: str = Header(None)):
+    """
+    認証ヘッダーからユーザー情報を取得
+
+    Authorizationヘッダーから Bearer トークンを取得し、
+    Supabase Authでユーザー情報を検証します。
+
+    引数:
+        authorization: Authorizationヘッダー（Bearer トークン）
+
+    戻り値:
+        ユーザー情報（dict）
+
+    例外:
+        HTTPException: 認証失敗時に401エラー
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="認証が必要です。Authorizationヘッダーを設定してください。"
+        )
+
+    # "Bearer <token>" 形式をパース
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="無効なAuthorizationヘッダー形式です。Bearer <token>の形式で指定してください。"
+        )
+
+    token = parts[1]
+
+    try:
+        supabase = get_supabase_client()
+
+        # Supabase Authでトークンを検証してユーザー情報を取得
+        user_response = supabase.auth.get_user(token)
+
+        if not user_response or not user_response.user:
+            raise HTTPException(
+                status_code=401,
+                detail="無効なトークンです。再度ログインしてください。"
+            )
+
+        # ユーザー情報を返す
+        user = user_response.user
+        return {
+            "id": user.id,
+            "email": user.email,
+            "name": user.user_metadata.get("name"),
+            "role": user.user_metadata.get("role", "user"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ユーザー認証エラー: {str(e)}")
+        raise HTTPException(
+            status_code=401,
+            detail=f"認証処理でエラーが発生しました: {str(e)}"
+        )
