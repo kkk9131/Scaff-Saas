@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ScaffoldConfiguration",
+  "description": "足場設定のJSONスキーマ",
+  "type": "object",
+  "required": ["type", "unit_width", "height_per_stage"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["standard", "support", "hanging"],
+      "description": "足場の種類"
+    },
+    "unit_width": {
+      "type": "number",
+      "enum": [900, 1800],
+      "description": "単位幅（mm）"
+    },
+    "height_per_stage": {
+      "type": "number",
+      "default": 1500,
+      "description": "1段あたりの高さ（mm）"
+    },
+    "material": {
+      "type": "string",
+      "enum": ["steel", "aluminum"],
+      "default": "steel",
+      "description": "材質"
+    },
+    "max_load": {
+      "type": "number",
+      "description": "最大積載荷重（kg/㎡）"
+    },
+    "safety_rail_height": {
+      "type": "number",
+      "default": 850,
+      "description": "手すり高さ（mm）"
+    },
+    "toe_board_height": {
+      "type": "number",
+      "default": 100,
+      "description": "幅木高さ（mm）"
+    },
+    "mesh_panel": {
+      "type": "boolean",
+      "default": false,
+      "description": "メッシュパネル使用の有無"
+    }
+  }
+}
