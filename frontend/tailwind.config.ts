@@ -11,7 +11,7 @@ import type { Config } from 'tailwindcss';
  */
 const config: Config = {
   // ダークモードをクラスベースで制御
-  darkMode: ['class'],
+  darkMode: 'class',
 
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',

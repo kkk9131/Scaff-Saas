@@ -36,7 +36,7 @@ export interface ModalProps {
   /**
    * 子要素
    */
-  children: React.ReactNode;
+  children?: React.ReactNode;
 
   /**
    * フッター（ボタンなど）
@@ -347,7 +347,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </Button>
         </>
       }
-    />
+    >
+      {/* 確認モーダルは本文が不要なためchildrenは空 */}
+    </Modal>
   );
 };
 
