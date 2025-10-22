@@ -104,7 +104,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className={cn(
               // 基本スタイル
               'flex h-12 w-full rounded-lg border-2 border-input',
-              'bg-background px-4 py-3 text-base',
+              'bg-background px-4 py-3 text-base text-foreground',
               'ring-offset-background',
               'file:border-0 file:bg-transparent file:text-sm file:font-medium',
               'placeholder:text-muted-foreground',

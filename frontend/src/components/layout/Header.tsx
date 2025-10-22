@@ -86,10 +86,22 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
     const [isDarkMode, setIsDarkMode] = React.useState(false);
     const [showUserMenu, setShowUserMenu] = React.useState(false);
 
+    // 初期化時にダークモード状態をチェック
+    React.useEffect(() => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    }, []);
+
     // ダークモード切替
     const toggleDarkMode = () => {
-      setIsDarkMode(!isDarkMode);
-      document.documentElement.classList.toggle('dark');
+      const newDarkMode = !isDarkMode;
+      setIsDarkMode(newDarkMode);
+
+      if (newDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     };
 
     return (

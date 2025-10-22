@@ -143,8 +143,7 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
             'dark:border-gray-700 dark:bg-slate-900',
             // アニメーション
             'transition-transform duration-300 ease-in-out',
-            // モバイル時の表示制御
-            'md:translate-x-0',
+            // 開閉状態の制御（全画面サイズで適用）
             isOpen ? 'translate-x-0' : 'translate-x-full',
             className
           )}
