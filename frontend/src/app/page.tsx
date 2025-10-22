@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { cn } from '@/lib/utils';
 import {
   Button,
   Input,
@@ -17,6 +18,8 @@ import {
   useToast,
   Header,
   Sidebar,
+  ChatSidebar,
+  type ChatMessage,
 } from '@/components';
 
 /**
@@ -26,10 +29,12 @@ import {
  * 職人向けの直感的でワクワクするUIを体験
  */
 export default function Home() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const { toast } = useToast();
 
   // トースト通知のデモ
@@ -74,6 +79,29 @@ export default function Home() {
     }, 2000);
   };
 
+  // チャットメッセージ送信ハンドラー
+  const handleSendMessage = (content: string) => {
+    // ユーザーメッセージを追加
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: new Date(),
+    };
+    setChatMessages((prev) => [...prev, userMessage]);
+
+    // AI応答をシミュレート（実際はOpenAI APIを呼び出す）
+    setTimeout(() => {
+      const aiMessage: ChatMessage = {
+        id: `msg-${Date.now()}-ai`,
+        role: 'assistant',
+        content: `「${content}」について理解しました。足場設計のお手伝いをさせていただきます。具体的にどのような点でサポートが必要でしょうか？`,
+        timestamp: new Date(),
+      };
+      setChatMessages((prev) => [...prev, aiMessage]);
+    }, 1000);
+  };
+
   return (
     <>
       {/* ヘッダー */}
@@ -82,16 +110,32 @@ export default function Home() {
         onLogout={() => alert('ログアウトしました')}
         onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         isMobileMenuOpen={isSidebarOpen}
+        onChatToggle={() => setIsChatOpen(!isChatOpen)}
+        isChatOpen={isChatOpen}
       />
 
-      {/* サイドバー */}
+      {/* 左サイドバー */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
+
+      {/* 右サイドバー（AIチャット） */}
+      <ChatSidebar
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onToggle={() => setIsChatOpen(!isChatOpen)}
+        messages={chatMessages}
+        onSendMessage={handleSendMessage}
       />
 
       {/* メインコンテンツ */}
-      <main className="min-h-screen bg-gradient-to-br from-white via-[#6366F1]/5 to-[#06B6D4]/5 pt-16 md:pl-64 dark:from-slate-900 dark:via-[#6366F1]/10 dark:to-[#06B6D4]/10">
+      <main className={cn(
+        "min-h-screen bg-gradient-to-br from-white via-[#6366F1]/5 to-[#06B6D4]/5 pt-16 transition-all duration-300",
+        "dark:from-slate-900 dark:via-[#6366F1]/10 dark:to-[#06B6D4]/10",
+        isSidebarOpen ? "md:pl-64" : "md:pl-20"
+      )}>
         <div className="container mx-auto space-y-12 p-6">
           {/* ヒーローセクション */}
           <section className="animate-fade-in-up space-y-6 text-center">

@@ -45,7 +45,7 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
   navItems?: NavItem[];
 
   /**
-   * サイドバーが開いているか（モバイル用）
+   * サイドバーが開いているか
    */
   isOpen?: boolean;
 
@@ -53,6 +53,16 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
    * サイドバーを閉じるハンドラー
    */
   onClose?: () => void;
+
+  /**
+   * サイドバーを開くハンドラー
+   */
+  onOpen?: () => void;
+
+  /**
+   * サイドバーの開閉をトグルするハンドラー
+   */
+  onToggle?: () => void;
 }
 
 /**
@@ -202,14 +212,14 @@ const defaultNavItems: NavItem[] = [
  */
 const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
   (
-    { className, navItems = defaultNavItems, isOpen = false, onClose, ...props },
+    { className, navItems = defaultNavItems, isOpen = true, onClose, onOpen, onToggle, ...props },
     ref
   ) => {
     const pathname = usePathname();
 
     return (
       <>
-        {/* オーバーレイ（モバイル時） */}
+        {/* オーバーレイ（モバイル時のみ） */}
         {isOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
@@ -223,40 +233,50 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
           ref={ref}
           className={cn(
             // 基本レイアウト
-            'fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col',
+            'fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] flex-col',
             'border-r-2 border-gray-200 bg-white shadow-lg',
             'dark:border-gray-700 dark:bg-slate-900',
-            // モバイル時のアニメーション
-            'transition-transform duration-300 ease-in-out md:translate-x-0',
-            isOpen ? 'translate-x-0' : '-translate-x-full',
+            // アニメーション
+            'transition-all duration-300 ease-in-out',
+            // 幅の切り替え（開：w-64、閉：w-20）
+            isOpen ? 'w-64' : 'w-20',
+            // モバイル時の表示制御
+            'md:translate-x-0',
+            isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
             className
           )}
           {...props}
         >
           {/* ナビゲーションリスト */}
-          <nav className="flex-1 space-y-1 overflow-y-auto p-4 scrollbar-thin">
+          <nav className={cn(
+            "flex-1 space-y-1 overflow-y-auto scrollbar-thin",
+            isOpen ? "p-4" : "p-2"
+          )}>
             {navItems.map((item) => (
               <NavItemComponent
                 key={item.href}
                 item={item}
                 isActive={pathname === item.href}
+                isOpen={isOpen}
                 onClose={onClose}
               />
             ))}
           </nav>
 
           {/* フッター（バージョン情報など） */}
-          <div className="border-t-2 border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-              <span>ScaffAI v1.0.0</span>
-              <Link
-                href="/help"
-                className="transition-colors hover:text-primary"
-              >
-                ヘルプ
-              </Link>
+          {isOpen && (
+            <div className="border-t-2 border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+                <span>ScaffAI v1.0.0</span>
+                <Link
+                  href="/help"
+                  className="transition-colors hover:text-primary"
+                >
+                  ヘルプ
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
         </aside>
       </>
     );
@@ -271,12 +291,14 @@ Sidebar.displayName = 'Sidebar';
 interface NavItemComponentProps {
   item: NavItem;
   isActive: boolean;
+  isOpen: boolean;
   onClose?: () => void;
 }
 
 const NavItemComponent: React.FC<NavItemComponentProps> = ({
   item,
   isActive,
+  isOpen,
   onClose,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -297,9 +319,9 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
         }}
         className={cn(
           // 基本スタイル
-          'flex items-center gap-3 rounded-lg px-4 py-3',
-          'font-medium transition-all duration-200',
-          'touch-target',
+          'flex items-center rounded-lg py-3 font-medium transition-all duration-200 touch-target',
+          // 幅に応じたパディング調整
+          isOpen ? 'gap-3 px-4' : 'justify-center px-2',
           // アクティブ状態
           isActive
             ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30 dark:bg-[#8B5CF6] dark:shadow-[#8B5CF6]/30'
@@ -308,15 +330,16 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
           !isActive && 'hover:scale-105 active:scale-95'
         )}
         aria-current={isActive ? 'page' : undefined}
+        title={!isOpen ? item.label : undefined}
       >
         {/* アイコン */}
         {item.icon && <span className="flex-shrink-0">{item.icon}</span>}
 
-        {/* ラベル */}
-        <span className="flex-1">{item.label}</span>
+        {/* ラベル（開いている時のみ表示） */}
+        {isOpen && <span className="flex-1">{item.label}</span>}
 
-        {/* バッジ */}
-        {item.badge && (
+        {/* バッジ（開いている時のみ表示） */}
+        {isOpen && item.badge && (
           <span
             className={cn(
               'flex h-6 min-w-[24px] items-center justify-center rounded-full px-2 text-xs font-bold',
@@ -329,8 +352,8 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
           </span>
         )}
 
-        {/* 展開アイコン */}
-        {hasChildren && (
+        {/* 展開アイコン（開いている時のみ表示） */}
+        {isOpen && hasChildren && (
           <svg
             className={cn(
               'h-5 w-5 transition-transform duration-200',
