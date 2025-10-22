@@ -95,12 +95,20 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
     // ダークモード切替
     const toggleDarkMode = () => {
       const newDarkMode = !isDarkMode;
+      console.log('ダークモード切替:', {
+        before: isDarkMode,
+        after: newDarkMode,
+        classList: document.documentElement.classList.toString()
+      });
+
       setIsDarkMode(newDarkMode);
 
       if (newDarkMode) {
         document.documentElement.classList.add('dark');
+        console.log('dark クラス追加後:', document.documentElement.classList.toString());
       } else {
         document.documentElement.classList.remove('dark');
+        console.log('dark クラス削除後:', document.documentElement.classList.toString());
       }
     };
 
