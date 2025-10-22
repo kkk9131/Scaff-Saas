@@ -225,6 +225,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
             // 基本レイアウト
             'fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col',
             'border-r-2 border-gray-200 bg-white shadow-lg',
+            'dark:border-gray-700 dark:bg-slate-900',
             // モバイル時のアニメーション
             'transition-transform duration-300 ease-in-out md:translate-x-0',
             isOpen ? 'translate-x-0' : '-translate-x-full',
@@ -245,8 +246,8 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
           </nav>
 
           {/* フッター（バージョン情報など） */}
-          <div className="border-t-2 border-gray-200 p-4">
-            <div className="flex items-center justify-between text-xs text-gray-600">
+          <div className="border-t-2 border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
               <span>ScaffAI v1.0.0</span>
               <Link
                 href="/help"
@@ -301,8 +302,8 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
           'touch-target',
           // アクティブ状態
           isActive
-            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30'
-            : 'text-foreground hover:bg-accent/10 hover:text-accent',
+            ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30 dark:bg-[#8B5CF6] dark:shadow-[#8B5CF6]/30'
+            : 'text-gray-700 hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] dark:text-gray-300 dark:hover:bg-[#06B6D4]/20',
           // ホバー効果
           !isActive && 'hover:scale-105 active:scale-95'
         )}
@@ -320,8 +321,8 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
             className={cn(
               'flex h-6 min-w-[24px] items-center justify-center rounded-full px-2 text-xs font-bold',
               isActive
-                ? 'bg-primary-foreground/20 text-primary-foreground'
-                : 'bg-primary/10 text-primary'
+                ? 'bg-white/20 text-white'
+                : 'bg-[#6366F1]/10 text-[#6366F1] dark:bg-[#8B5CF6]/20 dark:text-[#8B5CF6]'
             )}
           >
             {item.badge}

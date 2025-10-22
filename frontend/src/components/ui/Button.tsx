@@ -30,55 +30,62 @@ const buttonVariants = cva(
     variants: {
       // バリアント（色とスタイルの種類）
       variant: {
-        // デフォルト: 鮮烈なセーフティオレンジ（主要アクション）
+        // デフォルト: モダンなIndigo（主要アクション）
         default: cn(
-          'bg-[#FF5500] text-white',
-          'shadow-md shadow-[#FF5500]/20 hover:shadow-xl hover:shadow-[#FF5500]/40',
-          'hover:scale-105 hover:bg-[#FF6A1A]'
+          'bg-[#6366F1] text-white',
+          'shadow-md shadow-[#6366F1]/20 hover:shadow-xl hover:shadow-[#6366F1]/40',
+          'hover:scale-105 hover:bg-[#7C3AED]',
+          'dark:bg-[#7C3AED] dark:hover:bg-[#8B5CF6]'
         ),
 
-        // 破壊的アクション: 警告レッド（削除など）
+        // 破壊的アクション: レッド（削除など）
         destructive: cn(
-          'bg-destructive text-destructive-foreground',
-          'shadow-md hover:shadow-lg hover:shadow-destructive/30',
-          'hover:scale-105'
+          'bg-[#EF4444] text-white',
+          'shadow-md shadow-[#EF4444]/20 hover:shadow-lg hover:shadow-[#EF4444]/30',
+          'hover:scale-105 hover:bg-[#DC2626]',
+          'dark:bg-[#DC2626] dark:hover:bg-[#B91C1C]'
         ),
 
         // アウトライン: 枠線のみ（副次アクション）
         outline: cn(
-          'border-2 border-input bg-background',
-          'hover:bg-accent/10 hover:border-accent',
-          'hover:scale-105'
+          'border-2 border-gray-300 bg-transparent text-gray-900',
+          'hover:bg-[#06B6D4]/10 hover:border-[#06B6D4] hover:text-[#06B6D4]',
+          'hover:scale-105',
+          'dark:border-gray-600 dark:text-gray-100 dark:hover:bg-[#06B6D4]/20'
         ),
 
-        // セカンダリ: 深い鉄骨ブルー（補助アクション）
+        // セカンダリ: パープル（補助アクション）
         secondary: cn(
-          'bg-[#1E3A5F] text-white',
-          'shadow-md shadow-[#1E3A5F]/20 hover:shadow-xl hover:shadow-[#1E3A5F]/40',
-          'hover:scale-105 hover:bg-[#2A4A75]'
+          'bg-[#8B5CF6] text-white',
+          'shadow-md shadow-[#8B5CF6]/20 hover:shadow-xl hover:shadow-[#8B5CF6]/40',
+          'hover:scale-105 hover:bg-[#7C3AED]',
+          'dark:bg-[#7C3AED] dark:hover:bg-[#6D28D9]'
         ),
 
         // ゴースト: 背景なし（テキストリンク風）
         ghost: cn(
-          'hover:bg-accent/10 hover:text-accent',
-          'hover:scale-105'
+          'hover:bg-[#06B6D4]/10 hover:text-[#06B6D4]',
+          'hover:scale-105',
+          'dark:hover:bg-[#06B6D4]/20'
         ),
 
         // リンク: テキストリンク
-        link: 'text-primary underline-offset-4 hover:underline',
+        link: 'text-[#6366F1] underline-offset-4 hover:underline dark:text-[#8B5CF6]',
 
-        // 成功: 明るいグリーン（完了・確定）
+        // 成功: エメラルドグリーン（完了・確定）
         success: cn(
-          'bg-[#00D66A] text-white',
-          'shadow-md shadow-[#00D66A]/20 hover:shadow-xl hover:shadow-[#00D66A]/40',
-          'hover:scale-105 hover:bg-[#00E077]'
+          'bg-[#10B981] text-white',
+          'shadow-md shadow-[#10B981]/20 hover:shadow-xl hover:shadow-[#10B981]/40',
+          'hover:scale-105 hover:bg-[#059669]',
+          'dark:bg-[#059669] dark:hover:bg-[#047857]'
         ),
 
-        // 警告: ビビッドなイエロー（注意喚起）
+        // 警告: アンバー（注意喚起）
         warning: cn(
-          'bg-[#FFB800] text-black',
-          'shadow-md shadow-[#FFB800]/20 hover:shadow-xl hover:shadow-[#FFB800]/40',
-          'hover:scale-105'
+          'bg-[#F59E0B] text-white',
+          'shadow-md shadow-[#F59E0B]/20 hover:shadow-xl hover:shadow-[#F59E0B]/40',
+          'hover:scale-105 hover:bg-[#D97706]',
+          'dark:bg-[#D97706] dark:hover:bg-[#B45309]'
         ),
       },
 

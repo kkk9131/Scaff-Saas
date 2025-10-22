@@ -86,8 +86,8 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
         className={cn(
           // 基本スタイル
           'sticky top-0 z-50 w-full',
-          'border-b-2 border-gray-200',
-          'bg-white/95 backdrop-blur-md',
+          'border-b-2 border-gray-200 dark:border-gray-700',
+          'bg-white/95 backdrop-blur-md dark:bg-slate-900/95',
           'shadow-md',
           className
         )}
@@ -293,6 +293,7 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
                     className={cn(
                       'absolute right-0 top-full mt-2 w-56',
                       'rounded-lg border-2 border-gray-200 bg-white shadow-lg',
+                      'dark:border-gray-700 dark:bg-slate-800',
                       'animate-scale-in'
                     )}
                   >

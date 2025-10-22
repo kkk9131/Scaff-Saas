@@ -17,23 +17,23 @@
    CSS変数定義（Tailwind CSS 4形式）
    ============================================ */
 @theme {
-  /* カラーシステム - より鮮やかで力強い建設現場カラー */
-  --color-primary: #FF5500;
+  /* カラーシステム - モダンでクールなテック系SaaSカラー */
+  --color-primary: #6366F1;
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: #1E3A5F;
+  --color-secondary: #8B5CF6;
   --color-secondary-foreground: #ffffff;
 
-  --color-accent: #00A8E8;
+  --color-accent: #06B6D4;
   --color-accent-foreground: #ffffff;
 
-  --color-success: #00D66A;
+  --color-success: #10B981;
   --color-success-foreground: #ffffff;
 
-  --color-warning: #FFB800;
+  --color-warning: #F59E0B;
   --color-warning-foreground: #000000;
 
-  --color-destructive: #E63946;
+  --color-destructive: #EF4444;
   --color-destructive-foreground: #ffffff;
 
   --color-muted: #f1f5f9;
@@ -190,37 +190,37 @@
    ============================================ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: #0a1628;
-    --color-foreground: #f8fafc;
-    --color-card: #0f1a2e;
-    --color-card-foreground: #f8fafc;
-    --color-popover: #0f1a2e;
-    --color-popover-foreground: #f8fafc;
-    --color-muted: #1e293b;
-    --color-muted-foreground: #9aa8bf;
-    --color-border: #1e293b;
-    --color-input: #1e293b;
+    --color-background: #0f172a;
+    --color-foreground: #f1f5f9;
+    --color-card: #1e293b;
+    --color-card-foreground: #f1f5f9;
+    --color-popover: #1e293b;
+    --color-popover-foreground: #f1f5f9;
+    --color-muted: #334155;
+    --color-muted-foreground: #94a3b8;
+    --color-border: #334155;
+    --color-input: #334155;
   }
 
   .glass {
-    background: rgba(10, 22, 40, 0.8);
+    background: rgba(15, 23, 42, 0.8);
   }
 }
 
 /* ダークモードクラスによる強制 */
 .dark {
-  --color-background: #0a1628;
-  --color-foreground: #f8fafc;
-  --color-card: #0f1a2e;
-  --color-card-foreground: #f8fafc;
-  --color-popover: #0f1a2e;
-  --color-popover-foreground: #f8fafc;
-  --color-muted: #1e293b;
-  --color-muted-foreground: #9aa8bf;
-  --color-border: #1e293b;
-  --color-input: #1e293b;
+  --color-background: #0f172a;
+  --color-foreground: #f1f5f9;
+  --color-card: #1e293b;
+  --color-card-foreground: #f1f5f9;
+  --color-popover: #1e293b;
+  --color-popover-foreground: #f1f5f9;
+  --color-muted: #334155;
+  --color-muted-foreground: #94a3b8;
+  --color-border: #334155;
+  --color-input: #334155;
 }
 
 .dark .glass {
-  background: rgba(10, 22, 40, 0.8);
+  background: rgba(15, 23, 42, 0.8);
 }

@@ -47,6 +47,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       className={cn(
         // 基本スタイル
         'rounded-xl border-2 border-gray-200 bg-white text-gray-900',
+        'dark:border-gray-700 dark:bg-slate-800 dark:text-gray-100',
         'shadow-md',
         // トランジション
         'transition-all duration-200 ease-out',
