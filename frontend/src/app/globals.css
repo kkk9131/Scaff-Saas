@@ -56,42 +56,43 @@
     /* ボーダー半径 */
     --radius: 0.75rem;
   }
+}
 
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+/* ダークモードの変数定義 */
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
 
-    --primary: 243 75% 59%;
-    --primary-foreground: 0 0% 100%;
+  --primary: 243 75% 59%;
+  --primary-foreground: 0 0% 100%;
 
-    --secondary: 262 83% 58%;
-    --secondary-foreground: 0 0% 100%;
+  --secondary: 262 83% 58%;
+  --secondary-foreground: 0 0% 100%;
 
-    --accent: 189 94% 43%;
-    --accent-foreground: 0 0% 100%;
+  --accent: 189 94% 43%;
+  --accent-foreground: 0 0% 100%;
 
-    --success: 160 84% 39%;
-    --success-foreground: 0 0% 100%;
+  --success: 160 84% 39%;
+  --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 0%;
 
-    --destructive: 4 90% 58%;
-    --destructive-foreground: 0 0% 100%;
+  --destructive: 4 90% 58%;
+  --destructive-foreground: 0 0% 100%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
 
-    --card: 224 71% 4%;
-    --card-foreground: 210 40% 98%;
+  --card: 224 71% 4%;
+  --card-foreground: 210 40% 98%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 210 40% 98%;
+  --popover: 224 71% 4%;
+  --popover-foreground: 210 40% 98%;
 
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
-    --ring: 243 75% 59%;
-  }
+  --border: 215 28% 17%;
+  --input: 215 28% 17%;
+  --ring: 243 75% 59%;
 }
 
 /* ============================================
