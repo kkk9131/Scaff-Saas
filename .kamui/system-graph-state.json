@@ -1,0 +1,635 @@
+{
+  "schemaVersion": 1,
+  "projectPath": "/Users/kazuto/Desktop/ScaffーSaaS",
+  "projectRootName": "ScaffーSaaS",
+  "graphRenderingMode": "normal",
+  "linkDisplayMode": "all",
+  "graphStats": {
+    "totalNodes": 8,
+    "folders": 4,
+    "files": 4,
+    "images": 0,
+    "videos": 0,
+    "audio": 0,
+    "code": 0,
+    "text": 2,
+    "html": 1,
+    "yaml": 0,
+    "json": 0,
+    "other": 1,
+    "totalLines": 0,
+    "maxLines": 0
+  },
+  "directoryTree": {
+    "name": "ScaffーSaaS",
+    "type": "directory",
+    "path": "ScaffーSaaS",
+    "children": [
+      {
+        "name": ".kamui",
+        "type": "directory",
+        "path": ".kamui",
+        "children": [],
+        "hasMore": true
+      },
+      {
+        "name": ".worktrees",
+        "type": "directory",
+        "path": ".worktrees",
+        "children": [],
+        "hasMore": true
+      },
+      {
+        "name": "docs",
+        "type": "directory",
+        "path": "docs",
+        "children": [
+          {
+            "name": "scaffai_requirements_v1.3.md",
+            "type": "file",
+            "path": "docs/scaffai_requirements_v1.3.md"
+          }
+        ]
+      },
+      {
+        "name": ".DS_Store",
+        "type": "file",
+        "path": ".DS_Store"
+      },
+      {
+        "name": "novel-viewer.html",
+        "type": "file",
+        "path": "novel-viewer.html"
+      },
+      {
+        "name": "README.md",
+        "type": "file",
+        "path": "README.md"
+      }
+    ]
+  },
+  "graphData": {
+    "nodes": [
+      {
+        "id": "ScaffーSaaS",
+        "name": "ScaffーSaaS",
+        "path": "ScaffーSaaS",
+        "type": "directory",
+        "lines": 0,
+        "val": 14,
+        "color": "#4d515a",
+        "baseColor": "#4ec9b0",
+        "originalColor": "#4ec9b0",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": false,
+        "parentPath": null,
+        "childFileCount": 3,
+        "x": -3.727028974209045,
+        "y": -5.241400957133362,
+        "z": -3.7415566653144943,
+        "vx": -6.264133315516646e-10,
+        "vy": 3.9167446672841084e-10,
+        "vz": 2.4028928451504776e-10
+      },
+      {
+        "id": "ScaffーSaaS/.kamui",
+        "name": ".kamui",
+        "path": "ScaffーSaaS/.kamui",
+        "type": "directory",
+        "lines": 0,
+        "val": 14,
+        "color": "#4d515a",
+        "baseColor": "#4ec9b0",
+        "originalColor": "#4ec9b0",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": false,
+        "parentPath": "ScaffーSaaS",
+        "childFileCount": 0,
+        "x": -2.0193114425657757,
+        "y": 15.32007066377974,
+        "z": -33.58401340033966,
+        "vx": -5.340636562534023e-10,
+        "vy": 3.4261818138339403e-10,
+        "vz": 2.1187663382458129e-10
+      },
+      {
+        "id": "ScaffーSaaS/.worktrees",
+        "name": ".worktrees",
+        "path": "ScaffーSaaS/.worktrees",
+        "type": "directory",
+        "lines": 0,
+        "val": 14,
+        "color": "#4d515a",
+        "baseColor": "#4ec9b0",
+        "originalColor": "#4ec9b0",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": false,
+        "parentPath": "ScaffーSaaS",
+        "childFileCount": 0,
+        "x": 13.45851927408306,
+        "y": -26.01661037014521,
+        "z": -29.291140361664038,
+        "vx": -7.392275097783499e-10,
+        "vy": 2.4848059584752545e-10,
+        "vz": 2.880121575635824e-10
+      },
+      {
+        "id": "ScaffーSaaS/docs",
+        "name": "docs",
+        "path": "ScaffーSaaS/docs",
+        "type": "directory",
+        "lines": 0,
+        "val": 14,
+        "color": "#4d515a",
+        "baseColor": "#4ec9b0",
+        "originalColor": "#4ec9b0",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": false,
+        "parentPath": "ScaffーSaaS",
+        "childFileCount": 1,
+        "x": 0.9812408816180102,
+        "y": 28.282066892749658,
+        "z": 20.1625452892757,
+        "vx": -5.674244054461995e-10,
+        "vy": 3.710786164482607e-10,
+        "vz": 2.762969866050436e-10
+      },
+      {
+        "id": "ScaffーSaaS/docs/scaffai_requirements_v1.3.md",
+        "name": "scaffai_requirements_v1.3.md",
+        "path": "ScaffーSaaS/docs/scaffai_requirements_v1.3.md",
+        "type": "file",
+        "lines": 0,
+        "val": 6,
+        "color": "#3498db",
+        "baseColor": "#3498db",
+        "originalColor": "#3498db",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": true,
+        "parentPath": "ScaffーSaaS/docs",
+        "childFileCount": 0,
+        "x": 9.104119630737982,
+        "y": 56.11298130765443,
+        "z": 39.37756364053141,
+        "vx": -5.278928293270739e-10,
+        "vy": 4.29298840328599e-10,
+        "vz": 3.288022508215939e-10
+      },
+      {
+        "id": "ScaffーSaaS/.DS_Store",
+        "name": ".DS_Store",
+        "path": "ScaffーSaaS/.DS_Store",
+        "type": "file",
+        "lines": 0,
+        "val": 6,
+        "color": "#57606f",
+        "baseColor": "#57606f",
+        "originalColor": "#57606f",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": true,
+        "parentPath": "ScaffーSaaS",
+        "childFileCount": 0,
+        "x": -13.465200912732977,
+        "y": -30.884903455171735,
+        "z": 20.271211002367025,
+        "vx": -5.937105690128734e-10,
+        "vy": 2.94894605864001e-10,
+        "vz": 1.982114988357773e-10
+      },
+      {
+        "id": "ScaffーSaaS/novel-viewer.html",
+        "name": "novel-viewer.html",
+        "path": "ScaffーSaaS/novel-viewer.html",
+        "type": "file",
+        "lines": 0,
+        "val": 6,
+        "color": "#e44d26",
+        "baseColor": "#e44d26",
+        "originalColor": "#e44d26",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": true,
+        "parentPath": "ScaffーSaaS",
+        "childFileCount": 0,
+        "x": -33.49459380925832,
+        "y": -20.491513389367253,
+        "z": -19.51733278327828,
+        "vx": -7.28534212518043e-10,
+        "vy": 5.156150611184392e-10,
+        "vz": 2.9425019441923084e-10
+      },
+      {
+        "id": "ScaffーSaaS/README.md",
+        "name": "README.md",
+        "path": "ScaffーSaaS/README.md",
+        "type": "file",
+        "lines": 0,
+        "val": 6,
+        "color": "#3498db",
+        "baseColor": "#3498db",
+        "originalColor": "#3498db",
+        "defaultGlow": 0.18,
+        "glowIntensity": 0.18,
+        "highlighted": false,
+        "parentPath": "ScaffーSaaS",
+        "childFileCount": 0,
+        "x": 29.16225534741797,
+        "y": -17.080690689349808,
+        "z": 6.322723280453761,
+        "vx": -5.918291638338662e-10,
+        "vy": 4.2280185396574705e-10,
+        "vz": 1.9368665482772552e-10
+      }
+    ],
+    "links": [
+      {
+        "source": "ScaffーSaaS",
+        "target": "ScaffーSaaS/.kamui",
+        "type": "tree"
+      },
+      {
+        "source": "ScaffーSaaS",
+        "target": "ScaffーSaaS/.worktrees",
+        "type": "tree"
+      },
+      {
+        "source": "ScaffーSaaS",
+        "target": "ScaffーSaaS/docs",
+        "type": "tree"
+      },
+      {
+        "source": "ScaffーSaaS/docs",
+        "target": "ScaffーSaaS/docs/scaffai_requirements_v1.3.md",
+        "type": "tree"
+      },
+      {
+        "source": "ScaffーSaaS",
+        "target": "ScaffーSaaS/.DS_Store",
+        "type": "tree"
+      },
+      {
+        "source": "ScaffーSaaS",
+        "target": "ScaffーSaaS/novel-viewer.html",
+        "type": "tree"
+      },
+      {
+        "source": "ScaffーSaaS",
+        "target": "ScaffーSaaS/README.md",
+        "type": "tree"
+      }
+    ]
+  },
+  "trackedFiles": [
+    ".kamui/tasks-state.json",
+    "README.md",
+    "novel-viewer.html"
+  ],
+  "uiState": {
+    "expandedDirs": [
+      "ScaffーSaaS",
+      "ScaffーSaaS/ScaffーSaaS",
+      "ScaffーSaaS/docs",
+      "ScaffーSaaS/ScaffーSaaS/docs",
+      "ScaffーSaaS/.kamui",
+      "ScaffーSaaS/ScaffーSaaS/.kamui"
+    ],
+    "selectedPath": "ScaffーSaaS/novel-viewer.html"
+  },
+  "directoryTreeMeta": {
+    "mode": "full",
+    "maxDepthApplied": 10,
+    "maxEntriesPerDirectory": 0,
+    "isPartial": false
+  },
+  "gitHistoryMeta": {
+    "mode": "full",
+    "isPartial": false,
+    "branchPulse": {
+      "generatedAt": 1761116808287,
+      "targets": [
+        "main",
+        "task/task-1761115256929-102444",
+        "master"
+      ],
+      "statsByBranch": {
+        "task/task-1761115256929-102444": {
+          "branch": "task/task-1761115256929-102444",
+          "head": "5ed4bcc3a61d98288829bd474c7bea6255d8e87c",
+          "baseRef": "main",
+          "baseHead": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+          "mergeBase": "5ed4bcc3a61d98288829bd474c7bea6255d8e87c",
+          "divergence": {
+            "aheadCount": 0,
+            "fileCount": 0
+          },
+          "baseline": {
+            "aheadCount": 0,
+            "behindCount": 2,
+            "fileCount": 1
+          },
+          "upstream": null
+        },
+        "main": {
+          "branch": "main",
+          "head": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+          "baseRef": "origin/main",
+          "baseHead": "7844158003793a99111f5d65225a5e385a78bd21",
+          "mergeBase": "7844158003793a99111f5d65225a5e385a78bd21",
+          "divergence": {
+            "aheadCount": 3,
+            "fileCount": 2
+          },
+          "baseline": {
+            "aheadCount": 3,
+            "behindCount": 0,
+            "fileCount": 2
+          },
+          "upstream": null
+        }
+      }
+    }
+  },
+  "gitHistoryState": {
+    "selectedTimelineIndex": 1,
+    "activeCommitHash": null,
+    "entries": [
+      {
+        "type": "live",
+        "label": "現在のコードベース",
+        "files": [],
+        "branch": "main",
+        "targetCommitHash": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+        "worktreePath": "/Users/kazuto/Desktop/ScaffーSaaS",
+        "timestamp": 1761116808305,
+        "lane": 0,
+        "branchLabel": "main",
+        "branchTags": [
+          "main"
+        ],
+        "isDefaultWorktree": true,
+        "branchColor": "#4f85e8",
+        "index": 0
+      },
+      {
+        "type": "unstaged",
+        "label": "未ステージ (5)",
+        "files": [
+          ".DS_Store",
+          ".kamui/model-versions-cache.json",
+          ".kamui/system-graph-state.json",
+          "docs/.DS_Store",
+          "docs/scaffai_requirements_v1.3.md"
+        ],
+        "branch": "main",
+        "targetCommitHash": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+        "worktreePath": "/Users/kazuto/Desktop/ScaffーSaaS",
+        "timestamp": 1761116808305,
+        "sortOrder": 0,
+        "lane": 0,
+        "branchColor": "#4f85e8",
+        "index": 1
+      },
+      {
+        "type": "staged",
+        "label": "ステージ済み (1)",
+        "files": [
+          "kamui/tasks-state.json"
+        ],
+        "branch": "main",
+        "targetCommitHash": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+        "worktreePath": "/Users/kazuto/Desktop/ScaffーSaaS",
+        "timestamp": 1761116808305,
+        "sortOrder": 1,
+        "lane": 0,
+        "branchColor": "#4f85e8",
+        "index": 2
+      },
+      {
+        "type": "commit",
+        "label": "Merge task/task-1761115256929-102444: Add novel viewer UI",
+        "commit": {
+          "hash": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+          "subject": "Merge task/task-1761115256929-102444: Add novel viewer UI",
+          "author": "Kaz Trigger",
+          "timestamp": 1761115897,
+          "parents": [
+            "2ba43d5b9d86f66b15b75fc38af019a7b9c0ea4a",
+            "5ed4bcc3a61d98288829bd474c7bea6255d8e87c"
+          ],
+          "parent": "2ba43d5b9d86f66b15b75fc38af019a7b9c0ea4a",
+          "refs": "HEAD -> main, task/task-1761116449684-b63d9b, task/task-1761116447545-e13dc8",
+          "branches": [
+            "HEAD -> main",
+            "task/task-1761116449684-b63d9b",
+            "task/task-1761116447545-e13dc8",
+            "main",
+            "task/task-1761115256929-102444"
+          ]
+        },
+        "commitHash": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+        "lane": 0,
+        "parentLinks": [
+          {
+            "hash": "2ba43d5b9d86f66b15b75fc38af019a7b9c0ea4a",
+            "lane": 0
+          },
+          {
+            "hash": "5ed4bcc3a61d98288829bd474c7bea6255d8e87c",
+            "lane": 1
+          }
+        ],
+        "primaryBranchName": "main",
+        "branchColor": "#4f85e8",
+        "branchTags": [
+          "main",
+          "task/task-1761115256929-102444",
+          "task/task-1761116447545-e13dc8",
+          "task/task-1761116449684-b63d9b"
+        ],
+        "worktrees": [
+          {
+            "path": "/Users/kazuto/Desktop/ScaffーSaaS",
+            "head": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+            "branch": "main",
+            "isMerged": false,
+            "mergeCommitHash": null,
+            "status": {
+              "staged": [
+                {
+                  "path": "kamui/tasks-state.json",
+                  "originalPath": null,
+                  "status": "modified",
+                  "rawPath": "kamui/tasks-state.json",
+                  "timestamp": 1761116808134
+                }
+              ],
+              "unstaged": [],
+              "untracked": [
+                {
+                  "path": ".DS_Store",
+                  "status": "untracked",
+                  "rawPath": ".DS_Store",
+                  "timestamp": 1761116808134
+                },
+                {
+                  "path": ".kamui/model-versions-cache.json",
+                  "status": "untracked",
+                  "rawPath": ".kamui/model-versions-cache.json",
+                  "timestamp": 1761116808134
+                },
+                {
+                  "path": ".kamui/system-graph-state.json",
+                  "status": "untracked",
+                  "rawPath": ".kamui/system-graph-state.json",
+                  "timestamp": 1761116808134
+                },
+                {
+                  "path": ".worktrees/task-1761115256929-102444/",
+                  "status": "untracked",
+                  "rawPath": ".worktrees/task-1761115256929-102444/",
+                  "timestamp": 1761116808134
+                },
+                {
+                  "path": "docs/.DS_Store",
+                  "status": "untracked",
+                  "rawPath": "docs/.DS_Store",
+                  "timestamp": 1761116808134
+                },
+                {
+                  "path": "docs/scaffai_requirements_v1.3.md",
+                  "status": "untracked",
+                  "rawPath": "docs/scaffai_requirements_v1.3.md",
+                  "timestamp": 1761116808134
+                }
+              ],
+              "capturedAt": 1761116808134
+            },
+            "normalizedPath": "/Users/kazuto/Desktop/ScaffーSaaS",
+            "lane": 0
+          }
+        ],
+        "index": 3
+      },
+      {
+        "type": "commit",
+        "label": "Update tasks state before merge",
+        "commit": {
+          "hash": "2ba43d5b9d86f66b15b75fc38af019a7b9c0ea4a",
+          "subject": "Update tasks state before merge",
+          "author": "Kaz Trigger",
+          "timestamp": 1761115887,
+          "parents": [
+            "7844158003793a99111f5d65225a5e385a78bd21"
+          ],
+          "parent": "7844158003793a99111f5d65225a5e385a78bd21",
+          "refs": "",
+          "branches": [
+            "main"
+          ]
+        },
+        "commitHash": "2ba43d5b9d86f66b15b75fc38af019a7b9c0ea4a",
+        "lane": 0,
+        "parentLinks": [
+          {
+            "hash": "7844158003793a99111f5d65225a5e385a78bd21",
+            "lane": 0
+          }
+        ],
+        "primaryBranchName": "main",
+        "branchColor": "#4f85e8",
+        "branchTags": [],
+        "index": 4
+      },
+      {
+        "type": "commit",
+        "label": "Add novel viewer UI with HTML/CSS only",
+        "commit": {
+          "hash": "5ed4bcc3a61d98288829bd474c7bea6255d8e87c",
+          "subject": "Add novel viewer UI with HTML/CSS only",
+          "author": "Kaz Trigger",
+          "timestamp": 1761115802,
+          "parents": [
+            "7844158003793a99111f5d65225a5e385a78bd21"
+          ],
+          "parent": "7844158003793a99111f5d65225a5e385a78bd21",
+          "refs": "task/task-1761115256929-102444",
+          "branches": [
+            "task/task-1761115256929-102444"
+          ]
+        },
+        "commitHash": "5ed4bcc3a61d98288829bd474c7bea6255d8e87c",
+        "lane": 1,
+        "parentLinks": [
+          {
+            "hash": "7844158003793a99111f5d65225a5e385a78bd21",
+            "lane": 0
+          }
+        ],
+        "primaryBranchName": "task/task-1761115256929-102444",
+        "branchColor": "#4fe8b8",
+        "branchTags": [],
+        "worktrees": [
+          {
+            "path": "/Users/kazuto/Desktop/ScaffーSaaS/.worktrees/task-1761115256929-102444",
+            "head": "5ed4bcc3a61d98288829bd474c7bea6255d8e87c",
+            "branch": "task/task-1761115256929-102444",
+            "isMerged": true,
+            "mergeCommitHash": "04c5aad6cfadf87d91af3b3e13b1f969fb851192",
+            "status": {
+              "staged": [],
+              "unstaged": [],
+              "untracked": [],
+              "capturedAt": 1761116808134
+            },
+            "normalizedPath": "/Users/kazuto/Desktop/ScaffーSaaS/.worktrees/task-1761115256929-102444",
+            "lane": 1
+          }
+        ],
+        "index": 5
+      },
+      {
+        "type": "commit",
+        "label": "first commit",
+        "commit": {
+          "hash": "7844158003793a99111f5d65225a5e385a78bd21",
+          "subject": "first commit",
+          "author": "Kaz Trigger",
+          "timestamp": 1761115009,
+          "parents": [],
+          "parent": null,
+          "refs": "origin/main, task/task-1761115254809-cedd86",
+          "branches": [
+            "origin/main",
+            "task/task-1761115254809-cedd86",
+            "task/task-1761115256929-102444",
+            "main"
+          ]
+        },
+        "commitHash": "7844158003793a99111f5d65225a5e385a78bd21",
+        "lane": 0,
+        "parentLinks": [],
+        "primaryBranchName": "main",
+        "branchColor": "#4f85e8",
+        "branchTags": [
+          "task/task-1761115254809-cedd86"
+        ],
+        "index": 6
+      },
+      {
+        "type": "empty",
+        "label": "初期状態 (初回コミット以前)",
+        "files": [],
+        "marker": "pre-history",
+        "index": 7
+      }
+    ]
+  },
+  "projectRoot": "/Users/kazuto/Desktop/ScaffーSaaS",
+  "savedAt": 1761116815105
+}
