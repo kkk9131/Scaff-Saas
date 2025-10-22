@@ -1,0 +1,21 @@
+# FastAPI フレームワーク
+fastapi==0.104.1
+
+# ASGI サーバー
+uvicorn[standard]==0.24.0
+
+# データバリデーション
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# 環境変数管理
+python-dotenv==1.0.0
+
+# Supabase クライアント
+supabase==2.3.0
+
+# HTTPクライアント（Supabaseで使用）
+httpx<0.25.0,>=0.24.0
+
+# その他のユーティリティ
+python-multipart==0.0.6  # ファイルアップロード用
