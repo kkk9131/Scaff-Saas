@@ -2,26 +2,241 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/**
+ * グローバルスタイル定義
+ * 足場業務SaaS向けのデザインシステム
+ *
+ * カラーコンセプト:
+ * - Primary: 建設現場のセーフティオレンジ（活力・注意喚起）
+ * - Secondary: 足場の鉄骨グレー（信頼性・堅牢性）
+ * - Accent: 現場の空を表すブルー（清涼感・開放感）
+ * - Success: 作業完了のグリーン（安全・成功）
+ * - Warning: 注意喚起のイエロー（警告・確認）
+ * - Destructive: 危険を表すレッド（警告・削除）
+ */
 
-@media (prefers-color-scheme: dark) {
+/* ============================================
+   ライトモード（デフォルト）
+   ============================================ */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* 基本色 */
+    --background: 0 0% 100%; /* 純白 */
+    --foreground: 222 47% 11%; /* ダークネイビー */
+
+    /* カード */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    /* ポップオーバー */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* プライマリカラー: セーフティオレンジ */
+    --primary: 24 95% 53%; /* 鮮やかなオレンジ #FF6B1A */
+    --primary-foreground: 0 0% 100%; /* 白文字 */
+
+    /* セカンダリカラー: 鉄骨グレー */
+    --secondary: 215 16% 47%; /* スチールブルーグレー #62728A */
+    --secondary-foreground: 0 0% 100%;
+
+    /* アクセントカラー: スカイブルー */
+    --accent: 199 89% 48%; /* 明るいブルー #0D99E6 */
+    --accent-foreground: 0 0% 100%;
+
+    /* ミュート（控えめな色） */
+    --muted: 210 40% 96%; /* 薄いブルーグレー */
+    --muted-foreground: 215 16% 47%;
+
+    /* 成功カラー: 完了グリーン */
+    --success: 142 71% 45%; /* フレッシュグリーン #22B573 */
+    --success-foreground: 0 0% 100%;
+
+    /* 警告カラー: 注意イエロー */
+    --warning: 45 93% 47%; /* ビビッドイエロー #F0B90B */
+    --warning-foreground: 222 47% 11%; /* 黒文字 */
+
+    /* 破壊的アクション: 危険レッド */
+    --destructive: 0 84% 60%; /* 鮮やかなレッド #ED4343 */
+    --destructive-foreground: 0 0% 100%;
+
+    /* ボーダー */
+    --border: 214 32% 91%; /* 薄いグレー */
+    --input: 214 32% 91%;
+    --ring: 24 95% 53%; /* フォーカス時はプライマリカラー */
+
+    /* ボーダー半径 */
+    --radius: 0.75rem; /* 12px - 大きめの角丸 */
+  }
+
+  /* ============================================
+     ダークモード
+     ============================================ */
+  .dark {
+    /* 基本色 */
+    --background: 222 47% 11%; /* ダークネイビー */
+    --foreground: 210 40% 98%; /* ほぼ白 */
+
+    /* カード */
+    --card: 222 47% 14%; /* やや明るいダークネイビー */
+    --card-foreground: 210 40% 98%;
+
+    /* ポップオーバー */
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
+
+    /* プライマリカラー: セーフティオレンジ（やや明るめ） */
+    --primary: 24 95% 60%; /* #FF7F3D */
+    --primary-foreground: 222 47% 11%;
+
+    /* セカンダリカラー: 鉄骨グレー（明るめ） */
+    --secondary: 215 20% 65%; /* #9AA8BF */
+    --secondary-foreground: 222 47% 11%;
+
+    /* アクセントカラー: スカイブルー（明るめ） */
+    --accent: 199 89% 55%; /* #29A6F0 */
+    --accent-foreground: 222 47% 11%;
+
+    /* ミュート */
+    --muted: 223 47% 20%; /* ダークブルーグレー */
+    --muted-foreground: 215 20% 65%;
+
+    /* 成功カラー */
+    --success: 142 71% 50%; /* #26CC80 */
+    --success-foreground: 222 47% 11%;
+
+    /* 警告カラー */
+    --warning: 45 93% 55%; /* #F5C518 */
+    --warning-foreground: 222 47% 11%;
+
+    /* 破壊的アクション */
+    --destructive: 0 84% 65%; /* #F25C5C */
+    --destructive-foreground: 210 40% 98%;
+
+    /* ボーダー */
+    --border: 223 47% 20%;
+    --input: 223 47% 20%;
+    --ring: 24 95% 60%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================
+   基本スタイル
+   ============================================ */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* 読みやすいフォント設定 */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    /* スムーズなフォントレンダリング */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* テキスト選択時の色 */
+    @apply selection:bg-primary/20;
+  }
+
+  /* 見出しのデフォルトスタイル */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold tracking-tight;
+  }
+
+  h1 {
+    @apply text-4xl;
+  }
+
+  h2 {
+    @apply text-3xl;
+  }
+
+  h3 {
+    @apply text-2xl;
+  }
+
+  h4 {
+    @apply text-xl;
+  }
+
+  h5 {
+    @apply text-lg;
+  }
+
+  h6 {
+    @apply text-base;
+  }
 }
 
+/* ============================================
+   カスタムユーティリティ
+   ============================================ */
 @layer utilities {
+  /* テキストバランス調整 */
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* スクロールバーのスタイリング */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+
+  /* グラスモルフィズム効果 */
+  .glass {
+    background: hsla(var(--background), 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* 職人向けの大きなタッチターゲット */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px]; /* 最小44px×44px */
+  }
+
+  /* フォーカス時の視覚的フィードバック */
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+}
+
+/* ============================================
+   アニメーション用クラス
+   ============================================ */
+@layer components {
+  /* ホバー時の持ち上がり効果 */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out hover:scale-105 hover:shadow-lg active:scale-100;
+  }
+
+  /* ホバー時の輝き効果 */
+  .hover-glow {
+    @apply transition-all duration-200 ease-out hover:shadow-primary/50 hover:shadow-lg;
   }
 }
