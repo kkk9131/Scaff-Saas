@@ -108,40 +108,32 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           {/* 左側: ロゴとナビゲーション */}
           <div className="flex items-center gap-6">
-            {/* モバイルメニューボタン */}
+            {/* サイドバートグルボタン（デスクトップでも表示） */}
             <button
               onClick={onMenuToggle}
               className={cn(
                 'flex h-12 w-12 items-center justify-center rounded-lg',
                 'text-foreground transition-all duration-200',
                 'hover:bg-accent/10 active:scale-95',
-                'md:hidden',
                 'focus-visible-ring'
               )}
-              aria-label="メニューを開く"
+              aria-label="サイドバーを開閉"
               aria-expanded={isMobileMenuOpen}
             >
-              {/* ハンバーガーアイコン（アニメーション付き） */}
-              <div className="flex flex-col gap-1.5">
-                <span
-                  className={cn(
-                    'block h-0.5 w-6 bg-current transition-all duration-300',
-                    isMobileMenuOpen && 'translate-y-2 rotate-45'
-                  )}
+              {/* ハンバーガーアイコン */}
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
                 />
-                <span
-                  className={cn(
-                    'block h-0.5 w-6 bg-current transition-all duration-300',
-                    isMobileMenuOpen && 'opacity-0'
-                  )}
-                />
-                <span
-                  className={cn(
-                    'block h-0.5 w-6 bg-current transition-all duration-300',
-                    isMobileMenuOpen && '-translate-y-2 -rotate-45'
-                  )}
-                />
-              </div>
+              </svg>
             </button>
 
             {/* ロゴ */}
@@ -181,7 +173,7 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
             <button
               onClick={onChatToggle}
               className={cn(
-                'flex h-12 w-12 items-center justify-center rounded-lg',
+                'relative flex h-12 w-12 items-center justify-center rounded-lg',
                 'text-foreground transition-all duration-200',
                 'hover:bg-accent/10 hover:scale-105 active:scale-95',
                 'focus-visible-ring',
