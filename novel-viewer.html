@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小説閲覧UI - Novel Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #adb5bd;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --border: #dee2e6;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow-lg: rgba(0, 0, 0, 0.15);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --text-primary: #e9ecef;
+            --text-secondary: #adb5bd;
+            --text-muted: #6c757d;
+            --accent: #60a5fa;
+            --accent-hover: #3b82f6;
+            --border: #404040;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --shadow-lg: rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px var(--shadow);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .theme-toggle {
+            width: 50px;
+            height: 26px;
+            background: var(--bg-tertiary);
+            border-radius: 13px;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s ease;
+        }
+
+        [data-theme="dark"] .theme-toggle::before {
+            transform: translateX(24px);
+        }
+
+        .progress-bar-container {
+            height: 3px;
+            background: var(--bg-tertiary);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        /* Main Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            height: fit-content;
+            position: sticky;
+            top: 100px;
+            box-shadow: 0 4px 12px var(--shadow);
+            transition: background 0.3s ease;
+        }
+
+        .sidebar h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 0.5rem;
+        }
+
+        .chapter-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .chapter-item {
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+        }
+
+        .chapter-item:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-color: var(--border);
+        }
+
+        .chapter-item.active {
+            background: var(--accent);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Reading Area */
+        .reading-area {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 3rem;
+            box-shadow: 0 4px 12px var(--shadow);
+            min-height: 80vh;
+            transition: background 0.3s ease;
+        }
+
+        .chapter-content {
+            display: none;
+        }
+
+        .chapter-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chapter-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            border-left: 4px solid var(--accent);
+            padding-left: 1rem;
+        }
+
+        .chapter-meta {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+            padding-left: 1rem;
+        }
+
+        .chapter-text {
+            font-size: 1.125rem;
+            line-height: 2;
+            color: var(--text-primary);
+            text-align: justify;
+        }
+
+        .chapter-text p {
+            margin-bottom: 1.5rem;
+            text-indent: 1em;
+        }
+
+        /* Navigation Buttons */
+        .chapter-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-button {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow-lg);
+        }
+
+        .nav-button:disabled {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .nav-button.prev::before {
+            content: '←';
+        }
+
+        .nav-button.next::after {
+            content: '→';
+        }
+
+        /* Reading Stats */
+        .reading-stats {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 968px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+                order: 2;
+            }
+
+            .reading-area {
+                padding: 2rem 1.5rem;
+            }
+
+            .chapter-title {
+                font-size: 1.5rem;
+            }
+
+            .chapter-text {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .header-content {
+                padding: 1rem;
+            }
+
+            .logo {
+                font-size: 1.25rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .reading-area {
+                padding: 1.5rem 1rem;
+            }
+
+            .chapter-nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-button {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Selection */
+        ::selection {
+            background: var(--accent);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <a href="#" class="logo">📖 Novel Viewer</a>
+            <div class="header-controls">
+                <div class="reading-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Chapter</span>
+                        <span class="stat-value" id="current-chapter">1</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Progress</span>
+                        <span class="stat-value" id="reading-progress">0%</span>
+                    </div>
+                </div>
+                <div class="theme-toggle" id="theme-toggle" title="テーマ切り替え"></div>
+            </div>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h2>目次</h2>
+            <ul class="chapter-list" id="chapter-list">
+                <li class="chapter-item active" data-chapter="1">第1章 始まりの朝</li>
+                <li class="chapter-item" data-chapter="2">第2章 図書館の秘密</li>
+                <li class="chapter-item" data-chapter="3">第3章 失われた記憶</li>
+                <li class="chapter-item" data-chapter="4">第4章 真実への扉</li>
+                <li class="chapter-item" data-chapter="5">第5章 新たな旅立ち</li>
+            </ul>
+        </aside>
+
+        <main class="reading-area">
+            <div class="chapter-content active" data-chapter="1">
+                <h1 class="chapter-title">第1章 始まりの朝</h1>
+                <div class="chapter-meta">更新日: 2025-10-22 | 文字数: 2,450字</div>
+                <div class="chapter-text">
+                    <p>朝の光が窓から差し込み、部屋全体を優しく照らしていた。アキラは目を覚まし、いつものようにベッドから起き上がった。しかし、今日は何かが違っていた。空気の匂い、光の質、すべてが微妙に変化しているように感じられた。</p>
+                    <p>窓の外を見ると、見慣れた街並みが広がっていた。しかし、その風景の中に、これまで気づかなかった何かが隠れているような気がした。それは言葉にできない予感のようなものだった。</p>
+                    <p>アキラは身支度を整え、いつものように朝食を取った。トーストの焼ける香ばしい匂いが部屋に満ちる。コーヒーを一口飲むと、その温かさが体に染み渡っていく。日常の一コマ一コマが、今日はなぜか特別に感じられた。</p>
+                    <p>時計を見ると、まだ時間に余裕があった。アキラは思い立って、いつもとは違う道を歩いてみることにした。この決断が、すべての始まりとなることを、この時はまだ知る由もなかった。</p>
+                    <p>街を歩いていると、古い書店を見つけた。その店は以前からそこにあったはずだが、なぜか今まで気づかなかった。引き寄せられるように、アキラは店の中へと足を踏み入れた。</p>
+                </div>
+                <nav class="chapter-nav">
+                    <button class="nav-button prev" disabled>前の章</button>
+                    <button class="nav-button next" data-next="2">次の章</button>
+                </nav>
+            </div>
+
+            <div class="chapter-content" data-chapter="2">
+                <h1 class="chapter-title">第2章 図書館の秘密</h1>
+                <div class="chapter-meta">更新日: 2025-10-22 | 文字数: 2,680字</div>
+                <div class="chapter-text">
+                    <p>書店の扉を開けると、古い紙とインクの香りが鼻をくすぐった。店内は薄暗く、天井まで届く本棚が迷路のように並んでいた。奥の方から、微かに音楽が聞こえてくる。</p>
+                    <p>「いらっしゃいませ」老人の声が響いた。カウンターの向こうから、白髪の店主が顔を上げた。その目は優しく、何か深い知恵を秘めているように見えた。</p>
+                    <p>アキラは本棚の間を歩き、様々な本を手に取った。古典文学、哲学書、旅行記。それぞれの本が、異なる世界への扉のように思えた。そして、ある一冊の本が目に留まった。</p>
+                    <p>その本は他の本とは明らかに違っていた。革装の表紙には金色の文字で題名が刻まれていたが、それは見たこともない言語だった。しかし不思議なことに、アキラにはその意味が理解できた。「失われた記憶の書」</p>
+                    <p>本を開くと、最初のページには美しい挿絵が描かれていた。それは見覚えのある風景だった。いや、正確には「見覚えがあるような気がする」風景だった。アキラの心に、忘れていた何かが呼び覚まされようとしていた。</p>
+                </div>
+                <nav class="chapter-nav">
+                    <button class="nav-button prev" data-prev="1">前の章</button>
+                    <button class="nav-button next" data-next="3">次の章</button>
+                </nav>
+            </div>
+
+            <div class="chapter-content" data-chapter="3">
+                <h1 class="chapter-title">第3章 失われた記憶</h1>
+                <div class="chapter-meta">更新日: 2025-10-22 | 文字数: 2,890字</div>
+                <div class="chapter-text">
+                    <p>本を読み進めるにつれ、アキラの中で何かが変化し始めた。文字を追う目が止まり、心が別の時間、別の場所へと引き寄せられていく。それは夢のようでもあり、現実のようでもあった。</p>
+                    <p>突然、鮮明なヴィジョンが脳裏に浮かんだ。それは子供の頃の記憶だった。しかし、この記憶は今まで一度も思い出したことがなかった。どうしてこんな大切な思い出を忘れていたのだろうか。</p>
+                    <p>記憶の中で、アキラは誰かと一緒にいた。その人の顔は見えないが、温かさと安心感が心を満たしていた。二人は何かを探していた。それは単なる物ではなく、もっと本質的な何かだった。</p>
+                    <p>「見つけたね」その声が聞こえた瞬間、アキラは現実に引き戻された。店主が隣に立っていた。「その本を選んだということは、あなたは準備ができているということです」</p>
+                    <p>「準備とは何の準備ですか？」アキラは尋ねた。店主は微笑んだ。「失われたものを取り戻す準備です。そして、あなたが本当は誰なのかを思い出す準備です」</p>
+                </div>
+                <nav class="chapter-nav">
+                    <button class="nav-button prev" data-prev="2">前の章</button>
+                    <button class="nav-button next" data-next="4">次の章</button>
+                </nav>
+            </div>
+
+            <div class="chapter-content" data-chapter="4">
+                <h1 class="chapter-title">第4章 真実への扉</h1>
+                <div class="chapter-meta">更新日: 2025-10-22 | 文字数: 3,120字</div>
+                <div class="chapter-text">
+                    <p>店主の言葉は謎めいていたが、アキラは不思議と恐怖を感じなかった。むしろ、長い間待ち望んでいた何かが、ついに始まろうとしているという期待感があった。</p>
+                    <p>「この本を読み終えたとき、あなたは選択を迫られるでしょう」店主は続けた。「今の人生を続けるか、それとも本当の自分を取り戻すか。どちらを選んでも間違いではありません。ただ、選んだ道の責任は、あなた自身が負うことになります」</p>
+                    <p>アキラは本を抱えて書店を出た。外の世界は変わっていないように見えたが、自分の内側では大きな変化が起きていた。本を開き、物語の続きを読み始めた。</p>
+                    <p>物語の主人公は、アキラ自身と不思議なほど似ていた。いや、もしかしたらこれはアキラの物語なのかもしれない。主人公は二つの世界の間を行き来していた。一つは普通の日常の世界。もう一つは、魔法と不思議に満ちた世界。</p>
+                    <p>ページをめくるたびに、新しい記憶が蘇ってきた。それらは単なる想像ではなく、確かに経験した出来事のように感じられた。アキラは、自分が何か大きな物語の一部であることを理解し始めていた。</p>
+                </div>
+                <nav class="chapter-nav">
+                    <button class="nav-button prev" data-prev="3">前の章</button>
+                    <button class="nav-button next" data-next="5">次の章</button>
+                </nav>
+            </div>
+
+            <div class="chapter-content" data-chapter="5">
+                <h1 class="chapter-title">第5章 新たな旅立ち</h1>
+                <div class="chapter-meta">更新日: 2025-10-22 | 文字数: 2,750字</div>
+                <div class="chapter-text">
+                    <p>本の最後のページに辿り着いたとき、アキラは涙を流していた。それは悲しみの涙ではなく、長い眠りから目覚めた者の涙だった。すべてを思い出した。自分が何者で、何のためにここにいるのか。</p>
+                    <p>この世界は現実でもあり、試練の場でもあった。アキラは、ある大切な使命を果たすために、自らの記憶を封印してこの世界に来たのだ。そして今、その時が来た。</p>
+                    <p>立ち上がると、世界の見え方が変わっていた。すべてのものが、以前よりも鮮明で、意味に満ちているように感じられた。空気の振動、光の粒子、人々の心の動き。それらすべてが感じられた。</p>
+                    <p>再び書店を訪れると、店主は待っていたかのように微笑んだ。「お帰りなさい」その言葉は、ただの挨拶ではなく、深い意味を持っていた。「準備はできましたか？」</p>
+                    <p>アキラは頷いた。「はい、行きます」どこへ行くのか、言葉で説明する必要はなかった。二人はすでに理解し合っていた。店の奥には扉があり、その向こうには新しい冒険が待っていた。アキラは一歩踏み出した。新たな物語が、今、始まろうとしていた。</p>
+                </div>
+                <nav class="chapter-nav">
+                    <button class="nav-button prev" data-prev="4">前の章</button>
+                    <button class="nav-button next" disabled>次の章</button>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Theme Toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+
+        // Chapter Navigation
+        const chapterItems = document.querySelectorAll('.chapter-item');
+        const chapterContents = document.querySelectorAll('.chapter-content');
+        const currentChapterSpan = document.getElementById('current-chapter');
+
+        function switchChapter(chapterNum) {
+            // Update chapter list
+            chapterItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.chapter === chapterNum.toString()) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Update content
+            chapterContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.dataset.chapter === chapterNum.toString()) {
+                    content.classList.add('active');
+                }
+            });
+
+            // Update stats
+            currentChapterSpan.textContent = chapterNum;
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        chapterItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const chapterNum = parseInt(item.dataset.chapter);
+                switchChapter(chapterNum);
+            });
+        });
+
+        // Navigation buttons
+        document.querySelectorAll('.nav-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const next = button.dataset.next;
+                const prev = button.dataset.prev;
+
+                if (next) {
+                    switchChapter(parseInt(next));
+                } else if (prev) {
+                    switchChapter(parseInt(prev));
+                }
+            });
+        });
+
+        // Progress Bar
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('reading-progress');
+
+        function updateProgress() {
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight - windowHeight;
+            const scrolled = window.scrollY;
+            const progress = (scrolled / documentHeight) * 100;
+
+            progressBar.style.width = progress + '%';
+            progressPercent.textContent = Math.round(progress) + '%';
+        }
+
+        window.addEventListener('scroll', updateProgress);
+        window.addEventListener('resize', updateProgress);
+        updateProgress();
+    </script>
+</body>
+</html>
