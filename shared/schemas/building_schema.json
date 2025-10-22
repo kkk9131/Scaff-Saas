@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BuildingData",
+  "description": "建物データのJSONスキーマ（OCR/AI解析結果）",
+  "type": "object",
+  "required": ["id", "project_id", "width", "height", "walls"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "建物データの一意識別子"
+    },
+    "project_id": {
+      "type": "string",
+      "description": "紐づくプロジェクトID"
+    },
+    "width": {
+      "type": "number",
+      "minimum": 0,
+      "description": "建物の幅（メートル）"
+    },
+    "height": {
+      "type": "number",
+      "minimum": 0,
+      "description": "建物の高さ（メートル）"
+    },
+    "depth": {
+      "type": "number",
+      "minimum": 0,
+      "description": "建物の奥行き（メートル）"
+    },
+    "floors": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "階数"
+    },
+    "roof_type": {
+      "type": "string",
+      "enum": ["flat", "gable", "hip", "other"],
+      "description": "屋根の種類"
+    },
+    "walls": {
+      "type": "array",
+      "description": "壁データの配列",
+      "items": {
+        "$ref": "#/definitions/wall"
+      }
+    },
+    "openings": {
+      "type": "array",
+      "description": "開口部データの配列",
+      "items": {
+        "$ref": "#/definitions/opening"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "作成日時"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新日時"
+    }
+  },
+  "definitions": {
+    "wall": {
+      "type": "object",
+      "required": ["id", "start_x", "start_y", "end_x", "end_y", "height"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "start_x": {
+          "type": "number"
+        },
+        "start_y": {
+          "type": "number"
+        },
+        "end_x": {
+          "type": "number"
+        },
+        "end_y": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "opening": {
+      "type": "object",
+      "required": ["id", "type", "x", "y", "width", "height"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["window", "door", "other"]
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

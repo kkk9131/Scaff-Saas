@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AIFunctionDefinitions",
+  "description": "OpenAI Function Calling用の関数定義",
+  "functions": [
+    {
+      "name": "parse_drawing",
+      "description": "図面画像をOCR解析して建物データを抽出する",
+      "parameters": {
+        "type": "object",
+        "required": ["image_url", "project_id"],
+        "properties": {
+          "image_url": {
+            "type": "string",
+            "description": "解析対象の図面画像URL"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "紐づけるプロジェクトID"
+          }
+        }
+      }
+    },
+    {
+      "name": "generate_scaffold",
+      "description": "建物データから自動的に足場配置を生成する",
+      "parameters": {
+        "type": "object",
+        "required": ["building_data_id"],
+        "properties": {
+          "building_data_id": {
+            "type": "string",
+            "description": "建物データのID"
+          },
+          "scaffold_type": {
+            "type": "string",
+            "enum": ["standard", "support", "hanging"],
+            "default": "standard",
+            "description": "足場の種類"
+          },
+          "unit_width": {
+            "type": "number",
+            "enum": [900, 1800],
+            "default": 1800,
+            "description": "単位幅（mm）"
+          },
+          "height_per_stage": {
+            "type": "number",
+            "default": 1500,
+            "description": "1段あたりの高さ（mm）"
+          }
+        }
+      }
+    },
+    {
+      "name": "export_dxf",
+      "description": "作図データをDXFファイルとしてエクスポートする",
+      "parameters": {
+        "type": "object",
+        "required": ["drawing_id"],
+        "properties": {
+          "drawing_id": {
+            "type": "string",
+            "description": "エクスポートする作図データのID"
+          },
+          "include_scaffold": {
+            "type": "boolean",
+            "default": true,
+            "description": "足場レイヤーを含めるか"
+          },
+          "include_building": {
+            "type": "boolean",
+            "default": true,
+            "description": "建物レイヤーを含めるか"
+          },
+          "include_annotation": {
+            "type": "boolean",
+            "default": true,
+            "description": "注記レイヤーを含めるか"
+          }
+        }
+      }
+    },
+    {
+      "name": "generate_estimate",
+      "description": "作図データから見積を自動生成する",
+      "parameters": {
+        "type": "object",
+        "required": ["drawing_id", "project_id"],
+        "properties": {
+          "drawing_id": {
+            "type": "string",
+            "description": "見積対象の作図データID"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "プロジェクトID"
+          },
+          "tax_rate": {
+            "type": "number",
+            "default": 0.1,
+            "description": "消費税率（0.1 = 10%）"
+          }
+        }
+      }
+    },
+    {
+      "name": "send_estimate_email",
+      "description": "見積書をメールで送信する",
+      "parameters": {
+        "type": "object",
+        "required": ["estimate_id", "recipient_email"],
+        "properties": {
+          "estimate_id": {
+            "type": "string",
+            "description": "送信する見積のID"
+          },
+          "recipient_email": {
+            "type": "string",
+            "format": "email",
+            "description": "送信先メールアドレス"
+          },
+          "subject": {
+            "type": "string",
+            "description": "メール件名"
+          },
+          "message": {
+            "type": "string",
+            "description": "メール本文"
+          }
+        }
+      }
+    }
+  ]
+}
