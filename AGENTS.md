@@ -19,7 +19,10 @@
 コミットメッセージは日本語＋ゆるい関西弁＋絵文字で要点を示す（例: `✨ OCR処理パイプラインを追加したで`）。1機能ごとにこまめにコミットし、`git commit -m "🐛 図面アップロードのエラー処理を直しといた"` のように内容を具体的に書く。feature ブランチでの作業は自由だが、`main` への push/merge は必ず事前承認を得る。PR には概要、参照チケットやロードマップ箇所、テスト結果、UIやDXF/PDFの成果物を添付し、必要に応じてスクリーンショットやログ抜粋を示す。
 
 ## Git ワークフロー
-Feature Branch Workflow を採用し、`main`・`develop`・`feature/*`・`fix/*`・`hotfix/*` を目的別に使い分ける。ブランチ名は `feature/ocr-pipeline`、`fix/upload-validation` のように内容を明確にする。`main` への直接コミットや強制 push は禁止で、リリース時は `git tag -a v1.0.0 -m "🚀 v1.0.0: MVPリリースや"` のようにタグを付与する。`main` へマージする前には「mainブランチにマージしてもよろしいですか？」と必ず確認し、承認を得てから `git push origin main --tags` を実行する。
+Feature Branch Workflow を採用し、`main`・`develop`・`feature/*`・`fix/*`・`hotfix/*` を目的別に使い分ける。今後の開発は `git worktree` を用いて並行作業し、完了した作業はまず `dev` ブランチに統合、確認後に `main` へ昇格させる。ブランチ名は `feature/ocr-pipeline`、`fix/upload-validation` のように内容を明確にする。`main` への直接コミットや強制 push は禁止で、リリース時は `git tag -a v1.0.0 -m "🚀 v1.0.0: MVPリリースや"` のようにタグを付与する。`main` へマージする前には「mainブランチにマージしてもよろしいですか？」と必ず確認し、承認を得てから `git push origin main --tags` を実行する。
+
+## タスク管理
+`task_tickets.md` の各チケット（例: `[TASK-001]`）は完了時にタイトルの横へ 🚀 を追加して達成状況を示す。記録方法は `- [TASK-001] OCR基盤整備 🚀` のように統一し、更新後は変更点を PR またはコミットメッセージで共有する。
 
 ## セキュリティと設定
 Supabase・OpenAI・Resend などの鍵は `.env.local` など Git に含めないファイルで管理し、新しい環境変数は `docs/` に整理する。OCR/CAD を有効化する前に図面データを匿名化し、指定の Supabase バケットに保存、`CLAUDE.md` で推奨される RLS ポリシーを適用する。
