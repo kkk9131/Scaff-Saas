@@ -265,7 +265,7 @@ contexts/
 
 ---
 
-### [TASK-102] 共通UIコンポーネント作成
+### [TASK-102] 🚀 共通UIコンポーネント作成
 ```yaml
 依存: TASK-001
 並列可: TASK-101, TASK-103, TASK-104
