@@ -306,7 +306,7 @@ components/
 
 ---
 
-### [TASK-103] バックエンドAPI基盤構築
+### [TASK-103] 🚀 バックエンドAPI基盤構築
 ```yaml
 依存: TASK-002, TASK-003
 並列可: TASK-101, TASK-102, TASK-104
