@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /**
  * グローバルスタイル定義
@@ -16,162 +14,116 @@
  */
 
 /* ============================================
-   ライトモード（デフォルト）
+   CSS変数定義（Tailwind CSS 4形式）
+   ============================================ */
+@theme {
+  /* カラーシステム */
+  --color-primary: #ff6b1a;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #62728a;
+  --color-secondary-foreground: #ffffff;
+
+  --color-accent: #0d99e6;
+  --color-accent-foreground: #ffffff;
+
+  --color-success: #22b573;
+  --color-success-foreground: #ffffff;
+
+  --color-warning: #f0b90b;
+  --color-warning-foreground: #0a1628;
+
+  --color-destructive: #ed4343;
+  --color-destructive-foreground: #ffffff;
+
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #62728a;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #0a1628;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a1628;
+
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #ff6b1a;
+
+  --color-background: #ffffff;
+  --color-foreground: #0a1628;
+
+  /* スペーシング（大きなタッチターゲット用） */
+  --spacing-18: 4.5rem; /* 72px */
+  --spacing-22: 5.5rem; /* 88px */
+
+  /* ボーダー半径 */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* アニメーション */
+  --animate-fade-in-up: fade-in-up 0.5s ease-out;
+  --animate-scale-in: scale-in 0.3s ease-out;
+  --animate-slide-in-left: slide-in-left 0.4s ease-out;
+  --animate-slide-in-right: slide-in-right 0.4s ease-out;
+}
+
+/* ============================================
+   ベーススタイル
    ============================================ */
 @layer base {
-  :root {
-    /* 基本色 */
-    --background: 0 0% 100%; /* 純白 */
-    --foreground: 222 47% 11%; /* ダークネイビー */
-
-    /* カード */
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
-    /* ポップオーバー */
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    /* プライマリカラー: セーフティオレンジ */
-    --primary: 24 95% 53%; /* 鮮やかなオレンジ #FF6B1A */
-    --primary-foreground: 0 0% 100%; /* 白文字 */
-
-    /* セカンダリカラー: 鉄骨グレー */
-    --secondary: 215 16% 47%; /* スチールブルーグレー #62728A */
-    --secondary-foreground: 0 0% 100%;
-
-    /* アクセントカラー: スカイブルー */
-    --accent: 199 89% 48%; /* 明るいブルー #0D99E6 */
-    --accent-foreground: 0 0% 100%;
-
-    /* ミュート（控えめな色） */
-    --muted: 210 40% 96%; /* 薄いブルーグレー */
-    --muted-foreground: 215 16% 47%;
-
-    /* 成功カラー: 完了グリーン */
-    --success: 142 71% 45%; /* フレッシュグリーン #22B573 */
-    --success-foreground: 0 0% 100%;
-
-    /* 警告カラー: 注意イエロー */
-    --warning: 45 93% 47%; /* ビビッドイエロー #F0B90B */
-    --warning-foreground: 222 47% 11%; /* 黒文字 */
-
-    /* 破壊的アクション: 危険レッド */
-    --destructive: 0 84% 60%; /* 鮮やかなレッド #ED4343 */
-    --destructive-foreground: 0 0% 100%;
-
-    /* ボーダー */
-    --border: 214 32% 91%; /* 薄いグレー */
-    --input: 214 32% 91%;
-    --ring: 24 95% 53%; /* フォーカス時はプライマリカラー */
-
-    /* ボーダー半径 */
-    --radius: 0.75rem; /* 12px - 大きめの角丸 */
-  }
-
-  /* ============================================
-     ダークモード
-     ============================================ */
-  .dark {
-    /* 基本色 */
-    --background: 222 47% 11%; /* ダークネイビー */
-    --foreground: 210 40% 98%; /* ほぼ白 */
-
-    /* カード */
-    --card: 222 47% 14%; /* やや明るいダークネイビー */
-    --card-foreground: 210 40% 98%;
-
-    /* ポップオーバー */
-    --popover: 222 47% 14%;
-    --popover-foreground: 210 40% 98%;
-
-    /* プライマリカラー: セーフティオレンジ（やや明るめ） */
-    --primary: 24 95% 60%; /* #FF7F3D */
-    --primary-foreground: 222 47% 11%;
-
-    /* セカンダリカラー: 鉄骨グレー（明るめ） */
-    --secondary: 215 20% 65%; /* #9AA8BF */
-    --secondary-foreground: 222 47% 11%;
-
-    /* アクセントカラー: スカイブルー（明るめ） */
-    --accent: 199 89% 55%; /* #29A6F0 */
-    --accent-foreground: 222 47% 11%;
-
-    /* ミュート */
-    --muted: 223 47% 20%; /* ダークブルーグレー */
-    --muted-foreground: 215 20% 65%;
-
-    /* 成功カラー */
-    --success: 142 71% 50%; /* #26CC80 */
-    --success-foreground: 222 47% 11%;
-
-    /* 警告カラー */
-    --warning: 45 93% 55%; /* #F5C518 */
-    --warning-foreground: 222 47% 11%;
-
-    /* 破壊的アクション */
-    --destructive: 0 84% 65%; /* #F25C5C */
-    --destructive-foreground: 210 40% 98%;
-
-    /* ボーダー */
-    --border: 223 47% 20%;
-    --input: 223 47% 20%;
-    --ring: 24 95% 60%;
+  body {
+    @apply bg-white text-gray-900;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 /* ============================================
-   基本スタイル
+   カスタムアニメーション
    ============================================ */
-@layer base {
-  * {
-    @apply border-border;
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
-
-  body {
-    @apply bg-background text-foreground;
-    /* 読みやすいフォント設定 */
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-      'Hiragino Sans', 'Noto Sans JP', sans-serif;
-    /* スムーズなフォントレンダリング */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* テキスト選択時の色 */
-    @apply selection:bg-primary/20;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
+}
 
-  /* 見出しのデフォルトスタイル */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply font-bold tracking-tight;
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
   }
-
-  h1 {
-    @apply text-4xl;
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
+}
 
-  h2 {
-    @apply text-3xl;
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
   }
-
-  h3 {
-    @apply text-2xl;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
+}
 
-  h4 {
-    @apply text-xl;
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
   }
-
-  h5 {
-    @apply text-lg;
-  }
-
-  h6 {
-    @apply text-base;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -179,64 +131,96 @@
    カスタムユーティリティ
    ============================================ */
 @layer utilities {
-  /* テキストバランス調整 */
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* スクロールバーのスタイリング */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
-    border-radius: 4px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
-  }
-
-  /* グラスモルフィズム効果 */
+  /* ガラスモルフィズム効果 */
   .glass {
-    background: hsla(var(--background), 0.8);
+    background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
 
-  /* 職人向けの大きなタッチターゲット */
-  .touch-target {
-    @apply min-h-[44px] min-w-[44px]; /* 最小44px×44px */
+  .glass-dark {
+    background: rgba(10, 22, 40, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
-  /* フォーカス時の視覚的フィードバック */
-  .focus-visible-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  /* タッチターゲット（44px最小サイズ） */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* ホバーエフェクト */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .hover-lift:hover {
+    @apply scale-105 shadow-lg;
+  }
+
+  .hover-glow {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(255, 107, 26, 0.4);
+  }
+
+  /* アニメーションクラス */
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+
+  .animate-slide-in-left {
+    animation: slide-in-left 0.4s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.4s ease-out;
   }
 }
 
 /* ============================================
-   アニメーション用クラス
+   ダークモード対応
    ============================================ */
-@layer components {
-  /* ホバー時の持ち上がり効果 */
-  .hover-lift {
-    @apply transition-all duration-200 ease-out hover:scale-105 hover:shadow-lg active:scale-100;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #0a1628;
+    --color-foreground: #f8fafc;
+    --color-card: #0f1a2e;
+    --color-card-foreground: #f8fafc;
+    --color-popover: #0f1a2e;
+    --color-popover-foreground: #f8fafc;
+    --color-muted: #1e293b;
+    --color-muted-foreground: #9aa8bf;
+    --color-border: #1e293b;
+    --color-input: #1e293b;
   }
 
-  /* ホバー時の輝き効果 */
-  .hover-glow {
-    @apply transition-all duration-200 ease-out hover:shadow-primary/50 hover:shadow-lg;
+  .glass {
+    background: rgba(10, 22, 40, 0.8);
   }
+}
+
+/* ダークモードクラスによる強制 */
+.dark {
+  --color-background: #0a1628;
+  --color-foreground: #f8fafc;
+  --color-card: #0f1a2e;
+  --color-card-foreground: #f8fafc;
+  --color-popover: #0f1a2e;
+  --color-popover-foreground: #f8fafc;
+  --color-muted: #1e293b;
+  --color-muted-foreground: #9aa8bf;
+  --color-border: #1e293b;
+  --color-input: #1e293b;
+}
+
+.dark .glass {
+  background: rgba(10, 22, 40, 0.8);
 }

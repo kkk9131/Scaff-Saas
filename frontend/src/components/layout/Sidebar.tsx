@@ -224,7 +224,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
           className={cn(
             // 基本レイアウト
             'fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col',
-            'border-r-2 border-border bg-card shadow-lg',
+            'border-r-2 border-gray-200 bg-white shadow-lg',
             // モバイル時のアニメーション
             'transition-transform duration-300 ease-in-out md:translate-x-0',
             isOpen ? 'translate-x-0' : '-translate-x-full',
@@ -245,8 +245,8 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
           </nav>
 
           {/* フッター（バージョン情報など） */}
-          <div className="border-t-2 border-border p-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="border-t-2 border-gray-200 p-4">
+            <div className="flex items-center justify-between text-xs text-gray-600">
               <span>ScaffAI v1.0.0</span>
               <Link
                 href="/help"
@@ -351,7 +351,7 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
 
       {/* 子アイテム */}
       {hasChildren && isExpanded && (
-        <div className="ml-6 mt-1 space-y-1 border-l-2 border-border pl-4">
+        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-4">
           {item.children!.map((child) => (
             <Link
               key={child.href}

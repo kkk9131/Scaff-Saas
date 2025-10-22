@@ -217,7 +217,7 @@ const Modal: React.FC<ModalProps> = ({
       >
         {/* ヘッダー */}
         {(title || description || showCloseButton) && (
-          <div className="flex items-start justify-between border-b-2 border-border p-6">
+          <div className="flex items-start justify-between border-b-2 border-gray-200 p-6">
             <div className="flex-1">
               {title && (
                 <h2
@@ -276,7 +276,7 @@ const Modal: React.FC<ModalProps> = ({
 
         {/* フッター */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t-2 border-border p-6">
+          <div className="flex items-center justify-end gap-3 border-t-2 border-gray-200 p-6">
             {footer}
           </div>
         )}
