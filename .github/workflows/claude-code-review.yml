@@ -22,7 +22,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-      issues: read
+      issues: write  # Issue読み取り・作成権限
       id-token: write
 
     steps:
@@ -49,9 +49,48 @@ jobs:
 
             Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            ## レビュー結果の報告方法
+
+            1. **コメントで簡潔なサマリーを投稿**:
+              `gh pr comment` でレビュー結果の要約をPRにコメント
+
+            2. **重大な問題があればIssue作成**:
+              以下の条件に該当する場合は `gh issue create` でIssueを作成してください:
+              - セキュリティ脆弱性
+              - 重大なバグやパフォーマンス問題
+              - アーキテクチャ上の懸念事項
+              - テストカバレッジ不足
+
+            ## Issue作成テンプレート（必要時のみ使用）
+
+            ```bash
+            gh issue create --title "🚨 [PR#${{ github.event.pull_request.number }}] {問題の簡潔な要約}" \
+              --body "## 問題の詳細
+
+            {具体的な問題の説明}
+
+            ## 影響範囲
+
+            {どのような影響があるか}
+
+            ## 推奨される対応
+
+            {修正方法の提案}
+
+            ## 関連PR
+
+            Closes #${{ github.event.pull_request.number }}
+
+            ## 優先度
+
+            - [ ] Critical（緊急対応必要）
+            - [ ] High（早急に対応）
+            - [ ] Medium（計画的に対応）
+            - [ ] Low（時間があれば対応）
+            "
+            ```
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
 
