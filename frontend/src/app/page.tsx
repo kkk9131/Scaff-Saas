@@ -91,17 +91,17 @@ export default function Home() {
       />
 
       {/* メインコンテンツ */}
-      <main className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-primary/5 pt-16 md:pl-64">
+      <main className="min-h-screen bg-gradient-to-br from-white via-[#00A8E8]/10 to-[#FF5500]/10 pt-16 md:pl-64">
         <div className="container mx-auto space-y-12 p-6">
           {/* ヒーローセクション */}
           <section className="animate-fade-in-up space-y-6 text-center">
-            <h1 className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-5xl font-bold text-transparent md:text-6xl">
+            <h1 className="bg-gradient-to-r from-[#FF5500] via-[#00A8E8] to-[#FF5500] bg-clip-text text-5xl font-bold text-transparent md:text-6xl animate-pulse">
               ScaffAI
             </h1>
-            <p className="mx-auto max-w-2xl text-xl text-muted-foreground">
+            <p className="mx-auto max-w-2xl text-xl text-gray-700">
               職人のための、革新的な足場業務支援SaaS
               <br />
-              <span className="font-semibold text-primary">
+              <span className="font-bold text-[#FF5500]">
                 現場で使いやすい、ワクワクするUI
               </span>
             </p>

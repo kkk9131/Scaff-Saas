@@ -30,11 +30,11 @@ const buttonVariants = cva(
     variants: {
       // バリアント（色とスタイルの種類）
       variant: {
-        // デフォルト: セーフティオレンジ（主要アクション）
+        // デフォルト: 鮮烈なセーフティオレンジ（主要アクション）
         default: cn(
-          'bg-primary text-primary-foreground',
-          'shadow-md hover:shadow-lg hover:shadow-primary/30',
-          'hover:scale-105 hover:brightness-110'
+          'bg-[#FF5500] text-white',
+          'shadow-md shadow-[#FF5500]/20 hover:shadow-xl hover:shadow-[#FF5500]/40',
+          'hover:scale-105 hover:bg-[#FF6A1A]'
         ),
 
         // 破壊的アクション: 警告レッド（削除など）
@@ -51,11 +51,11 @@ const buttonVariants = cva(
           'hover:scale-105'
         ),
 
-        // セカンダリ: 鉄骨グレー（補助アクション）
+        // セカンダリ: 深い鉄骨ブルー（補助アクション）
         secondary: cn(
-          'bg-secondary text-secondary-foreground',
-          'shadow-md hover:shadow-lg hover:shadow-secondary/30',
-          'hover:scale-105'
+          'bg-[#1E3A5F] text-white',
+          'shadow-md shadow-[#1E3A5F]/20 hover:shadow-xl hover:shadow-[#1E3A5F]/40',
+          'hover:scale-105 hover:bg-[#2A4A75]'
         ),
 
         // ゴースト: 背景なし（テキストリンク風）
@@ -67,17 +67,17 @@ const buttonVariants = cva(
         // リンク: テキストリンク
         link: 'text-primary underline-offset-4 hover:underline',
 
-        // 成功: グリーン（完了・確定）
+        // 成功: 明るいグリーン（完了・確定）
         success: cn(
-          'bg-success text-success-foreground',
-          'shadow-md hover:shadow-lg hover:shadow-success/30',
-          'hover:scale-105'
+          'bg-[#00D66A] text-white',
+          'shadow-md shadow-[#00D66A]/20 hover:shadow-xl hover:shadow-[#00D66A]/40',
+          'hover:scale-105 hover:bg-[#00E077]'
         ),
 
-        // 警告: イエロー（注意喚起）
+        // 警告: ビビッドなイエロー（注意喚起）
         warning: cn(
-          'bg-warning text-warning-foreground',
-          'shadow-md hover:shadow-lg hover:shadow-warning/30',
+          'bg-[#FFB800] text-black',
+          'shadow-md shadow-[#FFB800]/20 hover:shadow-xl hover:shadow-[#FFB800]/40',
           'hover:scale-105'
         ),
       },

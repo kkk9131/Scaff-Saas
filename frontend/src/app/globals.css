@@ -17,23 +17,23 @@
    CSS変数定義（Tailwind CSS 4形式）
    ============================================ */
 @theme {
-  /* カラーシステム */
-  --color-primary: #ff6b1a;
+  /* カラーシステム - より鮮やかで力強い建設現場カラー */
+  --color-primary: #FF5500;
   --color-primary-foreground: #ffffff;
 
-  --color-secondary: #62728a;
+  --color-secondary: #1E3A5F;
   --color-secondary-foreground: #ffffff;
 
-  --color-accent: #0d99e6;
+  --color-accent: #00A8E8;
   --color-accent-foreground: #ffffff;
 
-  --color-success: #22b573;
+  --color-success: #00D66A;
   --color-success-foreground: #ffffff;
 
-  --color-warning: #f0b90b;
-  --color-warning-foreground: #0a1628;
+  --color-warning: #FFB800;
+  --color-warning-foreground: #000000;
 
-  --color-destructive: #ed4343;
+  --color-destructive: #E63946;
   --color-destructive-foreground: #ffffff;
 
   --color-muted: #f1f5f9;
