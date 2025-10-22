@@ -1,0 +1,402 @@
+'use client';
+
+import * as React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+
+/**
+ * ナビゲーションアイテムの型定義
+ */
+export interface NavItem {
+  /**
+   * 表示名
+   */
+  label: string;
+
+  /**
+   * リンク先のパス
+   */
+  href: string;
+
+  /**
+   * アイコン（SVGパスまたはReactコンポーネント）
+   */
+  icon?: React.ReactNode;
+
+  /**
+   * バッジ（通知数など）
+   */
+  badge?: string | number;
+
+  /**
+   * 子ナビゲーション項目
+   */
+  children?: NavItem[];
+}
+
+/**
+ * Sidebarコンポーネントのプロパティ型定義
+ */
+export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
+  /**
+   * ナビゲーション項目の配列
+   */
+  navItems?: NavItem[];
+
+  /**
+   * サイドバーが開いているか
+   */
+  isOpen?: boolean;
+
+  /**
+   * サイドバーを閉じるハンドラー
+   */
+  onClose?: () => void;
+
+  /**
+   * サイドバーを開くハンドラー
+   */
+  onOpen?: () => void;
+
+  /**
+   * サイドバーの開閉をトグルするハンドラー
+   */
+  onToggle?: () => void;
+}
+
+/**
+ * デフォルトのナビゲーション項目
+ */
+const defaultNavItems: NavItem[] = [
+  {
+    label: 'ダッシュボード',
+    href: '/dashboard',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'プロジェクト',
+    href: '/projects',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+        />
+      </svg>
+    ),
+    badge: 5,
+  },
+  {
+    label: '作図',
+    href: '/draw',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: '見積',
+    href: '/estimates',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'AIチャット',
+    href: '/chat',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+        />
+      </svg>
+    ),
+    badge: 'New',
+  },
+  {
+    label: '顧客管理',
+    href: '/customers',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+        />
+      </svg>
+    ),
+  },
+];
+
+/**
+ * Sidebarコンポーネント
+ *
+ * アプリケーションのメインナビゲーション
+ * - レスポンシブ対応（デスクトップ・モバイル）
+ * - アクティブ状態の視覚的表示
+ * - アイコン＋テキストで視認性向上
+ * - バッジ表示機能
+ *
+ * デザインコンセプト:
+ * - 足場の垂直構造をイメージした縦方向レイアウト
+ * - 大きなタッチターゲットで操作性確保
+ * - セーフティオレンジでアクティブ状態を強調
+ *
+ * 使用例:
+ * ```tsx
+ * <Sidebar
+ *   navItems={customNavItems}
+ *   isOpen={isSidebarOpen}
+ *   onClose={closeSidebar}
+ * />
+ * ```
+ */
+const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
+  (
+    { className, navItems = defaultNavItems, isOpen = true, onClose, onOpen, onToggle, ...props },
+    ref
+  ) => {
+    const pathname = usePathname();
+
+    return (
+      <>
+        {/* オーバーレイ（モバイル時のみ） */}
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* サイドバー本体 */}
+        <aside
+          ref={ref}
+          className={cn(
+            // 基本レイアウト
+            'fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] flex-col',
+            'border-r-2 border-gray-200 bg-white shadow-lg',
+            'dark:border-gray-700 dark:bg-slate-900',
+            // アニメーション
+            'transition-all duration-300 ease-in-out',
+            // 幅の切り替え（開：w-64、閉：w-20）
+            isOpen ? 'w-64' : 'w-20',
+            // モバイル時の表示制御
+            'md:translate-x-0',
+            isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+            className
+          )}
+          {...props}
+        >
+          {/* ナビゲーションリスト */}
+          <nav className={cn(
+            "flex-1 space-y-1 overflow-y-auto scrollbar-thin",
+            isOpen ? "p-4" : "p-2"
+          )}>
+            {navItems.map((item) => (
+              <NavItemComponent
+                key={item.href}
+                item={item}
+                isActive={pathname === item.href}
+                isOpen={isOpen}
+                onClose={onClose}
+              />
+            ))}
+          </nav>
+
+          {/* フッター（バージョン情報など） */}
+          {isOpen && (
+            <div className="border-t-2 border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+                <span>ScaffAI v1.0.0</span>
+                <Link
+                  href="/help"
+                  className="transition-colors hover:text-primary"
+                >
+                  ヘルプ
+                </Link>
+              </div>
+            </div>
+          )}
+        </aside>
+      </>
+    );
+  }
+);
+
+Sidebar.displayName = 'Sidebar';
+
+/**
+ * ナビゲーションアイテムコンポーネント
+ */
+interface NavItemComponentProps {
+  item: NavItem;
+  isActive: boolean;
+  isOpen: boolean;
+  onClose?: () => void;
+}
+
+const NavItemComponent: React.FC<NavItemComponentProps> = ({
+  item,
+  isActive,
+  isOpen,
+  onClose,
+}) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  const hasChildren = item.children && item.children.length > 0;
+
+  return (
+    <div>
+      {/* メインアイテム */}
+      <Link
+        href={item.href}
+        onClick={() => {
+          if (hasChildren) {
+            setIsExpanded(!isExpanded);
+          } else {
+            onClose?.();
+          }
+        }}
+        className={cn(
+          // 基本スタイル
+          'flex items-center rounded-lg py-3 font-medium transition-all duration-200 touch-target',
+          // 幅に応じたパディング調整
+          isOpen ? 'gap-3 px-4' : 'justify-center px-2',
+          // アクティブ状態
+          isActive
+            ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30 dark:bg-[#8B5CF6] dark:shadow-[#8B5CF6]/30'
+            : 'text-gray-700 hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] dark:text-gray-300 dark:hover:bg-[#06B6D4]/20',
+          // ホバー効果
+          !isActive && 'hover:scale-105 active:scale-95'
+        )}
+        aria-current={isActive ? 'page' : undefined}
+        title={!isOpen ? item.label : undefined}
+      >
+        {/* アイコン */}
+        {item.icon && <span className="flex-shrink-0">{item.icon}</span>}
+
+        {/* ラベル（開いている時のみ表示） */}
+        {isOpen && <span className="flex-1">{item.label}</span>}
+
+        {/* バッジ（開いている時のみ表示） */}
+        {isOpen && item.badge && (
+          <span
+            className={cn(
+              'flex h-6 min-w-[24px] items-center justify-center rounded-full px-2 text-xs font-bold',
+              isActive
+                ? 'bg-white/20 text-white'
+                : 'bg-[#6366F1]/10 text-[#6366F1] dark:bg-[#8B5CF6]/20 dark:text-[#8B5CF6]'
+            )}
+          >
+            {item.badge}
+          </span>
+        )}
+
+        {/* 展開アイコン（開いている時のみ表示） */}
+        {isOpen && hasChildren && (
+          <svg
+            className={cn(
+              'h-5 w-5 transition-transform duration-200',
+              isExpanded && 'rotate-90'
+            )}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        )}
+      </Link>
+
+      {/* 子アイテム */}
+      {hasChildren && isExpanded && (
+        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-4">
+          {item.children!.map((child) => (
+            <Link
+              key={child.href}
+              href={child.href}
+              onClick={onClose}
+              className={cn(
+                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                'transition-colors duration-150',
+                'hover:bg-accent/10 hover:text-accent'
+              )}
+            >
+              {child.icon && (
+                <span className="flex-shrink-0">{child.icon}</span>
+              )}
+              <span>{child.label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export { Sidebar };
