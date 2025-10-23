@@ -8,6 +8,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import sys
+
+# backend/utilsディレクトリをPythonパスに追加
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 # 環境変数を読み込む
 load_dotenv()
@@ -37,7 +41,14 @@ app = FastAPI(
     lifespan=lifespan,  # ライフサイクルハンドラーを設定
 )
 
-# CORS設定（フロントエンドからのアクセスを許可）
+# ミドルウェアの設定
+# 注意: ミドルウェアは登録の逆順で実行されます
+# 最初に実行したいミドルウェアを最後に追加してください
+
+# 将来的に他のミドルウェアを追加する場合は、この上に追加します
+# 例: app.add_middleware(AuthenticationMiddleware, ...)
+
+# CORSミドルウェア（最後に追加することで最初に実行される）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 本番環境では適切なドメインを指定
@@ -70,6 +81,38 @@ async def health_check():
         "status": "ok",
         "message": "API は正常に動作しています",
     }
+
+
+@app.get("/api/health/supabase")
+async def supabase_health_check():
+    """
+    Supabaseヘルスチェックエンドポイント
+    Supabaseへの接続が正常に動作しているか確認する
+
+    レビュー指摘に対応:
+    - HTTP REST API経由でヘルスチェックを実行
+    - get_session()やinternal tableを使用しない
+    """
+    try:
+        from utils.supabase_client import check_supabase_health
+
+        result = await check_supabase_health()
+        return result
+    except ImportError:
+        # Supabaseクライアントがまだ設定されていない場合
+        return {
+            "status": "unconfigured",
+            "message": "Supabaseクライアントが設定されていません",
+            "details": {
+                "error": "utils/supabase_client.pyが見つかりません"
+            },
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": "ヘルスチェック中にエラーが発生しました",
+            "details": {"error": str(e)},
+        }
 
 
 if __name__ == "__main__":
