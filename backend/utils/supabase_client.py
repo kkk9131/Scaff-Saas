@@ -77,8 +77,7 @@ class SupabaseClient:
                     logger.info("Supabaseクライアント（匿名用）の初期化に成功しました")
                 else:
                     logger.warning(
-                        "SUPABASE_ANON_KEYが設定されていません。"
-                        "ヘルスチェックには管理用キーが使用されます。"
+                        "SUPABASE_ANON_KEYが設定されていません。ヘルスチェックには管理用キーが使用されます。"
                     )
 
                 # 初期化完了フラグを立てる
