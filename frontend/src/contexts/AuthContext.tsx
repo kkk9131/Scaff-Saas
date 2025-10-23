@@ -6,16 +6,27 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session } from '@supabase/supabase-js'
+import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+
+// 認証エラーの型ガード関数
+function isAuthError(error: unknown): error is AuthError {
+  return error instanceof Error && 'status' in error
+}
 
 // 認証コンテキストの型定義
 interface AuthContextType {
   user: User | null // 現在ログイン中のユーザー情報
   session: Session | null // 現在のセッション情報
   loading: boolean // 認証状態を読み込み中かどうか
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }> // ログイン関数
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }> // 新規登録関数
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ error: AuthError | Error | null }> // ログイン関数
+  signUp: (
+    email: string,
+    password: string
+  ) => Promise<{ error: AuthError | Error | null }> // 新規登録関数
   signOut: () => Promise<void> // ログアウト関数
 }
 
@@ -63,8 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       })
       return { error }
-    } catch (error) {
-      return { error: error as Error }
+    } catch (error: unknown) {
+      // 型ガードでAuthErrorか判定
+      if (isAuthError(error)) {
+        return { error }
+      }
+      // AuthError以外のエラーは汎用Errorに変換
+      return { error: new Error('認証エラーが発生しました') }
     }
   }
 
@@ -79,8 +95,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       })
       return { error }
-    } catch (error) {
-      return { error: error as Error }
+    } catch (error: unknown) {
+      // 型ガードでAuthErrorか判定
+      if (isAuthError(error)) {
+        return { error }
+      }
+      // AuthError以外のエラーは汎用Errorに変換
+      return { error: new Error('登録エラーが発生しました') }
     }
   }
 

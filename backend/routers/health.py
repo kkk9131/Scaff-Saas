@@ -10,6 +10,7 @@ import sys
 
 from utils.responses import success_response, error_response
 from utils.supabase_client import get_supabase
+from config import APP_VERSION, HTTP_STATUS_SERVICE_UNAVAILABLE
 
 router = APIRouter()
 
@@ -48,7 +49,7 @@ async def health_check():
 
     try:
         # データベース接続を確認
-        db_healthy = await supabase.health_check()
+        db_healthy = supabase.health_check()
         if not db_healthy:
             db_status = "disconnected"
             db_test = "failed"
@@ -63,13 +64,10 @@ async def health_check():
         "status": overall_status,
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "api": {
-            "version": "1.0.0",
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+            "version": APP_VERSION,
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         },
-        "database": {
-            "status": db_status,
-            "connection_test": db_test
-        }
+        "database": {"status": db_status, "connection_test": db_test},
     }
 
     # データベース接続に失敗している場合は503エラーを返す
@@ -77,7 +75,7 @@ async def health_check():
         return error_response(
             code="SERVICE_UNAVAILABLE",
             message="データベースに接続できません",
-            status_code=503
+            status_code=HTTP_STATUS_SERVICE_UNAVAILABLE,
         )
 
     return success_response(data=health_data)
@@ -103,8 +101,5 @@ async def ping():
         }
     """
     return success_response(
-        data={
-            "message": "pong",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+        data={"message": "pong", "timestamp": datetime.utcnow().isoformat() + "Z"}
     )

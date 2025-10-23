@@ -31,7 +31,6 @@ class SupabaseClient:
 
     _instance: Optional["SupabaseClient"] = None
     _lock = threading.Lock()  # スレッドセーフのためのロック
-    _initialized = False  # 初期化済みフラグ
     _client: Optional[Client] = None
     _anon_client: Optional[Client] = None  # ヘルスチェック用匿名クライアント
 
@@ -43,49 +42,46 @@ class SupabaseClient:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
+                    instance = super().__new__(cls)
+                    instance._initialize()  # 初期化を__new__内で実行
+                    cls._instance = instance
         return cls._instance
 
     def __init__(self):
         """
-        Supabaseクライアントの初期化（1回のみ実行される）
+        __init__は何もしない（初期化は__new__内の_initialize()で実行済み）
         """
-        # 既に初期化済みの場合は何もしない
-        if self._initialized:
-            return
+        pass
 
-        with self._lock:
-            # Double-checked locking: ロック取得後に再度確認
-            if self._initialized:
-                return
+    def _initialize(self):
+        """
+        初期化処理（1回のみ実行される）
+        __new__メソッド内から呼び出される
+        """
+        # 環境変数の検証
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise ValueError(
+                "SUPABASE_URLとSUPABASE_KEYが環境変数に設定されていません。"
+                ".envファイルを確認してください。"
+            )
 
-            # 環境変数の検証
-            if not SUPABASE_URL or not SUPABASE_KEY:
-                raise ValueError(
-                    "SUPABASE_URLとSUPABASE_KEYが環境変数に設定されていません。"
-                    ".envファイルを確認してください。"
+        try:
+            # 管理用クライアント（Service Role Key）
+            self._client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            logger.info("Supabaseクライアント（管理用）の初期化に成功しました")
+
+            # ヘルスチェック用クライアント（匿名キー）
+            if SUPABASE_ANON_KEY:
+                self._anon_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+                logger.info("Supabaseクライアント（匿名用）の初期化に成功しました")
+            else:
+                logger.warning(
+                    "SUPABASE_ANON_KEYが設定されていません。ヘルスチェックには管理用キーが使用されます。"
                 )
 
-            try:
-                # 管理用クライアント（Service Role Key）
-                self._client = create_client(SUPABASE_URL, SUPABASE_KEY)
-                logger.info("Supabaseクライアント（管理用）の初期化に成功しました")
-
-                # ヘルスチェック用クライアント（匿名キー）
-                if SUPABASE_ANON_KEY:
-                    self._anon_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-                    logger.info("Supabaseクライアント（匿名用）の初期化に成功しました")
-                else:
-                    logger.warning(
-                        "SUPABASE_ANON_KEYが設定されていません。ヘルスチェックには管理用キーが使用されます。"
-                    )
-
-                # 初期化完了フラグを立てる
-                self._initialized = True
-
-            except Exception as e:
-                logger.error(f"Supabaseクライアントの初期化に失敗しました: {e}")
-                raise
+        except Exception as e:
+            logger.error(f"Supabaseクライアントの初期化に失敗しました: {e}")
+            raise
 
     @property
     def client(self) -> Client:
@@ -120,7 +116,7 @@ class SupabaseClient:
         """
         return self.client.storage.from_(bucket_name)
 
-    async def health_check(self) -> bool:
+    def health_check(self) -> bool:
         """
         Supabase接続のヘルスチェック
         セキュリティのため、匿名キー（ANON_KEY）を使用

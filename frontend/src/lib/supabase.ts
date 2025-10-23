@@ -1,17 +1,19 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { env } from './env';
 
 /**
- * Supabaseクライアントの作成
+ * Supabaseクライアントの作成（プライベート関数）
  * ブラウザ環境用のクライアント設定
  */
-export function createClient() {
+function createSupabaseClient() {
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 }
 
 /**
  * Supabaseクライアントのシングルトンインスタンス
+ * アプリケーション全体でこのインスタンスを使用すること
  */
-export const supabase = createClient();
+export const supabase = createSupabaseClient();
