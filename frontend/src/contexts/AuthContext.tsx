@@ -7,7 +7,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 // 認証コンテキストの型定義
 interface AuthContextType {
@@ -31,9 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Supabaseクライアントを作成
-  const supabase = createClient()
-
   useEffect(() => {
     // 初期認証状態を取得
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // クリーンアップ: コンポーネントがアンマウントされたらリスナーを解除
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, []) // シングルトンクライアントを使用するため依存配列は空
 
   /**
    * ログイン関数

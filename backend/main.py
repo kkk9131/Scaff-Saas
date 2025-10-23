@@ -52,8 +52,17 @@ app.add_middleware(
         "https://scaffai.vercel.app",  # 本番環境（後で設定）
     ],
     allow_credentials=True,
-    allow_methods=["*"],  # 全HTTPメソッドを許可
-    allow_headers=["*"],  # 全ヘッダーを許可
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],  # 必要なメソッドのみ許可
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Origin",
+        "User-Agent",
+        "DNT",
+        "Cache-Control",
+        "X-Requested-With",
+    ],  # 必要なヘッダーのみ許可
 )
 
 # カスタムミドルウェア追加
