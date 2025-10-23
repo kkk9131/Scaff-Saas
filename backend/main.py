@@ -23,12 +23,28 @@ from config import (
 # 環境変数の読み込み
 load_dotenv()
 
-# ロガー設定
+# 環境変数からログレベルを取得（デフォルト: INFO）
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# 有効なログレベルのマッピング
+LOG_LEVEL_MAP = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+
+# ログレベルの検証とデフォルト設定
+log_level = LOG_LEVEL_MAP.get(LOG_LEVEL, logging.INFO)
+
+# ロガー設定（環境変数でログレベルを制御可能）
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+logger.info(f"ログレベル: {LOG_LEVEL} で起動します")
 
 
 @asynccontextmanager

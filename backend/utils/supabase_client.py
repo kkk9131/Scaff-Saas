@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Supabase接続情報
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")  # Service Roleキー（バックエンド用・管理操作）
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")  # Service Roleキー（バックエンド用・管理操作）
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")  # 匿名キー（ヘルスチェック用）
 
 
@@ -59,15 +59,15 @@ class SupabaseClient:
         __new__メソッド内から呼び出される
         """
         # 環境変数の検証
-        if not SUPABASE_URL or not SUPABASE_KEY:
+        if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
             raise ValueError(
-                "SUPABASE_URLとSUPABASE_KEYが環境変数に設定されていません。"
+                "SUPABASE_URLとSUPABASE_SERVICE_ROLE_KEYが環境変数に設定されていません。"
                 ".envファイルを確認してください。"
             )
 
         try:
             # 管理用クライアント（Service Role Key）
-            self._client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            self._client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
             logger.info("Supabaseクライアント（管理用）の初期化に成功しました")
 
             # ヘルスチェック用クライアント（匿名キー）
