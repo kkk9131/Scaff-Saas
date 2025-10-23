@@ -7,8 +7,8 @@
 'use client';
 
 import { SubscriptionPlan } from '@/lib/api/subscriptions';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
