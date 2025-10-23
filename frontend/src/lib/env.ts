@@ -2,7 +2,7 @@
  * 環境変数の型定義とバリデーション
  *
  * このファイルは環境変数を型安全に扱うためのユーティリティを提供します。
- * アプリケーション起動時に必須の環境変数が設定されているかチェックします。
+ * Next.jsの環境変数システムに完全対応しています。
  */
 
 // 環境変数の型定義
@@ -12,19 +12,17 @@ interface Env {
 }
 
 /**
- * 環境変数を検証して取得する関数
- *
- * @param key - 環境変数のキー
- * @returns 環境変数の値
- * @throws 環境変数が設定されていない場合はエラー
+ * 環境変数を取得する関数
+ * Next.jsの環境変数は process.env から直接取得します
+ * NEXT_PUBLIC_ プレフィックスのある変数はクライアントサイドでも利用可能です
  */
 function getEnvVar(key: keyof Env): string {
   const value = process.env[key];
 
+  // 環境変数が見つからない場合はエラーをスロー
   if (!value) {
     throw new Error(
-      `環境変数 ${key} が設定されていません。` +
-      `.env.local ファイルを確認してください。`
+      `環境変数 ${key} が設定されていません。.env.local ファイルを確認してください。`
     );
   }
 
@@ -32,20 +30,13 @@ function getEnvVar(key: keyof Env): string {
 }
 
 /**
- * すべての必須環境変数を検証
- *
- * アプリケーション起動時にこの関数を呼び出すことで、
- * 必要な環境変数がすべて設定されているか確認できます。
+ * 環境変数をエクスポート（型安全）
+ * Next.jsビルド時にprocess.envから値が注入されます
  */
-function validateEnv(): Env {
-  return {
-    NEXT_PUBLIC_SUPABASE_URL: getEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
-  };
-}
-
-// 環境変数をエクスポート（型安全）
-export const env = validateEnv();
+export const env: Env = {
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+};
 
 // 個別にアクセスする場合のヘルパー
 export const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
