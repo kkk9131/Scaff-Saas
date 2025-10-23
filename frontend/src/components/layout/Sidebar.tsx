@@ -67,27 +67,9 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
 
 /**
  * デフォルトのナビゲーション項目
+ * 要件: プロジェクト、作図ツール、売上管理、チーム、見積り作成、設定
  */
 const defaultNavItems: NavItem[] = [
-  {
-    label: 'ダッシュボード',
-    href: '/dashboard',
-    icon: (
-      <svg
-        className="h-6 w-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-        />
-      </svg>
-    ),
-  },
   {
     label: 'プロジェクト',
     href: '/projects',
@@ -106,10 +88,9 @@ const defaultNavItems: NavItem[] = [
         />
       </svg>
     ),
-    badge: 5,
   },
   {
-    label: '作図',
+    label: '作図ツール',
     href: '/draw',
     icon: (
       <svg
@@ -128,7 +109,55 @@ const defaultNavItems: NavItem[] = [
     ),
   },
   {
-    label: '見積',
+    label: '売上管理',
+    href: '/sales',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'チーム',
+    href: '/teams',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-9.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+      </svg>
+    ),
+    children: [
+      {
+        label: 'メンバー管理',
+        href: '/teams/members',
+      },
+      {
+        label: '権限設定',
+        href: '/teams/permissions',
+      },
+    ],
+  },
+  {
+    label: '見積り作成',
     href: '/estimates',
     icon: (
       <svg
@@ -147,8 +176,8 @@ const defaultNavItems: NavItem[] = [
     ),
   },
   {
-    label: 'AIチャット',
-    href: '/chat',
+    label: '設定',
+    href: '/settings',
     icon: (
       <svg
         className="h-6 w-6"
@@ -160,27 +189,12 @@ const defaultNavItems: NavItem[] = [
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
         />
-      </svg>
-    ),
-    badge: 'New',
-  },
-  {
-    label: '顧客管理',
-    href: '/customers',
-    icon: (
-      <svg
-        className="h-6 w-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
         />
       </svg>
     ),
@@ -258,6 +272,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
                 item={item}
                 isActive={pathname === item.href}
                 isOpen={isOpen}
+                currentPath={pathname ?? ''}
                 onClose={onClose}
               />
             ))}
@@ -292,6 +307,7 @@ interface NavItemComponentProps {
   item: NavItem;
   isActive: boolean;
   isOpen: boolean;
+  currentPath: string;
   onClose?: () => void;
 }
 
@@ -299,11 +315,42 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
   item,
   isActive,
   isOpen,
+  currentPath,
   onClose,
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
   const hasChildren = item.children && item.children.length > 0;
+  const childHrefs = React.useMemo(
+    () => (item.children ? item.children.map((child) => child.href) : []),
+    [item.children]
+  );
+
+  const [isExpanded, setIsExpanded] = React.useState(() => {
+    if (!hasChildren) {
+      return false;
+    }
+
+    const isParentActive = currentPath.startsWith(item.href);
+    const isAnyChildActive = childHrefs.some((href) =>
+      currentPath.startsWith(href)
+    );
+
+    return isParentActive || isAnyChildActive;
+  });
+
+  React.useEffect(() => {
+    if (!hasChildren) {
+      return;
+    }
+
+    const isParentActive = currentPath.startsWith(item.href);
+    const isAnyChildActive = childHrefs.some((href) =>
+      currentPath.startsWith(href)
+    );
+
+    if (isParentActive || isAnyChildActive) {
+      setIsExpanded(true);
+    }
+  }, [childHrefs, currentPath, hasChildren, item.href]);
 
   return (
     <div>
@@ -375,16 +422,16 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
 
       {/* 子アイテム */}
       {hasChildren && isExpanded && (
-        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-4">
+        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4 transition-colors">
           {item.children!.map((child) => (
             <Link
               key={child.href}
               href={child.href}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300',
                 'transition-colors duration-150',
-                'hover:bg-accent/10 hover:text-accent'
+                'hover:bg-accent/10 hover:text-accent dark:hover:bg-accent/20 dark:hover:text-accent'
               )}
             >
               {child.icon && (
