@@ -1,6 +1,8 @@
 /**
  * 認証コンテキスト
- * アプリ全体で認証状態を共有するためのReact Context
+ *
+ * アプリケーション全体で認証状態を管理するためのReact Contextです。
+ * Supabase Authを使用してユーザーのログイン状態を追跡します。
  */
 
 'use client'
@@ -8,11 +10,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-
-// 認証エラーの型ガード関数
-function isAuthError(error: unknown): error is AuthError {
-  return error instanceof Error && 'status' in error
-}
 
 // 認証コンテキストの型定義
 interface AuthContextType {
@@ -22,11 +19,11 @@ interface AuthContextType {
   signIn: (
     email: string,
     password: string
-  ) => Promise<{ error: AuthError | Error | null }> // ログイン関数
+  ) => Promise<{ error: AuthError | null }> // ログイン関数
   signUp: (
     email: string,
     password: string
-  ) => Promise<{ error: AuthError | Error | null }> // 新規登録関数
+  ) => Promise<{ error: AuthError | null }> // 新規登録関数
   signOut: () => Promise<void> // ログアウト関数
 }
 
@@ -44,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // 初期認証状態を取得
+    // レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
@@ -61,53 +59,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // クリーンアップ: コンポーネントがアンマウントされたらリスナーを解除
     return () => subscription.unsubscribe()
-  }, []) // シングルトンクライアントを使用するため依存配列は空
+  }, [])
 
   /**
    * ログイン関数
    * メールアドレスとパスワードでログイン
+   *
+   * レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
    */
   const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      return { error }
-    } catch (error: unknown) {
-      // 型ガードでAuthErrorか判定
-      if (isAuthError(error)) {
-        return { error }
-      }
-      // AuthError以外のエラーは汎用Errorに変換
-      return { error: new Error('認証エラーが発生しました') }
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { error }
   }
 
   /**
    * 新規登録関数
    * メールアドレスとパスワードで新規アカウント作成
+   *
+   * レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
    */
   const signUp = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-      return { error }
-    } catch (error: unknown) {
-      // 型ガードでAuthErrorか判定
-      if (isAuthError(error)) {
-        return { error }
-      }
-      // AuthError以外のエラーは汎用Errorに変換
-      return { error: new Error('登録エラーが発生しました') }
-    }
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    return { error }
   }
 
   /**
    * ログアウト関数
    * 現在のセッションを終了
+   *
+   * レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
    */
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -127,13 +113,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * 認証コンテキストを使用するカスタムフック
- * コンポーネント内で認証状態にアクセスするために使用
+ * 認証コンテキストを使用するためのカスタムフック
+ *
+ * 使用例:
+ * const { user, session, signIn, signOut } = useAuth();
  */
 export function useAuth() {
   const context = useContext(AuthContext)
+
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
+
   return context
 }

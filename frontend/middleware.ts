@@ -1,6 +1,8 @@
 /**
- * Next.js ミドルウェア
- * 認証が必要なページへのアクセスを制御
+ * Next.jsミドルウェア - 認証チェック
+ *
+ * このミドルウェアはすべてのリクエストで実行され、
+ * 保護されたルートへのアクセス時に認証状態をチェックします。
  */
 
 import { createServerClient } from '@supabase/ssr'
@@ -9,7 +11,9 @@ import { env } from '@/lib/env'
 
 /**
  * ミドルウェア関数
- * 各リクエストの前に実行され、認証状態をチェック
+ *
+ * リクエストごとに実行され、認証が必要なページへのアクセスを制御します。
+ * Supabase Authのセッションをチェックし、未認証の場合はログインページにリダイレクトします。
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -44,10 +48,11 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 現在のセッションを取得
+  // 現在のユーザーを取得
+  // レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
   // 認証が必要なパスかどうかをチェック
   const isProtectedRoute =
@@ -55,7 +60,8 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/projects') ||
     request.nextUrl.pathname.startsWith('/draw') ||
     request.nextUrl.pathname.startsWith('/estimates') ||
-    request.nextUrl.pathname.startsWith('/chat')
+    request.nextUrl.pathname.startsWith('/chat') ||
+    request.nextUrl.pathname.startsWith('/upload')
 
   // 認証ページかどうかをチェック
   const isAuthRoute =
@@ -63,7 +69,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/signup')
 
   // 未認証ユーザーが保護されたルートにアクセスしようとした場合
-  if (isProtectedRoute && !session) {
+  if (isProtectedRoute && !user) {
     // ログインページにリダイレクト
     const redirectUrl = new URL('/login', request.url)
     // リダイレクト後に元のページに戻れるように、リダイレクト元のURLをクエリパラメータに追加
@@ -72,7 +78,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 認証済みユーザーが認証ページにアクセスしようとした場合
-  if (isAuthRoute && session) {
+  if (isAuthRoute && user) {
     // ダッシュボードにリダイレクト
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
@@ -82,16 +88,17 @@ export async function middleware(request: NextRequest) {
 
 /**
  * ミドルウェアを適用するパスの設定
- * /_next/static, /_next/image, /favicon.ico などの静的ファイルには適用しない
+ *
+ * すべてのパスに適用しますが、静的ファイルやAPIルートは除外します。
  */
 export const config = {
   matcher: [
     /*
-     * 以下のパス以外の全てのリクエストにミドルウェアを適用:
+     * 以下を除くすべてのパスにマッチ:
      * - _next/static (静的ファイル)
      * - _next/image (画像最適化ファイル)
      * - favicon.ico (ファビコン)
-     * - public フォルダ内のファイル
+     * - 画像ファイル (svg, png, jpg, jpeg, gif, webp)
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
