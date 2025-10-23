@@ -7,53 +7,17 @@
 
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 import { Button } from './Button'
 
 export const ThemeToggle = () => {
   // テーマ状態 ('light' | 'dark')
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const { theme, toggleTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  // マウント時にlocalStorageから設定を読み込み
   useEffect(() => {
     setMounted(true)
-
-    // localStorageから保存された設定を取得
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
-
-    // システムの設定を取得
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-      .matches
-      ? 'dark'
-      : 'light'
-
-    // 保存された設定 > システム設定の優先順位
-    const initialTheme = savedTheme || systemTheme
-    setTheme(initialTheme)
-
-    // HTMLにクラスを適用
-    if (initialTheme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
   }, [])
-
-  // テーマ切り替えハンドラー
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-
-    // HTMLのクラスを更新
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-
-    // localStorageに保存
-    localStorage.setItem('theme', newTheme)
-  }
 
   // マウント前はボタンを非表示（ちらつき防止）
   if (!mounted) {
