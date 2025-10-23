@@ -226,7 +226,7 @@ shared/
 
 ## 🏗️ Phase 1: 基盤構築（並列度: 高）
 
-### [TASK-101] Supabase Auth統合（フロントエンド）
+### [TASK-101] 🚀 Supabase Auth統合（フロントエンド）
 ```yaml
 依存: TASK-001, TASK-003
 並列可: TASK-102, TASK-103
@@ -265,7 +265,7 @@ contexts/
 
 ---
 
-### [TASK-102] 共通UIコンポーネント作成
+### [TASK-102] 🚀 共通UIコンポーネント作成
 ```yaml
 依存: TASK-001
 並列可: TASK-101, TASK-103, TASK-104
@@ -306,7 +306,7 @@ components/
 
 ---
 
-### [TASK-103] バックエンドAPI基盤構築
+### [TASK-103] 🚀 バックエンドAPI基盤構築
 ```yaml
 依存: TASK-002, TASK-003
 並列可: TASK-101, TASK-102, TASK-104
@@ -344,7 +344,7 @@ backend/
 
 ---
 
-### [TASK-104] 状態管理セットアップ
+### [TASK-104] 🚀 状態管理セットアップ
 ```yaml
 依存: TASK-001
 並列可: TASK-101, TASK-102, TASK-103
