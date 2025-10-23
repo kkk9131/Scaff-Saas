@@ -9,10 +9,8 @@ import { forwardRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Input } from './Input'
 
-export interface PasswordInputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
-  // 親コンポーネントから追加のpropsを受け取る場合はここに定義
-}
+// 親コンポーネントから引き継ぐ入力属性をそのまま利用するための型
+export type PasswordInputProps = React.InputHTMLAttributes<HTMLInputElement>
 
 /**
  * パスワード入力フィールドコンポーネント

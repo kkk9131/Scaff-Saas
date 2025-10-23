@@ -8,8 +8,18 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session, AuthError } from '@supabase/supabase-js'
+import {
+  User,
+  Session,
+  AuthError,
+  SignInWithPasswordCredentials,
+} from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+
+// ログインオプション: CAPTCHAなどSupabaseが提供する標準オプションに、persistSession制御を追加
+type SignInOptions = SignInWithPasswordCredentials['options'] & {
+  persistSession?: boolean
+}
 
 // 認証コンテキストの型定義
 interface AuthContextType {
@@ -18,7 +28,8 @@ interface AuthContextType {
   loading: boolean // 認証状態を読み込み中かどうか
   signIn: (
     email: string,
-    password: string
+    password: string,
+    options?: SignInOptions
   ) => Promise<{ error: AuthError | null }> // ログイン関数
   signUp: (
     email: string,
@@ -65,12 +76,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * ログイン関数
    * メールアドレスとパスワードでログイン
    *
+   * @param email ユーザーのメールアドレス
+   * @param password ユーザーのパスワード
+   * @param options persistSessionやCAPTCHAトークンなどの追加オプション
+   *
    * レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
    */
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (
+    email: string,
+    password: string,
+    options?: SignInOptions
+  ) => {
+    const shouldPersist = options?.persistSession ?? true
+    const captchaToken = options?.captchaToken
+
+    // Supabaseクライアント内部のセッション永続化設定を動的に切り替え
+    ;(supabase.auth as unknown as { persistSession?: boolean }).persistSession =
+      shouldPersist
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: captchaToken ? { captchaToken } : undefined,
     })
     return { error }
   }

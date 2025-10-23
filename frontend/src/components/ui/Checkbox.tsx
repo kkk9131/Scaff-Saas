@@ -42,34 +42,24 @@ export interface CheckboxProps
 /**
  * チェックボックスコンポーネント
  * Radix UIのCheckboxと同等の機能を実装
+ * 完全制御型として親コンポーネントから状態を受け取る
  */
 export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   (
-    { className, variant, checked, onCheckedChange, label, id, ...props },
+    {
+      className,
+      variant,
+      checked = false,
+      onCheckedChange,
+      label,
+      id,
+      ...props
+    },
     ref
   ) => {
-    // 内部状態管理
-    const [internalChecked, setInternalChecked] = React.useState(
-      checked || false
-    )
-
-    // 外部からのchecked変更を反映
-    React.useEffect(() => {
-      if (checked !== undefined) {
-        setInternalChecked(checked)
-      }
-    }, [checked])
-
-    // チェック状態変更ハンドラー
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newChecked = e.target.checked
-      setInternalChecked(newChecked)
-      onCheckedChange?.(newChecked)
-      props.onChange?.(e)
-    }
-
     // ユニークなIDを生成（ラベルとの紐付け用）
-    const checkboxId = id || React.useId()
+    const generatedId = React.useId()
+    const checkboxId = id ?? generatedId
 
     return (
       <div className="flex items-center gap-2">
@@ -79,8 +69,11 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             type="checkbox"
             id={checkboxId}
             ref={ref}
-            checked={internalChecked}
-            onChange={handleChange}
+            checked={checked}
+            onChange={(e) => {
+              onCheckedChange?.(e.target.checked)
+              props.onChange?.(e)
+            }}
             className="peer absolute opacity-0 h-5 w-5 cursor-pointer"
             {...props}
           />
@@ -88,10 +81,10 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           {/* カスタムチェックボックス表示 */}
           <div
             className={clsx(checkboxVariants({ variant }), className)}
-            data-state={internalChecked ? 'checked' : 'unchecked'}
+            data-state={checked ? 'checked' : 'unchecked'}
           >
             {/* チェックマーク */}
-            {internalChecked && (
+            {checked && (
               <Check className="h-4 w-4 text-current animate-scale-in" />
             )}
           </div>
