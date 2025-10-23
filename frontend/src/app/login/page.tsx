@@ -6,10 +6,11 @@
 
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import Script from 'next/script'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -18,6 +19,41 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { Mail, LogIn } from 'lucide-react'
+
+// Google Identity Servicesの最小限の型定義（公式タイプパッケージ未導入のため）
+type GoogleAccountsInitializeConfig = {
+  client_id: string
+  callback?: (response: unknown) => void
+}
+
+type GoogleAccountsButtonOptions = {
+  type?: 'standard' | 'icon'
+  theme?: 'outline' | 'filled_blue' | 'filled_black'
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+  text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
+  size?: 'large' | 'medium' | 'small'
+  logo_alignment?: 'left' | 'center'
+  width?: string | number
+}
+
+type GoogleAccountsId = {
+  initialize: (config: GoogleAccountsInitializeConfig) => void
+  renderButton: (element: HTMLElement, options: GoogleAccountsButtonOptions) => void
+  prompt: (momentListener?: () => void) => void
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: GoogleAccountsId
+      }
+    }
+  }
+}
+
+// 環境変数未設定時にUIを確認できるようダミークライアントIDを用意
+const DEFAULT_GOOGLE_CLIENT_ID = 'demo-client-id.apps.googleusercontent.com'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,6 +65,27 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
+  const [isGoogleScriptLoaded, setGoogleScriptLoaded] = useState(false)
+  const [isGoogleButtonRendered, setGoogleButtonRendered] = useState(false)
+  const googleButtonRef = useRef<HTMLDivElement | null>(null)
+  const googleClientId =
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? DEFAULT_GOOGLE_CLIENT_ID
+
+  // テーマに応じた背景グラデーションと装飾色を計算
+  const backgroundGradientClass =
+    themeMode === 'dark'
+      ? 'bg-gradient-to-br from-sky-950 via-purple-900 to-slate-950'
+      : 'bg-gradient-to-br from-white via-sky-100 to-slate-100'
+
+  const topGlowClass =
+    themeMode === 'dark' ? 'bg-sky-500/40' : 'bg-sky-300/40'
+
+  const bottomGlowClass =
+    themeMode === 'dark' ? 'bg-fuchsia-600/40' : 'bg-rose-200/40'
+
+  const accentGlowClass =
+    themeMode === 'dark' ? 'bg-indigo-700/40' : 'bg-cyan-200/40'
 
   /**
    * ログインフォーム送信処理
@@ -71,31 +128,91 @@ export default function LoginPage() {
   /**
    * Googleログイン処理
    */
-  const handleGoogleLogin = async () => {
-    setError(null)
-    setLoading(true)
+  const handleGoogleLogin = useCallback(() => {
+    setError('Googleログインは現在準備中です')
+    setLoading(false)
+  }, [setError, setLoading])
+
+  // HTML要素のクラス変更を監視し、ライト/ダークテーマを検知
+  useEffect(() => {
+    const updateThemeMode = () => {
+      const isDarkMode = document.documentElement.classList.contains('dark')
+      setThemeMode(isDarkMode ? 'dark' : 'light')
+    }
+
+    updateThemeMode()
+
+    const observer = new MutationObserver(updateThemeMode)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  // Google公式ボタンの描画処理
+  useEffect(() => {
+    if (!isGoogleScriptLoaded) {
+      setGoogleButtonRendered(false)
+      return
+    }
+
+    const buttonContainer = googleButtonRef.current
+    const googleAccounts = window.google?.accounts?.id
+
+    if (!buttonContainer || !googleAccounts) {
+      setGoogleButtonRendered(false)
+      return
+    }
+
+    // テーマ切り替え時に再描画するため、既存要素を初期化
+    buttonContainer.innerHTML = ''
+    buttonContainer.dataset.theme = themeMode
+    buttonContainer.dataset.variant =
+      themeMode === 'dark' ? 'filled_black' : 'filled_blue'
 
     try {
-      // TODO: Supabase OAuth設定後に実装
-      // const { error } = await supabase.auth.signInWithOAuth({
-      //   provider: 'google',
-      //   options: {
-      //     redirectTo: `${window.location.origin}/auth/callback`,
-      //   },
-      // })
+      googleAccounts.initialize({
+        client_id: googleClientId,
+        callback: () => {
+          // TODO: Supabase OAuth 組み込み時に差し替える
+          handleGoogleLogin()
+        },
+      })
 
-      // 暫定的なメッセージ
-      setError('Googleログインは現在準備中です')
-      setLoading(false)
+      googleAccounts.renderButton(buttonContainer, {
+        type: 'standard',
+        shape: 'pill',
+        theme: themeMode === 'dark' ? 'filled_black' : 'filled_blue',
+        text: 'signin_with',
+        size: 'large',
+        logo_alignment: 'left',
+        width: 320,
+      })
+
+      setGoogleButtonRendered(true)
     } catch (err) {
-      console.error('Google login error:', err)
-      setError('Googleログインに失敗しました')
-      setLoading(false)
+      console.error('Google button render error:', err)
+      setGoogleButtonRendered(false)
     }
-  }
+  }, [googleClientId, handleGoogleLogin, isGoogleScriptLoaded, themeMode])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/20 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div
+      className={`min-h-screen flex items-center justify-center ${backgroundGradientClass} py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden`}
+    >
+      <Script
+        src="https://accounts.google.com/gsi/client"
+        strategy="afterInteractive"
+        async
+        defer
+        onLoad={() => setGoogleScriptLoaded(true)}
+        onError={() => {
+          setGoogleScriptLoaded(false)
+          setGoogleButtonRendered(false)
+        }}
+      />
       {/* ダークテーマ切り替えボタン（右上） */}
       <div className="absolute top-6 right-6 z-20">
         <ThemeToggle />
@@ -103,8 +220,14 @@ export default function LoginPage() {
 
       {/* 背景装飾 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
+        <div className={`absolute -top-48 -right-40 w-[32rem] h-[32rem] ${topGlowClass} rounded-full blur-3xl`}></div>
+        <div className={`absolute -bottom-48 -left-40 w-[36rem] h-[36rem] ${bottomGlowClass} rounded-full blur-[120px]`}></div>
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] ${accentGlowClass} rounded-full blur-[90px] opacity-70`}></div>
+        {themeMode === 'dark' ? (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.25),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.15),transparent_40%),radial-gradient(circle_at_60%_80%,rgba(255,255,255,0.1),transparent_45%)]" />
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,rgba(255,255,255,0.65),transparent_50%),radial-gradient(circle_at_70%_20%,rgba(255,255,255,0.45),transparent_45%),radial-gradient(circle_at_50%_75%,rgba(255,255,255,0.55),transparent_50%)]" />
+        )}
       </div>
 
       {/* ログインカード */}
@@ -251,36 +374,46 @@ export default function LoginPage() {
             </div>
 
             {/* Googleログインボタン */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full border-2 hover:bg-secondary/50 transition-all duration-200 text-gray-900 dark:text-white"
-              size="lg"
-            >
-              <div className="flex items-center gap-3">
-                <svg className="h-5 w-5 text-gray-900 dark:text-white" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                <span className="text-gray-900 dark:text-white">Googleでログイン</span>
+            {isGoogleButtonRendered ? (
+              <div
+                className={`flex justify-center ${loading ? 'pointer-events-none opacity-60' : ''}`}
+                data-theme={themeMode}
+                data-variant={themeMode === 'dark' ? 'filled_black' : 'filled_blue'}
+              >
+                <div ref={googleButtonRef} className="g_id_signin" />
               </div>
-            </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full border-2 transition-all duration-200 text-gray-900 dark:text-white"
+                size="lg"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="h-5 w-5 text-gray-900 dark:text-white" viewBox="0 0 24 24">
+                    <path
+                      fill="currentColor"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </svg>
+                  <span className="text-gray-900 dark:text-white">Googleでログイン</span>
+                </div>
+              </Button>
+            )}
           </form>
 
           {/* 新規登録リンク */}
