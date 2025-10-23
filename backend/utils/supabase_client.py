@@ -145,7 +145,7 @@ class SupabaseClient:
             try:
                 # 認証エンドポイントへのアクセスで接続確認
                 # getSessionは既存のセッションを確認するだけで副作用がない
-                await check_client.auth.get_session()
+                check_client.auth.get_session()
                 logger.info(
                     f"Supabase接続チェック: OK "
                     f"(使用キー: {'匿名' if self._anon_client else '管理用'})"

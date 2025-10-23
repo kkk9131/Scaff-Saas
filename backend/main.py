@@ -62,6 +62,8 @@ app.add_middleware(
         "DNT",
         "Cache-Control",
         "X-Requested-With",
+        "apikey",  # Supabase APIキー
+        "X-Client-Info",  # Supabaseクライアント情報
     ],  # 必要なヘッダーのみ許可
 )
 
