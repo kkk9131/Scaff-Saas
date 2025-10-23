@@ -201,6 +201,13 @@ Primary requirements document: `docs/scaffai_requirements_v1.3.md`
 
 ## Communication Guidelines for Claude Code
 
+### Core Principles
+- **正確性を最優先**: わからないことは「わからない」と正直に伝える
+- **ハルシネーション（幻覚）を避ける**: 推測や憶測で答えない。確実な情報のみを提供
+- **できないことは明確に伝える**: 技術的制約や実装の難しさを隠さない
+- **質問を恐れない**: 曖昧な要件や不明点は必ずユーザーに確認する
+- **タスクチケットを正確に読む**: 思い込みではなく、ドキュメントの記載内容に従う
+
 ### Output Language
 - **すべての出力は日本語で行うこと** (All outputs must be in Japanese)
 - コード説明、エラーメッセージ、提案、進捗報告などは日本語で記述
