@@ -18,81 +18,101 @@
    ============================================ */
 @layer base {
   :root {
-    /* カラーシステム - モダンでクールなテック系SaaSカラー（HSL形式） */
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* カラーシステム - 水色×白のグラデーション + グレー基調 + オレンジアクセント（HSL形式） */
+    --background: 0 0% 100%; /* 白背景 */
+    --foreground: 220 13% 26%; /* ダークグレー文字 */
 
-    --primary: 243 75% 59%;
+    /* Primary: 爽やかな水色 */
+    --primary: 190 90% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 262 83% 58%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary: クリーンな白〜ライトグレー */
+    --secondary: 210 20% 97%;
+    --secondary-foreground: 220 13% 26%;
 
-    --accent: 189 94% 43%;
+    /* Accent: 鮮やかなオレンジ */
+    --accent: 25 95% 53%;
     --accent-foreground: 0 0% 100%;
 
+    /* Success: 完了グリーン */
     --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
 
+    /* Warning: 注意イエロー */
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
 
+    /* Destructive: 警告レッド */
     --destructive: 4 90% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    /* Muted: 淡いグレー */
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 9% 46%;
 
+    /* Card: 白カード */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 220 13% 26%;
 
+    /* Popover: 白ポップオーバー */
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 220 13% 26%;
 
+    /* Border & Input: ライトグレー */
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 243 75% 59%;
+    --ring: 190 90% 55%; /* 水色のフォーカスリング */
 
     /* ボーダー半径 */
     --radius: 0.75rem;
   }
 }
 
-/* ダークモードの変数定義 */
+/* ダークモードの変数定義 - 青×赤紫のグラデーション + グレー基調 + ブラッドオレンジアクセント */
 .dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
+  --background: 225 30% 11%; /* ダークブルーグレー背景 */
+  --foreground: 210 40% 98%; /* 明るい文字 */
 
-  --primary: 243 75% 59%;
+  /* Primary: 深い青 */
+  --primary: 220 80% 50%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 262 83% 58%;
+  /* Secondary: 赤紫 */
+  --secondary: 300 65% 45%;
   --secondary-foreground: 0 0% 100%;
 
-  --accent: 189 94% 43%;
+  /* Accent: ブラッドオレンジ */
+  --accent: 15 90% 50%;
   --accent-foreground: 0 0% 100%;
 
+  /* Success: 完了グリーン */
   --success: 160 84% 39%;
   --success-foreground: 0 0% 100%;
 
+  /* Warning: 注意イエロー */
   --warning: 38 92% 50%;
   --warning-foreground: 0 0% 0%;
 
+  /* Destructive: 警告レッド */
   --destructive: 4 90% 58%;
   --destructive-foreground: 0 0% 100%;
 
-  --muted: 217 33% 17%;
+  /* Muted: ダークグレー */
+  --muted: 220 20% 20%;
   --muted-foreground: 215 20% 65%;
 
-  --card: 224 71% 4%;
+  /* Card: ダークカード */
+  --card: 225 25% 15%;
   --card-foreground: 210 40% 98%;
 
-  --popover: 224 71% 4%;
+  /* Popover: ダークポップオーバー */
+  --popover: 225 25% 15%;
   --popover-foreground: 210 40% 98%;
 
-  --border: 215 28% 17%;
-  --input: 215 28% 17%;
-  --ring: 243 75% 59%;
+  /* Border & Input: ダークグレー */
+  --border: 220 20% 25%;
+  --input: 220 20% 25%;
+  --ring: 220 80% 50%; /* 青のフォーカスリング */
 }
 
 /* ============================================
@@ -154,6 +174,33 @@
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+/* 流体エフェクト用のアニメーション */
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(10px, -10px) scale(1.05);
+  }
+  50% {
+    transform: translate(-10px, 10px) scale(0.95);
+  }
+  75% {
+    transform: translate(-15px, -5px) scale(1.02);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    filter: blur(80px);
+  }
+  50% {
+    opacity: 0.5;
+    filter: blur(100px);
   }
 }
 

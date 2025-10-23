@@ -46,3 +46,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# YoYo AI version control directory
+.yoyo/
