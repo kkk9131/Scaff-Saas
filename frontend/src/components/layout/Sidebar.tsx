@@ -67,7 +67,7 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
 
 /**
  * デフォルトのナビゲーション項目
- * 要件: プロジェクト、作図ツール、売上管理、見積り作成、設定
+ * 要件: プロジェクト、作図ツール、売上管理、チーム、見積り作成、設定
  */
 const defaultNavItems: NavItem[] = [
   {
@@ -126,6 +126,35 @@ const defaultNavItems: NavItem[] = [
         />
       </svg>
     ),
+  },
+  {
+    label: 'チーム',
+    href: '/teams',
+    icon: (
+      <svg
+        className="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-9.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+      </svg>
+    ),
+    children: [
+      {
+        label: 'メンバー管理',
+        href: '/teams/members',
+      },
+      {
+        label: '権限設定',
+        href: '/teams/permissions',
+      },
+    ],
   },
   {
     label: '見積り作成',
@@ -243,6 +272,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
                 item={item}
                 isActive={pathname === item.href}
                 isOpen={isOpen}
+                currentPath={pathname ?? ''}
                 onClose={onClose}
               />
             ))}
@@ -277,6 +307,7 @@ interface NavItemComponentProps {
   item: NavItem;
   isActive: boolean;
   isOpen: boolean;
+  currentPath: string;
   onClose?: () => void;
 }
 
@@ -284,11 +315,42 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
   item,
   isActive,
   isOpen,
+  currentPath,
   onClose,
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
   const hasChildren = item.children && item.children.length > 0;
+  const childHrefs = React.useMemo(
+    () => (item.children ? item.children.map((child) => child.href) : []),
+    [item.children]
+  );
+
+  const [isExpanded, setIsExpanded] = React.useState(() => {
+    if (!hasChildren) {
+      return false;
+    }
+
+    const isParentActive = currentPath.startsWith(item.href);
+    const isAnyChildActive = childHrefs.some((href) =>
+      currentPath.startsWith(href)
+    );
+
+    return isParentActive || isAnyChildActive;
+  });
+
+  React.useEffect(() => {
+    if (!hasChildren) {
+      return;
+    }
+
+    const isParentActive = currentPath.startsWith(item.href);
+    const isAnyChildActive = childHrefs.some((href) =>
+      currentPath.startsWith(href)
+    );
+
+    if (isParentActive || isAnyChildActive) {
+      setIsExpanded(true);
+    }
+  }, [childHrefs, currentPath, hasChildren, item.href]);
 
   return (
     <div>
@@ -360,16 +422,16 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
 
       {/* 子アイテム */}
       {hasChildren && isExpanded && (
-        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-4">
+        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4 transition-colors">
           {item.children!.map((child) => (
             <Link
               key={child.href}
               href={child.href}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300',
                 'transition-colors duration-150',
-                'hover:bg-accent/10 hover:text-accent'
+                'hover:bg-accent/10 hover:text-accent dark:hover:bg-accent/20 dark:hover:text-accent'
               )}
             >
               {child.icon && (
