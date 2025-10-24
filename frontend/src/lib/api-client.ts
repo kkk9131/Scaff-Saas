@@ -303,10 +303,12 @@ class ApiClient {
       const backoffDelay = Math.pow(2, attempt) * 1000;
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
 
-      console.warn(
-        `リトライ中 (${attempt + 1}/${maxRetries}): ${endpoint}`,
-        response.error
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          `リトライ中 (${attempt + 1}/${maxRetries}): ${endpoint}`,
+          response.error
+        );
+      }
     }
 
     return lastError!;

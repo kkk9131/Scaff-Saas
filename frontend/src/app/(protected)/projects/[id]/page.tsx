@@ -20,6 +20,7 @@ import type { Project } from '@/types/project';
 import { ProjectInfo } from './components/ProjectInfo';
 import { ActionButtons } from './components/ActionButtons';
 import { FileList, type ProjectFileItem } from './components/FileList';
+import { ArrowLeft, List, RefreshCcw } from 'lucide-react';
 
 /**
  * ガラスモーフィズム調のパネルスタイル
@@ -297,11 +298,11 @@ export default function ProjectDetailPage() {
                   <Button
                     variant="outline"
                     onClick={() => router.push('/dashboard/projects')}
-                    iconLeft={<span aria-hidden>📁</span>}
+                    iconLeft={<List className="h-4 w-4" aria-hidden="true" />}
                   >
                     プロジェクト一覧へ戻る
                   </Button>
-                  <Button onClick={() => refetch()} iconLeft={<span aria-hidden>🔄</span>}>
+                  <Button onClick={() => refetch()} iconLeft={<RefreshCcw className="h-4 w-4" aria-hidden="true" />}>
                     再試行する
                   </Button>
                 </div>
@@ -318,7 +319,7 @@ export default function ProjectDetailPage() {
                     <Button
                       variant="outline"
                       onClick={() => router.push('/dashboard/projects')}
-                      iconLeft={<span aria-hidden>←</span>}
+                      iconLeft={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
                     >
                       一覧に戻る
                     </Button>
@@ -326,7 +327,7 @@ export default function ProjectDetailPage() {
                       variant="ghost"
                       onClick={() => refetch()}
                       isLoading={isFetching}
-                      iconLeft={<span aria-hidden>🔄</span>}
+                      iconLeft={<RefreshCcw className="h-4 w-4" aria-hidden="true" />}
                     >
                       最新情報を取得
                     </Button>
@@ -365,4 +366,3 @@ export default function ProjectDetailPage() {
     </div>
   );
 }
-

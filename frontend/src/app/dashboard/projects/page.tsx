@@ -7,7 +7,8 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import Fuse from 'fuse.js'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useRouter } from 'next/navigation'
@@ -41,6 +42,27 @@ import {
 } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { SearchBar } from '@/app/(protected)/projects/components/SearchBar'
+import {
+  FilterPanel,
+  type DateRange,
+} from '@/app/(protected)/projects/components/FilterPanel'
+import {
+  SortDropdown,
+  type ProjectSortKey,
+} from '@/app/(protected)/projects/components/SortDropdown'
+import {
+  Search,
+  Settings2,
+  FlaskConical,
+  AlertTriangle,
+  XCircle,
+  CheckCircle2,
+  Plus,
+  FileText,
+  Rocket,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 /**
  * ドロップ可能なカラムコンポーネント
@@ -109,6 +131,16 @@ export default function ProjectsPage() {
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
 
+  // 検索・フィルター・ソート用の状態管理
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedStatuses, setSelectedStatuses] = useState<ProjectStatus[]>([])
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: null,
+    endDate: null,
+  })
+  const [sortKey, setSortKey] = useState<ProjectSortKey>('updated_at')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
   // プロジェクトデータ管理
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -134,6 +166,9 @@ export default function ProjectsPage() {
 
   // 通知表示
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // 検索・フィルターパネルの開閉状態
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false)
 
   // ドラッグ&ドロップセンサー設定（キーボードとマウス/タッチ対応）
   const sensors = useSensors(
@@ -238,6 +273,126 @@ export default function ProjectsPage() {
       updated_at: '2025-10-01T12:00:00Z',
     },
   ]
+
+  // フィルター・検索・ソート適用後のプロジェクト一覧
+  const filteredProjects = useMemo(() => {
+    let baseList = [...projects]
+    const trimmedQuery = searchQuery.trim()
+
+    if (trimmedQuery.length > 0) {
+      const fuseInstance = new Fuse(projects, {
+        keys: [
+          { name: 'name', weight: 0.45 },
+          { name: 'description', weight: 0.2 },
+          { name: 'customer_name', weight: 0.2 },
+          { name: 'site_address', weight: 0.15 },
+        ],
+        threshold: 0.35,
+        includeScore: true,
+        ignoreLocation: true,
+        minMatchCharLength: 1,
+      })
+      baseList = fuseInstance.search(trimmedQuery).map((result) => result.item)
+    }
+
+    if (selectedStatuses.length > 0) {
+      baseList = baseList.filter((project) => selectedStatuses.includes(project.status))
+    }
+
+    if (dateRange.startDate) {
+      const filterStart = new Date(dateRange.startDate)
+      baseList = baseList.filter((project) => {
+        const target = project.start_date ?? project.created_at
+        if (!target) return false
+        const projectStart = new Date(target)
+        return !Number.isNaN(projectStart.getTime()) && projectStart >= filterStart
+      })
+    }
+
+    if (dateRange.endDate) {
+      const filterEnd = new Date(dateRange.endDate)
+      baseList = baseList.filter((project) => {
+        const target = project.end_date ?? project.start_date ?? project.updated_at
+        if (!target) return false
+        const projectEnd = new Date(target)
+        return !Number.isNaN(projectEnd.getTime()) && projectEnd <= filterEnd
+      })
+    }
+
+    const sortedList = [...baseList].sort((a, b) => {
+      switch (sortKey) {
+        case 'name': {
+          const comparison = a.name.localeCompare(b.name, 'ja')
+          return sortOrder === 'asc' ? comparison : -comparison
+        }
+        case 'created_at': {
+          const comparison =
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          return sortOrder === 'asc' ? comparison : -comparison
+        }
+        case 'updated_at':
+        default: {
+          const comparison =
+            new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+          return sortOrder === 'asc' ? comparison : -comparison
+        }
+      }
+    })
+
+    return sortedList
+  }, [
+    projects,
+    searchQuery,
+    selectedStatuses,
+    dateRange.startDate,
+    dateRange.endDate,
+    sortKey,
+    sortOrder,
+  ])
+
+  const totalProjectsCount = projects.length
+  const filteredProjectsCount = filteredProjects.length
+  const isFilterActive =
+    searchQuery.trim().length > 0 ||
+    selectedStatuses.length > 0 ||
+    Boolean(dateRange.startDate) ||
+    Boolean(dateRange.endDate)
+
+  // ステータス別にプロジェクトを分類（完了カラムにアーカイブ済みも含める）
+  const projectsByStatus = useMemo(
+    () => ({
+      draft: filteredProjects.filter((project) => project.status === 'draft'),
+      active: filteredProjects.filter((project) => project.status === 'active'),
+      completed: filteredProjects.filter(
+        (project) => project.status === 'completed' || project.status === 'archived'
+      ),
+    }),
+    [filteredProjects]
+  )
+
+  const columns = useMemo<
+    Array<{ status: ProjectStatus; label: string; Icon: LucideIcon; projects: Project[] }>
+  >(
+    () => [
+      { status: 'draft', label: '未着手', Icon: FileText, projects: projectsByStatus.draft },
+      { status: 'active', label: '進行中', Icon: Rocket, projects: projectsByStatus.active },
+      {
+        status: 'completed',
+        label: '完了 / アーカイブ',
+        Icon: CheckCircle2,
+        projects: projectsByStatus.completed,
+      },
+    ],
+    [projectsByStatus]
+  )
+
+  /**
+   * 日付・ステータスフィルターを初期状態へ戻す
+   */
+  const handleFilterReset = () => {
+    setSelectedStatuses([])
+    setDateRange({ startDate: null, endDate: null })
+  }
 
   // 背景グラデーションと発光装飾（ダッシュボードと統一）
   const backgroundGradientClass = isDark
@@ -508,20 +663,6 @@ export default function ProjectsPage() {
     }
   }, [authLoading, user])
 
-  // ステータス別にプロジェクトを分類
-  const projectsByStatus = {
-    draft: (projects || []).filter((p) => p.status === 'draft'),
-    active: (projects || []).filter((p) => p.status === 'active'),
-    completed: (projects || []).filter((p) => p.status === 'completed' || p.status === 'archived'),
-  }
-
-  // カラム定義
-  const columns: { status: ProjectStatus; label: string; icon: string; projects: Project[] }[] = [
-    { status: 'draft', label: '未着手', icon: '📝', projects: projectsByStatus.draft },
-    { status: 'active', label: '進行中', icon: '🚀', projects: projectsByStatus.active },
-    { status: 'completed', label: '完了', icon: '✅', projects: projectsByStatus.completed },
-  ]
-
   // ローディング中の表示
   if (authLoading || loading) {
     return (
@@ -640,27 +781,89 @@ export default function ProjectsPage() {
         >
           <div className="p-6">
             {/* ページヘッダー */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <div className="flex items-center gap-3">
+            <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
                   {useMockData && (
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-600">
-                      🎭 モックモード
+                    <span className="flex items-center gap-1 rounded-full border border-yellow-300 bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700 transition-colors dark:border-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-300">
+                      <FlaskConical className="h-3.5 w-3.5" aria-hidden="true" />
+                      モックモード
+                    </span>
+                  )}
+                  {isFilterActive && (
+                    <span className="flex items-center gap-1 rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700 transition-colors dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-200">
+                      <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      フィルター適用中
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  全 {(projects || []).length} 件のプロジェクト
+                <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+                  プロジェクトボード
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  絞り込み結果 {filteredProjectsCount} 件 / 全 {totalProjectsCount} 件
                 </p>
               </div>
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-[#06B6D4] to-[#6366F1] shadow-lg shadow-sky-500/20 transition-all duration-300 hover:shadow-sky-500/40 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#06B6D4]"
-              >
-                <span className="text-lg">➕</span>
-                <span>新規プロジェクト</span>
-              </button>
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  iconLeft={<Search className="h-5 w-5" aria-hidden="true" />}
+                  onClick={() => setIsSearchPanelOpen((prev) => !prev)}
+                  className={`rounded-2xl transition-all duration-300 ${
+                    isSearchPanelOpen
+                      ? 'border-transparent bg-gradient-to-r from-[#0EA5E9] to-[#06B6D4] text-white shadow-lg shadow-sky-500/20 hover:-translate-y-0.5 hover:shadow-sky-500/40 dark:shadow-indigo-900/50'
+                      : 'text-slate-700 hover:border-[#06B6D4] hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] dark:text-slate-100 dark:hover:bg-[#06B6D4]/20 dark:hover:text-[#06B6D4]'
+                  }`}
+                >
+                  {isSearchPanelOpen ? '検索ツールを隠す' : '検索ツールを表示'}
+                  {isFilterActive && !isSearchPanelOpen && (
+                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[#06B6D4]/20 px-2 text-xs font-semibold text-[#06B6D4] dark:bg-[#06B6D4]/30">
+                      ON
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="lg"
+                  iconLeft={<Plus className="h-5 w-5" aria-hidden="true" />}
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="rounded-2xl bg-gradient-to-r from-[#06B6D4] to-[#6366F1] text-white shadow-lg shadow-sky-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sky-500/40 dark:shadow-indigo-900/50"
+                >
+                  新規プロジェクト
+                </Button>
+              </div>
             </div>
+
+            {isSearchPanelOpen && (
+              <>
+                <div className="mb-6 grid gap-6 lg:grid-cols-3">
+                  <SearchBar
+                    className="lg:col-span-2"
+                    value={searchQuery}
+                    onChange={(value) => setSearchQuery(value)}
+                    onClear={() => setSearchQuery('')}
+                  />
+                  <SortDropdown
+                    sortKey={sortKey}
+                    sortOrder={sortOrder}
+                    onSortKeyChange={(key) => setSortKey(key)}
+                    onSortOrderChange={(order) => setSortOrder(order)}
+                  />
+                </div>
+
+                <FilterPanel
+                  selectedStatuses={selectedStatuses}
+                  onSelectedStatusesChange={(statuses) => setSelectedStatuses(statuses)}
+                  dateRange={dateRange}
+                  onDateRangeChange={(range) => setDateRange(range)}
+                  onReset={handleFilterReset}
+                  className="mb-8"
+                />
+              </>
+            )}
 
             {/* エラー/警告表示 */}
             {error && (
@@ -670,7 +873,11 @@ export default function ProjectsPage() {
                   : 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300'
               }`}>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{useMockData ? '⚠️' : '❌'}</span>
+                  {useMockData ? (
+                    <AlertTriangle className="h-5 w-5 text-yellow-500 dark:text-yellow-400" aria-hidden="true" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500 dark:text-red-400" aria-hidden="true" />
+                  )}
                   <span>{error}</span>
                 </div>
               </div>
@@ -688,9 +895,11 @@ export default function ProjectsPage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">
-                      {notification.type === 'success' ? '✅' : '⚠️'}
-                    </span>
+                    {notification.type === 'success' ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500 dark:text-emerald-300" aria-hidden="true" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400" aria-hidden="true" />
+                    )}
                     <span>{notification.message}</span>
                   </div>
                   <button
@@ -725,12 +934,10 @@ export default function ProjectsPage() {
                         <div className="px-4 py-3 border-b border-white/30 dark:border-slate-700/50">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-2xl" role="img" aria-label={column.label}>
-                                {column.icon}
+                              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 text-sky-600 shadow-sm shadow-sky-500/10 dark:bg-slate-900/70 dark:text-sky-300 dark:shadow-indigo-900/40">
+                                <column.Icon className="h-5 w-5" aria-hidden="true" />
                               </span>
-                              <h3 className="font-bold text-gray-900 dark:text-slate-100">
-                                {column.label}
-                              </h3>
+                              <h3 className="font-bold text-gray-900 dark:text-slate-100">{column.label}</h3>
                             </div>
                             <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/50 dark:bg-slate-800/50 text-gray-700 dark:text-gray-300">
                               {column.projects.length}件
@@ -741,8 +948,8 @@ export default function ProjectsPage() {
                         {/* プロジェクトカード一覧（ドラッグ可能） */}
                         <div className="p-4 space-y-3 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto">
                           {column.projects.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                              プロジェクトがありません
+                            <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                              該当するプロジェクトがありません
                             </div>
                           ) : (
                             column.projects.map((project) => (

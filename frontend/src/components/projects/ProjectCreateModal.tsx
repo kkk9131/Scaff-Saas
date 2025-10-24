@@ -12,6 +12,7 @@ import { ProjectForm } from './ProjectForm'
 import { Project, ProjectCreateRequest } from '@/types/project'
 import { createProject } from '@/lib/api/projects'
 import { useTheme } from '@/contexts/ThemeContext'
+import { XCircle } from 'lucide-react'
 
 /**
  * プロジェクト作成モーダルのプロパティ
@@ -89,7 +90,9 @@ export function ProjectCreateModal({
         onClose()
       }
     } catch (err) {
-      console.error('プロジェクト作成エラー:', err)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('プロジェクト作成エラー:', err)
+      }
       setError('プロジェクトの作成に失敗しました')
     } finally {
       setIsLoading(false)
@@ -124,7 +127,7 @@ export function ProjectCreateModal({
       {error && (
         <div className="mb-4 p-4 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
           <div className="flex items-center gap-2">
-            <span className="text-lg">❌</span>
+            <XCircle className="h-5 w-5" aria-hidden="true" />
             <span>{error}</span>
           </div>
         </div>

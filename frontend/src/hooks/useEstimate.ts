@@ -211,8 +211,8 @@ export function useDeleteEstimate() {
       //   method: 'DELETE',
       // });
 
-      // ダミー処理（開発用）
-      console.log('見積を削除:', id);
+      // TODO: API実装後に削除リクエストへ置き換える
+      void id; // 変数を維持してリンター警告を回避
     },
     onSuccess: () => {
       // 見積一覧のキャッシュを無効化
