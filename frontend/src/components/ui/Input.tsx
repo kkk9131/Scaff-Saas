@@ -98,29 +98,29 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
 
           {/* 入力フィールド本体 */}
+          {/* 各入力フィールドで統一感のあるアウトラインを提供 */}
           <input
             id={inputId}
             type={type}
             className={cn(
-              // 基本スタイル
-              'flex h-12 w-full rounded-lg border-2 border-input',
-              'bg-background px-4 py-3 text-base text-foreground',
-              'ring-offset-background',
-              'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-              'placeholder:text-muted-foreground',
-              // トランジション
-              'transition-all duration-200',
-              // フォーカス状態
-              'focus-visible:outline-none focus-visible:ring-2',
-              'focus-visible:ring-ring focus-visible:ring-offset-2',
-              'focus-visible:border-primary',
-              // ホバー状態
-              'hover:border-accent/50',
+              // 基本スタイル（ライトモード基準）
+              'flex h-12 w-full rounded-xl border border-slate-300 bg-white/95 px-4 py-3 text-base text-slate-900 placeholder:text-slate-400',
+              'shadow-[0_8px_26px_-18px_rgba(14,165,233,0.45)] transition-all duration-200',
+              // フォーカス時のアウトライン強調
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:border-sky-400',
+              // ホバー時の微調整
+              'hover:border-sky-300 hover:shadow-[0_10px_30px_-18px_rgba(14,165,233,0.5)]',
               // 無効状態
-              'disabled:cursor-not-allowed disabled:opacity-50',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+              // ファイル入力対応
+              'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+              // ダークモード
+              'dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-400',
+              'dark:shadow-[0_12px_32px_-22px_rgba(15,23,42,0.8)] dark:hover:border-slate-500 dark:hover:shadow-[0_12px_36px_-22px_rgba(15,23,42,0.85)]',
+              'dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-900 dark:focus-visible:border-slate-400',
               // エラー状態
               error &&
-                'border-destructive focus-visible:ring-destructive/50',
+                'border-red-400 focus-visible:border-red-500 focus-visible:ring-red-200 hover:border-red-400 dark:border-red-500 dark:focus-visible:ring-red-400/60',
               // 左要素がある場合はパディング調整
               leftElement && 'pl-10',
               // 右要素がある場合はパディング調整

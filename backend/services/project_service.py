@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 import uuid
 
-from utils.supabase_client import get_supabase
+from utils.supabase_client import get_supabase_client
 from models.project import (
     Project,
     ProjectCreate,
@@ -29,7 +29,7 @@ class ProjectService:
 
     def __init__(self):
         """サービスの初期化"""
-        self.supabase = get_supabase()
+        self.supabase = get_supabase_client()
         self.table_name = "projects"
 
     async def create_project(

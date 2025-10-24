@@ -100,9 +100,9 @@ class ProjectCreate(ProjectBase):
 
     新規プロジェクト作成に必要なフィールド
     """
-    user_id: str = Field(
-        ...,
-        description="プロジェクト所有者のユーザーID（UUID）"
+    user_id: Optional[str] = Field(
+        default=None,
+        description="プロジェクト所有者のユーザーID（UUID）。バックエンドで自動設定されるため、フロントエンドからの送信は不要"
     )
 
 

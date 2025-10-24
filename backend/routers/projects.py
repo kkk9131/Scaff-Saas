@@ -66,18 +66,24 @@ async def create_project(
         }
     """
     try:
+        # デバッグ: 受信したデータをログ出力
+        logger.info(f"プロジェクト作成リクエスト受信: {project_data.model_dump()}")
+
         # ユーザーIDを上書き（セキュリティ対策）
         project_data.user_id = current_user["id"]
+
+        logger.info(f"ユーザーID設定後: {project_data.model_dump()}")
 
         service = ProjectService()
         project = await service.create_project(project_data)
 
         return success_response(
-            data=project.model_dump(),
+            data=project.model_dump(mode='json'),
             message="プロジェクトを作成しました"
         )
 
     except ValueError as e:
+        logger.error(f"バリデーションエラー: {str(e)}")
         return error_response(
             code="VALIDATION_ERROR",
             message=str(e),
@@ -141,7 +147,7 @@ async def list_projects(
         )
 
         # Projectオブジェクトを辞書に変換
-        result["projects"] = [p.model_dump() for p in result["projects"]]
+        result["projects"] = [p.model_dump(mode='json') for p in result["projects"]]
 
         return success_response(data=result)
 
@@ -196,7 +202,7 @@ async def get_project(
                 status_code=HTTP_STATUS_NOT_FOUND
             )
 
-        return success_response(data=project.model_dump())
+        return success_response(data=project.model_dump(mode='json'))
 
     except Exception as e:
         logger.error(f"プロジェクト取得エラー: {str(e)}")
@@ -258,7 +264,7 @@ async def update_project(
             )
 
         return success_response(
-            data=project.model_dump(),
+            data=project.model_dump(mode='json'),
             message="プロジェクトを更新しました"
         )
 
@@ -314,7 +320,11 @@ async def delete_project(
                 status_code=HTTP_STATUS_NOT_FOUND
             )
 
-        return success_response(message="プロジェクトを削除しました")
+        # NOTE: FastAPIのレスポンスフォーマットに合わせ、削除したIDを返す
+        return success_response(
+            data={"id": project_id},
+            message="プロジェクトを削除しました"
+        )
 
     except Exception as e:
         logger.error(f"プロジェクト削除エラー: {str(e)}")
@@ -375,7 +385,7 @@ async def duplicate_project(
             )
 
         return success_response(
-            data=duplicated.model_dump(),
+            data=duplicated.model_dump(mode='json'),
             message="プロジェクトを複製しました"
         )
 
