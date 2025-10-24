@@ -578,7 +578,7 @@ app/(protected)/projects/
 
 ---
 
-### [TASK-203] プロジェクト詳細画面実装
+### [TASK-203] 🚀 プロジェクト詳細画面実装
 ```yaml
 依存: TASK-201, TASK-202
 並列可: TASK-204
@@ -611,7 +611,7 @@ app/(protected)/projects/[id]/
 
 ---
 
-### [TASK-204] プロジェクト検索・フィルター機能
+### [TASK-204] 🚀 プロジェクト検索・フィルター機能
 ```yaml
 依存: TASK-202
 並列可: TASK-203
