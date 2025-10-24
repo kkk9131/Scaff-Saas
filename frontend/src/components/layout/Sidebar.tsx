@@ -72,7 +72,7 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
 const defaultNavItems: NavItem[] = [
   {
     label: 'プロジェクト',
-    href: '/projects',
+    href: '/dashboard/projects',
     icon: (
       <svg
         className="h-6 w-6"

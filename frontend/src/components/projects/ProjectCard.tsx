@@ -50,7 +50,7 @@ export function ProjectCard({
 
   // カードクリック時の処理（詳細画面へ遷移）
   const handleCardClick = () => {
-    router.push(`/dashboard/projects/${project.id}`)
+    router.push(`/projects/${project.id}`)
   }
 
   // アクション実行時はバブリングを停止

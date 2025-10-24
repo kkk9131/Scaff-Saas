@@ -390,7 +390,7 @@ export default function ProjectsPage() {
    * プロジェクト編集処理（詳細画面へ遷移）
    */
   const handleEdit = (project: Project) => {
-    router.push(`/dashboard/projects/${project.id}`)
+    router.push(`/projects/${project.id}`)
   }
 
   /**
