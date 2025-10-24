@@ -14,6 +14,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { ChatSidebar, ChatMessage } from '@/components/layout/ChatSidebar'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
+import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget'
 
 // モックデータ型定義
 interface Project {
@@ -333,6 +334,9 @@ export default function DashboardPage() {
                 {revenueProgress.toFixed(1)}% 達成
               </p>
             </div>
+
+            {/* 最近のアクティビティウィジェット */}
+            <RecentActivityWidget />
 
             {/* 直近3つのプロジェクト */}
             <div>
