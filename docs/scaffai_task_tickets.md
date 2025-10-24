@@ -664,7 +664,7 @@ app/(protected)/projects/components/
 
 ---
 
-### [TASK-206] プロジェクトステータス管理機能
+### [TASK-206] 🚀 プロジェクトステータス管理機能
 ```yaml
 依存: TASK-201, TASK-202
 並列可: なし
