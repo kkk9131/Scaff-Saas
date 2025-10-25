@@ -2,42 +2,66 @@
 """
 テストユーザー作成スクリプト
 
-Supabase Admin APIを使用してテストユーザーを作成します。
+Supabase Admin API を用いてテストユーザーを作成する補助ツールです。
+機密情報をベタ書きせず、環境変数から認証情報を読み込みます。
 """
 
 import os
-from supabase import create_client, Client
+from typing import Final
 
-# 環境変数から認証情報を取得
-SUPABASE_URL = "https://jbcltijeibwrblgoymwf.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiY2x0aWplaWJ3cmJsZ295bXdmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTExMzc0MSwiZXhwIjoyMDc2Njg5NzQxfQ.BrJZZfSci-j1PFOk_HHZnJ1W--x29iwXS2xKDBmaxO4"
+from supabase import Client, create_client
 
-# テストユーザーの認証情報
-TEST_EMAIL = "playwright-test@example.com"
-TEST_PASSWORD = "TestPassword123!"
 
-def main():
-    """テストユーザーを作成"""
+SUPABASE_URL_ENV_NAME: Final[str] = "SUPABASE_URL"
+SUPABASE_SERVICE_ROLE_ENV_NAME: Final[str] = "SUPABASE_SERVICE_ROLE_KEY"
+TEST_EMAIL_ENV_NAME: Final[str] = "TEST_USER_EMAIL"
+TEST_PASSWORD_ENV_NAME: Final[str] = "TEST_USER_PASSWORD"
+
+
+def load_env_variable(env_name: str) -> str:
+    """指定した環境変数を取得する
+
+    環境変数が未設定の場合は ValueError を発生させ、秘匿情報の設定漏れに
+    早期に気付けるようにします。
+    """
+
+    value = os.environ.get(env_name)
+    if not value:
+        raise ValueError(
+            f"環境変数 {env_name} が未設定です。`.env.local` などに安全に設定してください。"
+        )
+    return value
+
+
+def main() -> None:
+    """テストユーザーを作成するメイン処理"""
+
     try:
-        # Supabase管理者クライアントを作成
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        # Supabase 管理者クライアントを環境変数から初期化
+        supabase_url = load_env_variable(SUPABASE_URL_ENV_NAME)
+        service_role_key = load_env_variable(SUPABASE_SERVICE_ROLE_ENV_NAME)
+        test_email = load_env_variable(TEST_EMAIL_ENV_NAME)
+        test_password = load_env_variable(TEST_PASSWORD_ENV_NAME)
+        supabase: Client = create_client(supabase_url, service_role_key)
 
-        print(f"テストユーザーを作成中: {TEST_EMAIL}")
+        print(f"テストユーザーを作成中: {test_email}")
 
-        # ユーザーを作成
-        response = supabase.auth.admin.create_user({
-            "email": TEST_EMAIL,
-            "password": TEST_PASSWORD,
-            "email_confirm": True  # メール確認をスキップ
-        })
+        # メール確認をスキップしつつテストユーザーを作成
+        response = supabase.auth.admin.create_user(
+            {
+                "email": test_email,
+                "password": test_password,
+                "email_confirm": True,
+            }
+        )
 
-        print(f"✅ テストユーザーを作成しました")
-        print(f"   Email: {TEST_EMAIL}")
-        print(f"   Password: {TEST_PASSWORD}")
+        print("✅ テストユーザーを作成しました")
+        print(f"   Email: {test_email}")
+        print("   Password: （環境変数 TEST_USER_PASSWORD を参照してください）")
         print(f"   User ID: {response.user.id}")
 
-    except Exception as e:
-        print(f"❌ エラーが発生しました: {str(e)}")
+    except Exception as error:  # noqa: BLE001
+        print(f"❌ エラーが発生しました: {error}")
 
 if __name__ == "__main__":
     main()
