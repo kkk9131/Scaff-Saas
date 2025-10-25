@@ -34,12 +34,12 @@
 |---------|-----------|-----------|-----------|
 | **Phase 0: セットアップ** | 5 | 2 | 16h |
 | **Phase 1: 基盤構築** | 8 | 4 | 40h |
-| **Phase 2: プロジェクト管理** | 6 | 3 | 32h |
+| **Phase 2: プロジェクト管理** | 7 | 3 | 44h |
 | **Phase 3: 作図機能** | 12 | 5 | 80h |
 | **Phase 4: 見積機能** | 5 | 2 | 24h |
 | **Phase 5: AI機能** | 7 | 3 | 40h |
 | **Phase 6: 統合テスト** | 4 | 2 | 16h |
-| **合計** | **47** | **21** | **248h** |
+| **合計** | **48** | **21** | **260h** |
 
 ---
 
@@ -640,7 +640,7 @@ app/(protected)/projects/components/
 
 ---
 
-### [TASK-205] プロジェクト統合テスト
+### [TASK-205] 🚀 プロジェクト統合テスト
 ```yaml
 依存: TASK-201, TASK-202, TASK-203
 並列可: なし
@@ -685,6 +685,45 @@ app/(protected)/projects/components/
 **完了条件**:
 - ステータスが変更可能
 - UIに反映される
+
+---
+
+### [TASK-207] 🚀 Agent Builder連携によるプロジェクト管理エージェント実装
+```yaml
+依存: TASK-201, TASK-202, TASK-203, TASK-205
+並列可: なし
+ブランチ: feature/207-project-agent-builder
+優先度: 🟡 重要
+工数: 12h
+担当技術: Agent Builder, ChatKit, MCP, Supabase, FastAPI
+```
+
+**作業内容**:
+- Agent Builderワークスペースにプロジェクト管理用ワークフロー（案件検索→要約→更新アクション）を構築
+- Supabase CRUDと連携するMCPコネクタを本番承認済みWorkspaceへ登録し、ガードレール設定（権限・操作確認）を実装
+- ChatKit経由でフロントエンドに埋め込むチャットウィジェットを追加し、プロジェクト操作のハンドオフUIを調整
+- Responses/Traces APIでランログを取得し、Evalsに接続する評価データセットを初期化
+- docs配下に導入手順・運用ガイド（権限管理、ログ活用方法、評価ループ）を追記
+
+**成果物**:
+```
+shared/ai/
+├── agentBuilder/
+│   ├── projectAgent.workflow.json
+│   └── guardrails.policy.json
+frontend/app/(protected)/projects/
+└── components/ProjectAgentChat.tsx
+backend/mcp/
+└── supabase_project_connector.py
+docs/
+└── guides/agent_builder_project_management.md
+```
+
+**完了条件**:
+- Agent Builder上でプロジェクト管理エージェントのデプロイが完了し、ChatKit UIから操作できる
+- MCP経由のプロジェクト作成・更新・要約アクションが権限チェック付きで成功する
+- Tracesダッシュボードでランログが確認でき、Evalsに評価データセットが登録済み
+- 導入手順と運用ガイドが最新状態で`docs/`に公開されている
 
 ---
 

@@ -440,8 +440,11 @@ export default function ProjectsPage() {
 
   /**
    * プロジェクト削除モーダルを開く
+   * @param projectId 削除対象のプロジェクトID
    */
-  const handleRequestDelete = (project: Project) => {
+  const handleRequestDelete = (projectId: string) => {
+    const project = projects?.find((p) => p.id === projectId)
+    if (!project) return
     setDeleteTarget(project)
     setIsDeleteModalOpen(true)
   }
@@ -463,6 +466,8 @@ export default function ProjectsPage() {
       return
     }
 
+    // プロジェクト名を先に保存（state更新のタイミング問題を回避）
+    const projectName = deleteTarget.name
     setDeleteLoading(true)
 
     try {
@@ -474,7 +479,7 @@ export default function ProjectsPage() {
       }
 
       setProjects((projects || []).filter((p) => p.id !== deleteTarget.id))
-      showNotification('success', `「${deleteTarget.name}」を削除しました`)
+      showNotification('success', `「${projectName}」を削除しました`)
       setIsDeleteModalOpen(false)
       setDeleteTarget(null)
     } catch (err) {
@@ -517,6 +522,8 @@ export default function ProjectsPage() {
       return
     }
 
+    // プロジェクト名を先に保存（state更新のタイミング問題を回避）
+    const projectName = duplicateTarget.name
     setDuplicateLoading(true)
 
     try {
@@ -529,7 +536,7 @@ export default function ProjectsPage() {
 
       if (response.data) {
         setProjects([response.data, ...(projects || [])])
-        showNotification('success', `「${duplicateTarget.name}」を複製しました`)
+        showNotification('success', `「${projectName}」を複製しました`)
         setIsDuplicateModalOpen(false)
         setDuplicateTarget(null)
         setDuplicateName('')
