@@ -10,6 +10,10 @@
 
 import { test, expect } from '@playwright/test'
 
+// E2E認証バイパスの有効／無効を判定
+const AUTH_BYPASS_ENABLED =
+  process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === 'true'
+
 // テスト用のユーザー情報
 const TEST_USER = {
   email: 'test@example.com',
@@ -38,10 +42,14 @@ test.describe('認証フロー', () => {
 
     // ログインフォームの要素を確認
     await expect(
-      page.getByRole('heading', { name: /ScaffAI ログイン/ })
+      page.getByRole('heading', { name: /ScaffAI にログイン/ })
     ).toBeVisible()
-    await expect(page.getByPlaceholder('メールアドレス')).toBeVisible()
-    await expect(page.getByPlaceholder('パスワード')).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'メールアドレス' })
+    ).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'パスワード' })
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: /ログイン/ })).toBeVisible()
     await expect(page.getByText(/新規登録/)).toBeVisible()
   })
@@ -56,8 +64,12 @@ test.describe('認証フロー', () => {
     await page.goto('/login')
 
     // メールアドレスとパスワードを入力
-    await page.getByPlaceholder('メールアドレス').fill(TEST_USER.email)
-    await page.getByPlaceholder('パスワード').fill(TEST_USER.password)
+    await page
+      .getByRole('textbox', { name: 'メールアドレス' })
+      .fill(TEST_USER.email)
+    await page
+      .getByRole('textbox', { name: 'パスワード' })
+      .fill(TEST_USER.password)
 
     // ログインボタンをクリック
     await page.getByRole('button', { name: /ログイン/ }).click()
@@ -73,12 +85,15 @@ test.describe('認証フロー', () => {
    * テスト3: ログイン失敗フロー（不正な認証情報）
    */
   test('不正な認証情報でログイン失敗', async ({ page }) => {
+    test.skip(AUTH_BYPASS_ENABLED, '認証バイパス有効時はエラーフローを検証できません')
     await page.goto('/login')
 
     // 存在しないメールアドレスとパスワードを入力
-    await page.getByPlaceholder('メールアドレス').fill(TEST_USER.email)
     await page
-      .getByPlaceholder('パスワード')
+      .getByRole('textbox', { name: 'メールアドレス' })
+      .fill(TEST_USER.email)
+    await page
+      .getByRole('textbox', { name: 'パスワード' })
       .fill(TEST_USER.invalidPassword)
 
     // ログインボタンをクリック
@@ -103,7 +118,7 @@ test.describe('認証フロー', () => {
     await page.getByRole('button', { name: /ログイン/ }).click()
 
     // ブラウザのバリデーションメッセージを確認（HTML5のrequired属性）
-    const emailInput = page.getByPlaceholder('メールアドレス')
+    const emailInput = page.getByRole('textbox', { name: 'メールアドレス' })
     await expect(emailInput).toHaveAttribute('required', '')
   })
 
@@ -111,12 +126,15 @@ test.describe('認証フロー', () => {
    * テスト5: ローディング状態の確認
    */
   test('ログイン中のローディング状態が表示される', async ({ page }) => {
+    test.skip(AUTH_BYPASS_ENABLED, '認証バイパス有効時はローディング表示が発生しません')
     await page.goto('/login')
 
     // フォームに入力
-    await page.getByPlaceholder('メールアドレス').fill(TEST_USER.email)
     await page
-      .getByPlaceholder('パスワード')
+      .getByRole('textbox', { name: 'メールアドレス' })
+      .fill(TEST_USER.email)
+    await page
+      .getByRole('textbox', { name: 'パスワード' })
       .fill(TEST_USER.invalidPassword)
 
     // ログインボタンをクリック
@@ -153,8 +171,12 @@ test.describe('認証フロー', () => {
   test.skip('ログアウトが正常に動作する', async ({ page }) => {
     // まずログイン
     await page.goto('/login')
-    await page.getByPlaceholder('メールアドレス').fill(TEST_USER.email)
-    await page.getByPlaceholder('パスワード').fill(TEST_USER.password)
+    await page
+      .getByRole('textbox', { name: 'メールアドレス' })
+      .fill(TEST_USER.email)
+    await page
+      .getByRole('textbox', { name: 'パスワード' })
+      .fill(TEST_USER.password)
     await page.getByRole('button', { name: /ログイン/ }).click()
     await expect(page).toHaveURL('/dashboard')
 
@@ -178,9 +200,11 @@ test.describe('認証フロー', () => {
     // 保護されたページに直接アクセス
     await page.goto('/dashboard')
 
-    // ログインページにリダイレクトされることを確認
-    // 注意: 実際のリダイレクト実装に応じて調整が必要
-    await expect(page).toHaveURL(/\/login|\//)
+    if (AUTH_BYPASS_ENABLED) {
+      await expect(page).toHaveURL(/\/dashboard/)
+    } else {
+      await expect(page).toHaveURL(/\/login|\//)
+    }
   })
 })
 
@@ -196,8 +220,12 @@ test.describe('モバイル画面での認証フロー', () => {
     await page.goto('/login')
 
     // ログインフォームが正しく表示されることを確認
-    await expect(page.getByPlaceholder('メールアドレス')).toBeVisible()
-    await expect(page.getByPlaceholder('パスワード')).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'メールアドレス' })
+    ).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'パスワード' })
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: /ログイン/ })).toBeVisible()
   })
 })

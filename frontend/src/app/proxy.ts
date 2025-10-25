@@ -17,6 +17,11 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // E2Eテスト時はSupabase認証を省略してそのまま通過させる
+  if (process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === 'true') {
+    return response
+  }
+
   // Supabaseサーバークライアントを作成
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

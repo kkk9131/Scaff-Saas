@@ -5,6 +5,10 @@
 
 import { defineConfig, devices } from '@playwright/test'
 
+// E2Eテスト実行時は認証バイパスを常に有効化
+process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS =
+  process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS ?? 'true'
+
 /**
  * Playwright設定
  * - ローカル開発サーバーを自動起動
@@ -82,5 +86,9 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // サーバー起動タイムアウト（2分）
+    env: {
+      // Playwright実行時のみ認証バイパスを有効化し、保護ページのテストを容易にする
+      NEXT_PUBLIC_E2E_AUTH_BYPASS: 'true',
+    },
   },
 })

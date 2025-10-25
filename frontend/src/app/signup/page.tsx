@@ -94,7 +94,9 @@ export default function SignUpPage() {
         router.push('/login')
       }, 3000)
     } catch (err) {
-      console.error('Signup error:', err)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Signup error:', err)
+      }
       setError('予期しないエラーが発生しました')
       setLoading(false)
     }

@@ -26,7 +26,10 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
 
     // テストファイルのパターン（E2Eテストを除外）
-    include: ['tests/unit/**/*.test.{ts,tsx}'],
+    include: [
+      'tests/unit/**/*.test.{ts,tsx}',
+      'tests/api/**/*.test.{ts,tsx}',
+    ],
     exclude: ['node_modules', 'tests/e2e/**'],
 
     // カバレッジ設定

@@ -30,11 +30,23 @@ export type ApiErrorCode =
  */
 export interface ApiResponse<T = any> {
   data?: T;
+  /**
+   * バックエンドが success レスポンスを返したかどうか
+   */
+  success?: boolean;
+  /**
+   * バックエンドから受け取ったメッセージ
+   */
+  message?: string;
   error?: {
     code: ApiErrorCode;
     message: string;
     statusCode?: number;
   };
+  /**
+   * 正規化前のレスポンスボディ（デバッグ用途）
+   */
+  raw?: unknown;
 }
 
 /**
@@ -166,12 +178,59 @@ class ApiClient {
 
       // エラーレスポンスの処理
       if (!response.ok) {
+        // エラーメッセージの抽出
+        let errorMessage = 'リクエストに失敗しました';
+
+        if (data.detail) {
+          // FastAPIのバリデーションエラー(422)の場合、detailは配列
+          if (Array.isArray(data.detail)) {
+            // 各エラーオブジェクトからmsgを抽出して結合
+            errorMessage = data.detail
+              .map((err: any) => err.msg || JSON.stringify(err))
+              .join(', ');
+          } else if (typeof data.detail === 'string') {
+            // detailが文字列の場合はそのまま使用
+            errorMessage = data.detail;
+          } else {
+            // detailがオブジェクトの場合はJSON文字列化
+            errorMessage = JSON.stringify(data.detail);
+          }
+        } else if (data.message) {
+          // messageフィールドがある場合
+          errorMessage = data.message;
+        }
+
         return {
           error: {
             code: this.getErrorCodeFromStatus(response.status),
-            message: data.detail || data.message || 'リクエストに失敗しました',
+            message: errorMessage,
             statusCode: response.status,
           },
+          message: typeof data?.message === 'string' ? data.message : undefined,
+          success: typeof data?.success === 'boolean' ? data.success : undefined,
+          raw: data,
+        };
+      }
+
+      // successレスポンスを標準形式に正規化
+      if (data && typeof data === 'object') {
+        const successValue = typeof data.success === 'boolean' ? data.success : undefined;
+        const messageValue = typeof data.message === 'string' ? data.message : undefined;
+
+        if (successValue !== undefined && Object.prototype.hasOwnProperty.call(data, 'data')) {
+          return {
+            data: (data as { data: T }).data,
+            success: successValue,
+            message: messageValue,
+            raw: data,
+          };
+        }
+
+        return {
+          data,
+          success: successValue,
+          message: messageValue,
+          raw: data,
         };
       }
 
@@ -244,10 +303,12 @@ class ApiClient {
       const backoffDelay = Math.pow(2, attempt) * 1000;
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
 
-      console.warn(
-        `リトライ中 (${attempt + 1}/${maxRetries}): ${endpoint}`,
-        response.error
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          `リトライ中 (${attempt + 1}/${maxRetries}): ${endpoint}`,
+          response.error
+        );
+      }
     }
 
     return lastError!;

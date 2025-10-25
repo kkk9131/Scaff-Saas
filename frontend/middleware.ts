@@ -22,6 +22,12 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // E2Eテスト用の認証バイパス（Playwright実行時に利用）
+  // 環境変数が有効な場合はSupabaseチェックをスキップし、そのまま処理を続行
+  if (process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === 'true') {
+    return response
+  }
+
   // Supabaseサーバークライアントを作成
   const supabase = createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,

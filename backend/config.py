@@ -14,6 +14,8 @@ APP_VERSION: Final[str] = "1.0.0"
 
 # ===== HTTPステータスコード =====
 HTTP_STATUS_OK: Final[int] = 200
+HTTP_STATUS_BAD_REQUEST: Final[int] = 400
+HTTP_STATUS_NOT_FOUND: Final[int] = 404
 HTTP_STATUS_SERVICE_UNAVAILABLE: Final[int] = 503
 
 # ===== タイムアウト設定（秒） =====
