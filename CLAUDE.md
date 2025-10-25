@@ -436,6 +436,54 @@ git push origin develop
 git branch -d hotfix/critical-auth-bug
 ```
 
+#### 5. Phaseベースの開発フロー（推奨）
+```bash
+# ===== Phase開始: phase2ブランチ作成 =====
+git checkout develop
+git pull origin develop
+git checkout -b phase2
+
+# ===== タスク実装: feature/201ブランチで作業 =====
+git checkout -b feature/201-project-crud-api
+
+# 開発作業
+git add .
+git commit -m "✨ TASK-201: プロジェクトCRUD APIを実装したで"
+git push origin feature/201-project-crud-api
+
+# ===== phase2にマージ =====
+git checkout phase2
+git merge feature/201-project-crud-api
+git push origin phase2
+
+# ブランチ削除（任意）
+git branch -d feature/201-project-crud-api
+
+# ===== 次のタスク: feature/202ブランチで作業 =====
+git checkout -b feature/202-project-management-ui
+# ... 同様に実装・コミット・マージ ...
+
+# ===== Phase完了: developにマージ（⚠️ 確認必須） =====
+# Phase 2の全タスク（TASK-201〜206）完了後
+git checkout develop
+git merge phase2
+git push origin develop
+
+# phase2ブランチ削除（任意）
+git branch -d phase2
+```
+
+**Phaseベースワークフローの利点**:
+- ✅ Phase単位でタスクをまとめて管理
+- ✅ developを安定した状態に保てる
+- ✅ タスク間の依存関係を解決しやすい
+- ✅ Phase全体として統合テスト可能
+- ✅ `docs/scaffai_task_tickets.md`の管理方針と一致
+
+**使い分け**:
+- **単発タスク**: feature → develop（従来フロー）
+- **Phaseタスク（3つ以上の関連タスク）**: feature → phase → develop（推奨フロー）
+
 ### コミット頻度とタイミング
 
 **こまめにコミット**:

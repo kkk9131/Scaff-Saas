@@ -140,8 +140,8 @@ export function useDeleteDrawing() {
       //   method: 'DELETE',
       // });
 
-      // ダミー処理（開発用）
-      console.log('作図データを削除:', projectId);
+      // TODO: API実装後に削除リクエストへ置き換える
+      void projectId; // 変数を維持してリンター警告を回避
     },
     onSuccess: (_, projectId) => {
       // 該当プロジェクトの作図データのキャッシュを削除

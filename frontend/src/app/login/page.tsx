@@ -117,7 +117,9 @@ export default function LoginPage() {
       router.push('/dashboard')
       router.refresh()
     } catch (err) {
-      console.error('Login error:', err)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Login error:', err)
+      }
       setError('予期しないエラーが発生しました')
       setLoading(false)
     }
@@ -196,7 +198,9 @@ export default function LoginPage() {
 
       setGoogleButtonRendered(true)
     } catch (err) {
-      console.error('Google button render error:', err)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Google button render error:', err)
+      }
       setGoogleButtonRendered(false)
     }
   }, [googleClientId, handleGoogleLogin, isGoogleScriptLoaded, themeMode])

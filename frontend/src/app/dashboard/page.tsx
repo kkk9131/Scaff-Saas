@@ -14,6 +14,8 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { ChatSidebar, ChatMessage } from '@/components/layout/ChatSidebar'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
+import { ProjectStatsWidget } from '@/components/dashboard/ProjectStatsWidget'
+import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget'
 
 // モックデータ型定義
 interface Project {
@@ -315,6 +317,9 @@ export default function DashboardPage() {
           `}
         >
           <div className="p-6 space-y-6">
+            {/* プロジェクト統計セクション */}
+            <ProjectStatsWidget />
+
             {/* 目標売上セクション */}
             <div className={`${glassPanelClass} p-6`}>
               <div className="flex items-center justify-between mb-4">
@@ -333,6 +338,9 @@ export default function DashboardPage() {
                 {revenueProgress.toFixed(1)}% 達成
               </p>
             </div>
+
+            {/* 最近のアクティビティウィジェット */}
+            <RecentActivityWidget />
 
             {/* 直近3つのプロジェクト */}
             <div>

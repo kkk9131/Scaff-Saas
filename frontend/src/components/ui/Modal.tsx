@@ -62,6 +62,24 @@ export interface ModalProps {
    * 追加のCSSクラス
    */
   className?: string;
+
+  /**
+   * ヘッダー領域へ追加するクラス
+   * 特定モーダル用に境界線や背景を調整したい場合に利用
+   */
+  headerClassName?: string;
+
+  /**
+   * コンテンツ領域へ追加するクラス
+   * 背景色やスクロール挙動を個別に調整する際に利用
+   */
+  contentClassName?: string;
+
+  /**
+   * フッター領域へ追加するクラス
+   * アクションボタン周りの境界線や余白を個別に設定する用途を想定
+   */
+  footerClassName?: string;
 }
 
 /**
@@ -114,6 +132,9 @@ const Modal: React.FC<ModalProps> = ({
   closeOnEsc = true,
   showCloseButton = true,
   className,
+  headerClassName,
+  contentClassName,
+  footerClassName,
 }) => {
   const modalRef = React.useRef<HTMLDivElement>(null);
 
@@ -209,7 +230,10 @@ const Modal: React.FC<ModalProps> = ({
       <div
         ref={modalRef}
         className={cn(
-          'relative w-full overflow-hidden rounded-xl bg-card shadow-2xl',
+          'relative w-full overflow-hidden rounded-xl',
+          'bg-white dark:bg-slate-900',
+          'border border-gray-200 dark:border-slate-700',
+          'shadow-2xl',
           'animate-scale-in',
           sizeClasses[size],
           className
@@ -217,7 +241,12 @@ const Modal: React.FC<ModalProps> = ({
       >
         {/* ヘッダー */}
         {(title || description || showCloseButton) && (
-          <div className="flex items-start justify-between border-b-2 border-gray-200 p-6">
+          <div
+            className={cn(
+              'flex items-start justify-between border-b border-gray-200 dark:border-slate-700 p-6',
+              headerClassName
+            )}
+          >
             <div className="flex-1">
               {title && (
                 <h2
@@ -270,13 +299,23 @@ const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* コンテンツ */}
-        <div className="max-h-[calc(100vh-16rem)] overflow-y-auto p-6 scrollbar-thin">
+        <div
+          className={cn(
+            'max-h-[calc(100vh-16rem)] overflow-y-auto p-6 scrollbar-thin',
+            contentClassName
+          )}
+        >
           {children}
         </div>
 
         {/* フッター */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t-2 border-gray-200 p-6">
+          <div
+            className={cn(
+              'flex items-center justify-end gap-3 border-t border-gray-200 dark:border-slate-700 p-6',
+              footerClassName
+            )}
+          >
             {footer}
           </div>
         )}
