@@ -16,6 +16,26 @@ import {
 } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
+/**
+ * PlaywrightなどのE2Eテストで利用するモックユーザー情報
+ * 本番では使用されず、NEXT_PUBLIC_E2E_AUTH_BYPASS 環境変数が true の場合のみ有効
+ */
+const E2E_TEST_USER: User = {
+  id: '00000000-0000-4000-8000-0000e2e00001',
+  email: 'e2e-user@example.com',
+  app_metadata: { provider: 'email' },
+  user_metadata: { name: 'E2Eテストユーザー' },
+  aud: 'authenticated',
+  created_at: '2024-01-01T00:00:00Z',
+  confirmed_at: '2024-01-01T00:00:00Z',
+  email_confirmed_at: '2024-01-01T00:00:00Z',
+  last_sign_in_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  role: 'authenticated',
+  factor_ids: [],
+  identities: [],
+} as unknown as User
+
 // ログインオプション: CAPTCHAなどSupabaseが提供する標準オプションに、persistSession制御を追加
 type SignInOptions = SignInWithPasswordCredentials['options'] & {
   persistSession?: boolean
@@ -46,11 +66,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
  * 子コンポーネントに認証状態を提供する
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const isAuthBypassEnabled =
+    process.env.NEXT_PUBLIC_E2E_AUTH_BYPASS === 'true'
+  const [user, setUser] = useState<User | null>(
+    isAuthBypassEnabled ? E2E_TEST_USER : null
+  )
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isAuthBypassEnabled)
 
   useEffect(() => {
+    if (isAuthBypassEnabled) {
+      return
+    }
+
     // 初期認証状態を取得
     // レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -70,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // クリーンアップ: コンポーネントがアンマウントされたらリスナーを解除
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isAuthBypassEnabled])
 
   /**
    * ログイン関数
@@ -87,6 +115,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     options?: SignInOptions
   ) => {
+    if (isAuthBypassEnabled) {
+      // テストモードではログイン処理を即座に成功扱いとし、モックユーザーをセット
+      setUser(E2E_TEST_USER)
+      setSession(null)
+      setLoading(false)
+      return { error: null }
+    }
+
     const shouldPersist = options?.persistSession ?? true
     const captchaToken = options?.captchaToken
 
@@ -109,6 +145,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
    */
   const signUp = async (email: string, password: string) => {
+    if (isAuthBypassEnabled) {
+      // テストモードではサインアップも即時成功扱いとする
+      setUser(E2E_TEST_USER)
+      setSession(null)
+      setLoading(false)
+      return { error: null }
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -123,6 +167,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * レビュー指摘: Supabase Authは例外をthrowしないため、try-catchは不要
    */
   const signOut = async () => {
+    if (isAuthBypassEnabled) {
+      // テストモードではステートをクリアするだけで完了
+      setUser(null)
+      setSession(null)
+      return
+    }
+
     await supabase.auth.signOut()
   }
 
