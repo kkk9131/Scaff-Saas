@@ -66,7 +66,10 @@ export function SearchBar({
   return (
     <div
       className={cn(
-        'relative flex w-full flex-col gap-2 rounded-2xl border border-white/30 bg-white/60 p-4 shadow-lg shadow-sky-500/10 backdrop-blur-xl transition-colors duration-300 dark:border-slate-700/60 dark:bg-slate-950/50 dark:shadow-slate-900/40',
+        // クイックアクション調：完全透過＋ガラス（ライトもダークも背景色はのせない）
+        'glass-scope group relative flex w-full flex-col gap-2 overflow-hidden rounded-2xl border border-white/40 bg-transparent p-4 shadow-lg shadow-sky-500/10 backdrop-blur-xl transition-all duration-300 dark:border-slate-700/60 dark:bg-transparent dark:shadow-indigo-900/40',
+        // 薄いグラデーションのトップコート（QAに近い質感）
+        'before:absolute before:inset-0 before:rounded-2xl before:opacity-90 before:pointer-events-none before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30',
         className
       )}
       {...props}
@@ -90,6 +93,11 @@ export function SearchBar({
           leftElement={<Search className="h-5 w-5 text-slate-400" aria-hidden="true" />}
           aria-label="プロジェクト検索キーワード"
           fullWidth
+          // ガラスパネル内では入力自体も半透明にして一体感を出す
+          className={cn(
+            'bg-transparent border-white/40 backdrop-blur-sm',
+            'dark:bg-transparent dark:border-slate-700/50'
+          )}
         />
         {value && (
           <Button
@@ -110,4 +118,3 @@ export function SearchBar({
     </div>
   );
 }
-

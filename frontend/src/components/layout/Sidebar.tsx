@@ -243,13 +243,13 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
         )}
 
         {/* サイドバー本体 */}
-        <aside
+        <aside data-sidebar-root
           ref={ref}
           className={cn(
             // 基本レイアウト
             'fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] flex-col',
-            'border-r-2 border-gray-200 bg-white shadow-lg',
-            'dark:border-gray-700 dark:bg-slate-900',
+            // 背景は完全透過（ライト/ダーク共通）
+            'border-r border-gray-200 dark:border-gray-700 bg-transparent',
             // アニメーション
             'transition-all duration-300 ease-in-out',
             // 幅の切り替え（開：w-64、閉：w-20）
@@ -259,12 +259,14 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
             isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
             className
           )}
+          style={{ backgroundColor: 'transparent' }}
           {...props}
         >
           {/* ナビゲーションリスト */}
           <nav className={cn(
-            "flex-1 space-y-1 overflow-y-auto scrollbar-thin",
-            isOpen ? "p-4" : "p-2"
+            // ライトモード時は黒文字に統一
+            'flex-1 space-y-1 overflow-y-auto scrollbar-thin text-black',
+            isOpen ? 'p-4' : 'p-2'
           )}>
             {navItems.map((item) => (
               <NavItemComponent
@@ -280,8 +282,8 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
 
           {/* フッター（バージョン情報など） */}
           {isOpen && (
-            <div className="border-t-2 border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+            <div className="border-t border-white/30 dark:border-gray-700 p-4">
+              <div className="flex items-center justify-between text-xs text-black/80 dark:text-gray-400">
                 <span>ScaffAI v1.0.0</span>
                 <Link
                   href="/help"
@@ -370,9 +372,10 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
           // 幅に応じたパディング調整
           isOpen ? 'gap-3 px-4' : 'justify-center px-2',
           // アクティブ状態
+          // アクティブ時は共通のエメラルド→シアングラデで統一
           isActive
-            ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30 dark:bg-[#8B5CF6] dark:shadow-[#8B5CF6]/30'
-            : 'text-gray-700 hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] dark:text-gray-300 dark:hover:bg-[#06B6D4]/20',
+            ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 text-white shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-cyan-500/30 focus-visible:ring-emerald-300'
+            : 'text-black hover:bg-black/5 hover:text-black dark:text-gray-300 dark:hover:bg-[#06B6D4]/20',
           // ホバー効果
           !isActive && 'hover:scale-105 active:scale-95'
         )}
@@ -392,7 +395,7 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
               'flex h-6 min-w-[24px] items-center justify-center rounded-full px-2 text-xs font-bold',
               isActive
                 ? 'bg-white/20 text-white'
-                : 'bg-[#6366F1]/10 text-[#6366F1] dark:bg-[#8B5CF6]/20 dark:text-[#8B5CF6]'
+                : 'bg-black/10 text-black dark:bg-[#8B5CF6]/20 dark:text-[#8B5CF6]'
             )}
           >
             {item.badge}
@@ -422,16 +425,17 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
 
       {/* 子アイテム */}
       {hasChildren && isExpanded && (
-        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4 transition-colors">
+        <div className="ml-6 mt-1 space-y-1 border-l border-gray-200 dark:border-gray-700 pl-4 transition-colors">
           {item.children!.map((child) => (
             <Link
               key={child.href}
               href={child.href}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300',
+                // 子項目もライトは黒文字
+                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-black dark:text-gray-300',
                 'transition-colors duration-150',
-                'hover:bg-accent/10 hover:text-accent dark:hover:bg-accent/20 dark:hover:text-accent'
+                'hover:bg-black/5 hover:text-black dark:hover:bg-accent/20 dark:hover:text-accent'
               )}
             >
               {child.icon && (

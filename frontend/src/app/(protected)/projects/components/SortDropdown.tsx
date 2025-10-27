@@ -63,7 +63,9 @@ export function SortDropdown({
   return (
     <div
       className={cn(
-        'relative flex flex-col gap-3 rounded-2xl border border-white/30 bg-white/60 p-4 shadow-lg shadow-sky-500/10 backdrop-blur-xl transition-colors duration-300 dark:border-slate-700/60 dark:bg-slate-950/50 dark:shadow-slate-900/40',
+        // QA調：完全透過＋ガラス＋グラデトップコート
+        'glass-scope group relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-white/40 bg-transparent p-4 shadow-lg shadow-sky-500/10 backdrop-blur-xl transition-all duration-300 dark:border-slate-700/60 dark:bg-transparent dark:shadow-indigo-900/40',
+        'before:absolute before:inset-0 before:rounded-2xl before:opacity-90 before:pointer-events-none before:bg-gradient-to-br before:from-[#06B6D4]/0 before:via-[#22D3EE]/0 before:to-[#0EA5E9]/30',
         className
       )}
       {...props}
@@ -82,8 +84,8 @@ export function SortDropdown({
             value={sortKey}
             onChange={handleSortKeyChange}
             className={cn(
-              'flex h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white/95 px-4 py-3 text-base text-slate-900 shadow-[0_8px_26px_-18px_rgba(14,165,233,0.45)] transition-all duration-200 hover:border-sky-300 hover:shadow-[0_10px_30px_-18px_rgba(14,165,233,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
-              'dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:shadow-[0_12px_32px_-22px_rgba(15,23,42,0.8)] dark:hover:border-slate-500 dark:hover:shadow-[0_12px_36px_-22px_rgba(15,23,42,0.85)] dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-900'
+              'flex h-12 w-full appearance-none rounded-xl border border-white/40 bg-transparent px-4 py-3 text-base text-slate-900 shadow-[0_8px_26px_-18px_rgba(14,165,233,0.45)] transition-all duration-200 hover:border-sky-300 hover:shadow-[0_10px_30px_-18px_rgba(14,165,233,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+              'dark:border-slate-700 dark:bg-transparent dark:text-slate-100 dark:shadow-[0_12px_32px_-22px_rgba(15,23,42,0.8)] dark:hover:border-slate-500 dark:hover:shadow-[0_12px_36px_-22px_rgba(15,23,42,0.85)] dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-900'
             )}
             aria-label="プロジェクトの並び替え基準"
           >
@@ -103,7 +105,7 @@ export function SortDropdown({
         type="button"
         variant="ghost"
         onClick={toggleOrder}
-        className="flex items-center justify-between rounded-xl border border-white/40 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-sky-500/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-500/20 dark:border-slate-700/60 dark:bg-slate-950/60 dark:text-slate-100 dark:shadow-slate-900/40 dark:hover:shadow-indigo-900/50"
+        className="flex items-center justify-between rounded-xl border border-white/40 bg-transparent px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-sky-500/10 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-500/20 dark:border-slate-700/60 dark:bg-transparent dark:text-slate-100 dark:shadow-slate-900/40 dark:hover:shadow-indigo-900/50"
         aria-label={`並び順を${sortOrder === 'asc' ? '降順' : '昇順'}へ変更`}
       >
         <span>並び順: {sortOrder === 'asc' ? '昇順' : '降順'}</span>
@@ -116,4 +118,3 @@ export function SortDropdown({
     </div>
   );
 }
-

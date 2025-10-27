@@ -37,3 +37,6 @@ export {
 } from './Toast';
 
 export { Modal, ConfirmModal, type ModalProps, type ConfirmModalProps } from './Modal';
+
+// タイポグラフィ
+export { H1, H2, H3, Body, Muted, Eyebrow, GradientText, TextBase, type TextBaseProps } from './Text';

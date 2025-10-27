@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 /**
- * ガラスモーフィズム調のパネルスタイル
- * ダッシュボード全体で使用している質感に合わせるための共通クラス。
+ * ガラスモーフィズム調のパネル（検索ツールカードと同質感）
  */
 const panelBaseClass =
-  'relative overflow-hidden rounded-2xl border border-white/30 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/50 backdrop-blur-xl shadow-xl shadow-sky-500/10 dark:shadow-slate-900/50 transition-colors duration-300';
+  'glass-scope group relative overflow-hidden rounded-2xl border border-white/40 dark:border-slate-700/60 bg-transparent dark:bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 dark:shadow-slate-900/50 transition-all duration-300 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#8B5CF6]/0 before:via-[#A855F7]/0 before:to-[#C084FC]/25';
 
 /**
  * プロジェクトファイル情報
@@ -87,11 +86,11 @@ export function FileList({ files = [], onPreview, onDownload, className }: FileL
   return (
     <section className={cn(panelBaseClass, 'p-6 space-y-4', className)}>
       <header>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">添付ファイル</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">添付ファイル</h2>
       </header>
 
       {!hasFiles && (
-        <p className="rounded-lg border border-dashed border-white/40 bg-white/70 p-6 text-center text-sm text-gray-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/40 dark:text-gray-300">
+        <p className="rounded-lg border border-dashed border-white/30 bg-transparent backdrop-blur-sm p-6 text-center text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-transparent dark:text-gray-300">
           まだファイルが登録されていません。図面や写真をアップロードするとここに表示されます。
         </p>
       )}
@@ -101,7 +100,7 @@ export function FileList({ files = [], onPreview, onDownload, className }: FileL
           {files.map((file) => (
             <li
               key={file.id}
-              className="flex flex-col gap-3 rounded-xl border border-white/40 bg-white/80 p-4 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900/70 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-white/30 bg-transparent backdrop-blur-sm p-4 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-700 dark:bg-transparent md:flex-row md:items-center md:justify-between"
             >
               <div className="flex flex-1 items-center gap-4">
                 <span className="text-2xl" aria-hidden>
@@ -109,7 +108,7 @@ export function FileList({ files = [], onPreview, onDownload, className }: FileL
                 </span>
 
                 <div>
-                  <p className="text-base font-semibold text-gray-900 dark:text-gray-50">
+                  <p className="text-base font-semibold text-gray-900 dark:text-slate-100">
                     {file.name}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -154,4 +153,3 @@ export function FileList({ files = [], onPreview, onDownload, className }: FileL
     </section>
   );
 }
-

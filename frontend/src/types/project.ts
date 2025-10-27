@@ -101,23 +101,23 @@ export const PROJECT_STATUS_COLORS: Record<
   { bg: string; text: string; border: string }
 > = {
   draft: {
-    bg: 'bg-gray-100 dark:bg-gray-800',
-    text: 'text-gray-700 dark:text-gray-300',
-    border: 'border-gray-300 dark:border-gray-600',
+    bg: 'bg-indigo-100/80 dark:bg-indigo-900/30',
+    text: 'text-indigo-900 dark:text-indigo-300',
+    border: 'border-indigo-600 dark:border-indigo-600',
   },
   active: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-700 dark:text-blue-300',
-    border: 'border-blue-300 dark:border-blue-600',
+    bg: 'bg-cyan-100/80 dark:bg-cyan-900/30',
+    text: 'text-cyan-900 dark:text-cyan-300',
+    border: 'border-cyan-600 dark:border-cyan-600',
   },
   completed: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-700 dark:text-green-300',
-    border: 'border-green-300 dark:border-green-600',
+    bg: 'bg-emerald-100/70 dark:bg-emerald-900/30',
+    text: 'text-emerald-900 dark:text-emerald-300',
+    border: 'border-emerald-600 dark:border-emerald-600',
   },
   archived: {
-    bg: 'bg-purple-100 dark:bg-purple-900/30',
-    text: 'text-purple-700 dark:text-purple-300',
-    border: 'border-purple-300 dark:border-purple-600',
+    bg: 'bg-gray-100/80 dark:bg-gray-900/30',
+    text: 'text-gray-900 dark:text-gray-300',
+    border: 'border-gray-600 dark:border-gray-600',
   },
 }
