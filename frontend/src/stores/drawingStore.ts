@@ -125,7 +125,7 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   // 初期状態
   elements: [],
   selectedElementIds: [],
-  currentTool: 'select',
+  currentTool: 'scaffold', // デフォルトはサックスモード（scaffold）
   isDrawing: false,
   canvasScale: 1,
   canvasPosition: { x: 0, y: 0 },
