@@ -56,6 +56,7 @@ interface DrawingState {
   leftSidebarOpen: boolean;
   rightSidebarOpen: boolean;
   underbarVisible: boolean;
+  modeTabsVisible: boolean;
 
   // アクション - 要素操作
   addElement: (element: DrawingElement) => void;
@@ -87,6 +88,7 @@ interface DrawingState {
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   toggleUnderbar: () => void;
+  toggleModeTabs: () => void;
 
   // アクション - 履歴操作
   undo: () => void;
@@ -119,6 +121,7 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   leftSidebarOpen: true, // デフォルトで左サイドバー表示
   rightSidebarOpen: true, // デフォルトで右サイドバー表示
   underbarVisible: true, // デフォルトでアンダーバー表示
+  modeTabsVisible: true, // デフォルトでモードタブ表示
 
   // 要素を追加
   addElement: (element) =>
@@ -243,6 +246,12 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   toggleUnderbar: () =>
     set((state) => ({
       underbarVisible: !state.underbarVisible,
+    })),
+
+  // UI操作 - モードタブの表示/非表示
+  toggleModeTabs: () =>
+    set((state) => ({
+      modeTabsVisible: !state.modeTabsVisible,
     })),
 
   // 履歴を保存

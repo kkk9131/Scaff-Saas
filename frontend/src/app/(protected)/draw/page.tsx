@@ -15,6 +15,7 @@
 
 import { useTheme } from '@/contexts/ThemeContext';
 import Header from './components/Header';
+import ModeTabs from './components/ModeTabs';
 import CanvasStage from './components/CanvasStage';
 import Sidebars from './components/Sidebars';
 import Underbar from './components/Underbar';
@@ -46,6 +47,9 @@ export default function DrawPage() {
       <div className="relative z-10 h-full w-full">
         {/* ヘッダー */}
         <Header />
+
+        {/* モード切替タブ */}
+        <ModeTabs />
 
         {/* メインキャンバス */}
         <CanvasStage />
