@@ -4,6 +4,7 @@
  */
 
 import { create } from 'zustand';
+import type { BracketSize, ScaffoldGroup } from '@/types/scaffold';
 
 // 作図要素の型定義
 export interface DrawingElement {
@@ -52,6 +53,14 @@ interface DrawingState {
   showGrid: boolean;
   mousePosition: { x: number; y: number };
 
+  // サックスモード設定
+  currentColor: 'white' | 'red' | 'blue' | 'green';
+  bracketSize: BracketSize;
+  directionReversed: boolean;
+
+  // 足場グループ
+  scaffoldGroups: ScaffoldGroup[];
+
   // UI状態
   leftSidebarOpen: boolean;
   rightSidebarOpen: boolean;
@@ -83,6 +92,18 @@ interface DrawingState {
   toggleSnapToGrid: () => void;
   toggleShowGrid: () => void;
   setMousePosition: (position: { x: number; y: number }) => void;
+
+  // アクション - サックスモード操作
+  setCurrentColor: (color: 'white' | 'red' | 'blue' | 'green') => void;
+  setBracketSize: (size: BracketSize) => void;
+  setDirectionReversed: (reversed: boolean) => void;
+  toggleDirectionReversed: () => void;
+
+  // アクション - 足場グループ操作
+  addScaffoldGroup: (group: ScaffoldGroup) => void;
+  updateScaffoldGroup: (id: string, updates: Partial<ScaffoldGroup>) => void;
+  removeScaffoldGroup: (id: string) => void;
+  clearScaffoldGroups: () => void;
 
   // アクション - UI操作
   toggleLeftSidebar: () => void;
@@ -116,6 +137,12 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   snapToGrid: true, // デフォルトでスナップON
   showGrid: true, // デフォルトでグリッド表示ON
   mousePosition: { x: 0, y: 0 },
+
+  // サックスモード設定の初期状態
+  currentColor: 'white', // デフォルトは白色
+  bracketSize: 'W', // デフォルトはW（600mm）
+  directionReversed: false, // デフォルトは通常方向
+  scaffoldGroups: [], // 足場グループは空
 
   // UI状態の初期状態
   leftSidebarOpen: true, // デフォルトで左サイドバー表示
@@ -289,5 +316,55 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
         };
       }
       return state;
+    }),
+
+  // サックスモード操作 - 色を設定
+  setCurrentColor: (color) =>
+    set({
+      currentColor: color,
+    }),
+
+  // サックスモード操作 - ブラケットサイズを設定
+  setBracketSize: (size) =>
+    set({
+      bracketSize: size,
+    }),
+
+  // サックスモード操作 - 方向反転フラグを設定
+  setDirectionReversed: (reversed) =>
+    set({
+      directionReversed: reversed,
+    }),
+
+  // サックスモード操作 - 方向反転フラグを切替
+  toggleDirectionReversed: () =>
+    set((state) => ({
+      directionReversed: !state.directionReversed,
+    })),
+
+  // 足場グループを追加
+  addScaffoldGroup: (group) =>
+    set((state) => ({
+      scaffoldGroups: [...state.scaffoldGroups, group],
+    })),
+
+  // 足場グループを更新
+  updateScaffoldGroup: (id, updates) =>
+    set((state) => ({
+      scaffoldGroups: state.scaffoldGroups.map((group) =>
+        group.id === id ? { ...group, ...updates } : group
+      ),
+    })),
+
+  // 足場グループを削除
+  removeScaffoldGroup: (id) =>
+    set((state) => ({
+      scaffoldGroups: state.scaffoldGroups.filter((group) => group.id !== id),
+    })),
+
+  // すべての足場グループをクリア
+  clearScaffoldGroups: () =>
+    set({
+      scaffoldGroups: [],
     }),
 }));
