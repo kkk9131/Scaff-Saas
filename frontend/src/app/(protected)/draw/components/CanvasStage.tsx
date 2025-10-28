@@ -17,6 +17,7 @@ import { Stage, Layer } from 'react-konva';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import { generateScaffoldSpan } from '@/lib/sax/spanGenerator';
+import { snapPositionToGrid, DEFAULT_SCALE } from '@/lib/utils/scale';
 import GridOverlay from './GridOverlay';
 import SaxTool from './SaxTool';
 
@@ -52,6 +53,9 @@ export default function CanvasStage() {
   } = useDrawingStore();
 
   const { currentMode } = useDrawingModeStore();
+
+  // グリッド設定を取得
+  const { snapToGrid, gridSize } = useDrawingStore();
 
   // パンモード（スペースキー押下中）の状態
   const [isPanning, setIsPanning] = useState(false);
@@ -213,8 +217,19 @@ export default function CanvasStage() {
     // サックスモードでのスパン描画開始
     if (currentMode === 'draw' && currentTool === 'scaffold' && !isPanning) {
       // キャンバス座標系に変換（スケールとポジションを考慮）
-      const canvasX = (pos.x - canvasPosition.x) / canvasScale;
-      const canvasY = (pos.y - canvasPosition.y) / canvasScale;
+      let canvasX = (pos.x - canvasPosition.x) / canvasScale;
+      let canvasY = (pos.y - canvasPosition.y) / canvasScale;
+
+      // グリッドスナップが有効な場合、座標をスナップ
+      if (snapToGrid) {
+        const snapped = snapPositionToGrid(
+          { x: canvasX, y: canvasY },
+          gridSize,
+          DEFAULT_SCALE
+        );
+        canvasX = snapped.x;
+        canvasY = snapped.y;
+      }
 
       setIsDrawingSpan(true);
       setSpanStart({ x: canvasX, y: canvasY });
@@ -246,8 +261,20 @@ export default function CanvasStage() {
 
     // マウス座標をストアに保存（アンダーバー表示用）
     // キャンバス座標系に変換（スケールとポジションを考慮）
-    const canvasX = (pos.x - canvasPosition.x) / canvasScale;
-    const canvasY = (pos.y - canvasPosition.y) / canvasScale;
+    let canvasX = (pos.x - canvasPosition.x) / canvasScale;
+    let canvasY = (pos.y - canvasPosition.y) / canvasScale;
+
+    // グリッドスナップが有効な場合、座標をスナップ
+    if (snapToGrid) {
+      const snapped = snapPositionToGrid(
+        { x: canvasX, y: canvasY },
+        gridSize,
+        DEFAULT_SCALE
+      );
+      canvasX = snapped.x;
+      canvasY = snapped.y;
+    }
+
     setMousePosition({ x: Math.round(canvasX), y: Math.round(canvasY) });
 
     // スパン描画中のプレビュー更新
