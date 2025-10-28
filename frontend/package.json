@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "ui:sync:dry": "node ../scripts/sync-ui-defaults.mjs --dry",
+    "ui:sync": "node ../scripts/sync-ui-defaults.mjs --write",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest",

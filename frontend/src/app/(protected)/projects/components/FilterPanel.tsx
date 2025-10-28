@@ -98,7 +98,9 @@ export function FilterPanel({
   return (
     <div
       className={cn(
-        'relative flex flex-col gap-4 rounded-2xl border border-white/30 bg-white/60 p-4 shadow-lg shadow-sky-500/10 backdrop-blur-xl transition-colors duration-300 dark:border-slate-700/60 dark:bg-slate-950/50 dark:shadow-slate-900/40',
+        // QA調：完全透過＋ガラス＋グラデトップコート
+        'glass-scope group relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-white/40 bg-transparent p-4 shadow-lg shadow-sky-500/10 backdrop-blur-xl transition-all duration-300 dark:border-slate-700/60 dark:bg-transparent dark:shadow-indigo-900/40',
+        'before:absolute before:inset-0 before:rounded-2xl before:opacity-90 before:pointer-events-none before:bg-gradient-to-br before:from-[#8B5CF6]/0 before:via-[#A855F7]/0 before:to-[#C084FC]/25',
         className
       )}
       {...props}
@@ -138,7 +140,8 @@ export function FilterPanel({
           {statusOrder.map((status) => (
             <label
               key={status}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-sky-500/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-500/20 dark:border-slate-700/50 dark:bg-slate-950/60 dark:text-slate-100 dark:shadow-slate-900/40 dark:hover:shadow-indigo-900/50"
+              // 完全透過のチップ（境界とblurのみ）
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/40 bg-transparent px-3 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-sky-500/10 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-sky-500/20 dark:border-slate-700/50 dark:bg-transparent dark:text-slate-100 dark:shadow-slate-900/40 dark:hover:shadow-indigo-900/50"
             >
               <Checkbox
                 checked={selectedStatuses.includes(status)}
@@ -168,6 +171,7 @@ export function FilterPanel({
             value={dateRange.startDate ?? ''}
             onChange={(event) => handleDateChange('startDate', event.target.value)}
             leftElement={<Calendar className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+            className={cn('bg-transparent border-white/40 dark:bg-transparent dark:border-slate-700/50')}
           />
           <Input
             type="date"
@@ -176,6 +180,7 @@ export function FilterPanel({
             min={dateRange.startDate ?? undefined}
             onChange={(event) => handleDateChange('endDate', event.target.value)}
             leftElement={<Calendar className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+            className={cn('bg-transparent border-white/40 dark:bg-transparent dark:border-slate-700/50')}
           />
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -185,4 +190,3 @@ export function FilterPanel({
     </div>
   );
 }
-

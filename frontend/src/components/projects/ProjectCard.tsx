@@ -65,7 +65,7 @@ export function ProjectCard({
 
   return (
     <div
-      className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-slate-700/60 bg-white/70 dark:bg-slate-950/60 backdrop-blur-xl shadow-md shadow-sky-500/10 dark:shadow-slate-900/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-sky-500/20 dark:hover:shadow-indigo-900/40"
+      className="project-card group relative overflow-hidden rounded-xl border border-white/30 dark:border-slate-700/60 bg-white dark:bg-slate-950/60 shadow-md shadow-sky-500/10 dark:shadow-slate-900/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-sky-500/20 dark:hover:shadow-indigo-900/40 text-black dark:text-slate-100"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
@@ -76,7 +76,7 @@ export function ProjectCard({
       <div className="relative flex items-stretch">
         {/* ドラッグハンドル（左端） */}
         <div
-          className="flex items-center justify-center w-8 cursor-grab active:cursor-grabbing hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors"
+          className="flex items-center justify-center w-8 cursor-grab active:cursor-grabbing hover:bg-white/80 transition-colors dark:hover:bg-slate-800/50"
           {...dragListeners}
         >
           <GripVertical className="w-5 h-5 text-gray-400 dark:text-gray-600" />
@@ -86,7 +86,7 @@ export function ProjectCard({
         <div className="flex-1 p-4 space-y-3 cursor-pointer" onClick={handleCardClick}>
         {/* ヘッダー: プロジェクト名とステータス */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-bold text-gray-900 dark:text-slate-100 text-sm leading-tight flex-1">
+          <h3 className="font-bold text-black dark:text-slate-100 text-sm leading-tight flex-1">
             {project.name}
           </h3>
           <ProjectStatusBadge status={project.status} showIcon={false} className="flex-shrink-0" />
@@ -94,20 +94,20 @@ export function ProjectCard({
 
         {/* 顧客名 */}
         {project.customer_name && (
-          <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+          <div className="flex items-center gap-2 text-xs">
             <User className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">{project.customer_name}</span>
           </div>
         )}
 
         {/* 現場住所 */}
-        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-2 text-xs">
           <MapPin className="w-4 h-4 flex-shrink-0" />
           <span className="truncate">{truncateAddress(project.site_address)}</span>
         </div>
 
         {/* 期間 */}
-        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-2 text-xs">
           <Calendar className="w-4 h-4 flex-shrink-0" />
           <span>
             {formatDate(project.start_date)} 〜 {formatDate(project.end_date)}
@@ -115,14 +115,14 @@ export function ProjectCard({
         </div>
 
         {/* 最終更新日 */}
-        <div className="text-xs text-gray-500 dark:text-gray-500 pt-2 border-t border-white/30 dark:border-slate-700/50">
+        <div className="text-xs text-black dark:text-gray-400 pt-2 border-t border-white/30 dark:border-slate-700/50">
           更新: {formatDate(project.updated_at)}
         </div>
 
         {/* クイックアクション（ホバー時表示） */}
         {showActions && (
           <div
-            className="absolute top-2 right-2 flex gap-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-lg p-1 shadow-lg z-10"
+            className="absolute top-2 right-2 flex gap-1 bg-white dark:bg-slate-900/90 backdrop-blur-md rounded-lg p-1 shadow-lg z-10"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}

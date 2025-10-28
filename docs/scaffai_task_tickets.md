@@ -729,22 +729,23 @@ docs/
 
 ## ✏️ Phase 3: 作図機能（並列度: 高）
 
-### [TASK-301] Konva.js基盤構築
+> 参照: `docs/scaffai_drawing_mvp_requirements.md`（MVP要件のソース）
+
+### [TASK-301] キャンバス基盤・UIレイアウト
 ```yaml
 依存: TASK-108
-並列可: TASK-302, TASK-303
-ブランチ: feature/301-konva-foundation
+並列可: TASK-302, TASK-309
+ブランチ: feature/301-canvas-layout
 優先度: 🔴 最重要
 工数: 8h
-担当技術: Konva.js, React Konva
+担当技術: React, React-Konva, Tailwind, shadcn/ui
 ```
 
 **作業内容**:
-- Konva.jsセットアップ
-- CanvasStageコンポーネント実装
-- レイヤー管理（足場・建物・注記）
-- ズーム・パン機能
-- グリッド表示
+- Konva Stageの初期化とレイヤー構成（足場/注記）
+- ズーム・パン（ホイールズーム、スペース＋ドラッグでパン）
+- グリッド描画（150/300mm切替、スナップON/OFF）
+- UIレイアウト（ヘッダー・左右サイドバー・アンダーバー）
 
 **成果物**:
 ```
@@ -752,330 +753,277 @@ app/(protected)/draw/
 ├── page.tsx
 └── components/
     ├── CanvasStage.tsx
-    ├── LayerManager.tsx
-    └── GridOverlay.tsx
+    ├── GridOverlay.tsx
+    ├── Sidebars.tsx
+    └── Underbar.tsx
 ```
 
 **完了条件**:
-- Konvaキャンバスが表示
-- ズーム・パンが動作
-- レイヤー切替が可能
+- キャンバスが表示され、ズーム・パン・グリッド切替が機能
+- アンダーバーに座標/寸法が表示
 
 ---
 
-### [TASK-302] 描画ツールパネル実装
+### [TASK-302] モード切替（タブ＋ショートカット1〜4）
 ```yaml
 依存: TASK-301
-並列可: TASK-303, TASK-304
-ブランチ: feature/302-tool-panel
-優先度: 🔴 最重要
-工数: 8h
-担当技術: React, Konva.js
-```
-
-**作業内容**:
-- ツールパネルUI実装
-- 線描画ツール
-- 矩形描画ツール
-- 円描画ツール
-- テキストツール
-- 削除ツール
-- 選択・移動ツール
-
-**成果物**:
-```
-app/(protected)/draw/components/
-├── ToolPanel.tsx
-└── tools/
-    ├── LineTool.tsx
-    ├── RectTool.tsx
-    ├── CircleTool.tsx
-    ├── TextTool.tsx
-    └── DeleteTool.tsx
-```
-
-**完了条件**:
-- 全描画ツールが動作
-- ツール切替がスムーズ
-
----
-
-### [TASK-303] 図形プロパティ編集機能
-```yaml
-依存: TASK-301
-並列可: TASK-302, TASK-304
-ブランチ: feature/303-shape-properties
-優先度: 🟡 重要
-工数: 6h
-担当技術: React, Konva.js
-```
-
-**作業内容**:
-- プロパティパネル実装
-- 色変更
-- 線幅変更
-- 透明度変更
-- 図形削除
-- レイヤー移動
-
-**成果物**:
-```
-app/(protected)/draw/components/
-└── PropertyPanel.tsx
-```
-
-**完了条件**:
-- 選択図形のプロパティが編集可能
-
----
-
-### [TASK-304] 作図データ保存・読込機能
-```yaml
-依存: TASK-301
-並列可: TASK-302, TASK-303
-ブランチ: feature/304-drawing-save-load
-優先度: 🔴 最重要
-工数: 6h
-担当技術: Supabase Storage, Konva.js
-```
-
-**作業内容**:
-- Konva JSONシリアライゼーション
-- Supabase Storageへの保存API実装
-- 読込API実装
-- 自動保存機能
-
-**成果物**:
-```
-backend/routers/
-└── drawings.py
-    ├── POST /api/drawings/save
-    └── GET /api/drawings/{id}
-frontend/hooks/
-└── useDrawingSave.ts
-```
-
-**完了条件**:
-- 作図データが保存・読込可能
-- 自動保存が動作
-
----
-
-### [TASK-305] 足場割付ロジック実装（バックエンド）
-```yaml
-依存: TASK-103, TASK-004
-並列可: TASK-306
-ブランチ: feature/305-scaffold-calculation
-優先度: 🔴 最重要
-工数: 10h
-担当技術: Python, FastAPI
-```
-
-**作業内容**:
-- 足場割付アルゴリズム実装
-  - 1800/900単位計算
-  - 高さ段数計算
-  - 部材配置ロジック
-- 割付API実装（POST /api/scaffold/calculate）
-
-**成果物**:
-```
-backend/
-├── services/
-│   └── scaffold_service.py
-└── routers/
-    └── scaffold.py
-```
-
-**完了条件**:
-- 躯体幅・高さから自動割付が計算される
-- APIが正確な結果を返す
-
----
-
-### [TASK-306] 足場割付UI統合
-```yaml
-依存: TASK-301, TASK-305
-並列可: なし
-ブランチ: feature/306-scaffold-ui-integration
-優先度: 🔴 最重要
-工数: 8h
-担当技術: React, Konva.js
-```
-
-**作業内容**:
-- 割付設定パネル実装
-- 自動割付ボタン
-- 割付結果のKonvaキャンバスへの反映
-- プレビュー機能
-
-**成果物**:
-```
-app/(protected)/draw/components/
-├── ScaffoldPanel.tsx
-└── ScaffoldPreview.tsx
-```
-
-**完了条件**:
-- 自動割付ボタンで足場が配置される
-- 設定変更が即座に反映
-
----
-
-### [TASK-307] DXF出力機能実装
-```yaml
-依存: TASK-301, TASK-004
-並列可: TASK-308
-ブランチ: feature/307-dxf-export
-優先度: 🔴 最重要
-工数: 10h
-担当技術: dxf-writer, Konva.js
-```
-
-**作業内容**:
-- Konva JSON → DXF変換ロジック実装
-- DXFライブラリ統合（dxf-writer）
-- レイヤー別出力
-- DXFファイル生成
-
-**成果物**:
-```
-lib/
-└── dxfConverter.ts
-    ├── konvaToDxf()
-    └── exportDxf()
-```
-
-**完了条件**:
-- DXFファイルがダウンロード可能
-- AutoCAD/JW-CADで開ける
-
----
-
-### [TASK-308] 作図データSupabase Storage連携
-```yaml
-依存: TASK-304, TASK-307
-並列可: なし
-ブランチ: feature/308-drawing-storage
+並列可: TASK-303, TASK-309
+ブランチ: feature/302-mode-switch
 優先度: 🔴 最重要
 工数: 4h
-担当技術: Supabase Storage
-```
-
-**作業内容**:
-- DXFファイルのStorage保存
-- ファイルURL管理
-- ダウンロード機能
-
-**成果物**:
-- Storage連携完了
-
-**完了条件**:
-- DXFファイルがStorageに保存される
-- URLからダウンロード可能
-
----
-
-### [TASK-309] 作図履歴・Undo/Redo機能
-```yaml
-依存: TASK-301
-並列可: なし
-ブランチ: feature/309-drawing-history
-優先度: 🟡 重要
-工数: 6h
 担当技術: React, Zustand
 ```
 
 **作業内容**:
-- 履歴管理ロジック実装
-- Undo/Redoボタン
-- キーボードショートカット（Ctrl+Z, Ctrl+Y）
+- モードストア実装（draw/edit/memo/view）
+- タブUIとショートカット（1/2/3/4）の連動
+- 現在モードの視覚化（アクティブスタイル）
 
 **成果物**:
-```
-stores/
-└── historyStore.ts
-hooks/
-└── useHistory.ts
-```
+- `stores/drawingModeStore.ts`
+- `components/ModeTabs.tsx`
 
 **完了条件**:
-- Undo/Redoが動作
+- タブ/ショートカットでモードが切替わり、UIに反映
 
 ---
 
-### [TASK-310] 作図ショートカットキー実装
+### [TASK-303] サックスモード・スパン自動生成エンジン（Core）
 ```yaml
-依存: TASK-301, TASK-302
+依存: TASK-302
+並列可: TASK-304
+ブランチ: feature/303-sax-core
+優先度: 🔴 最重要
+工数: 12h
+担当技術: TypeScript, React-Konva
+```
+
+**作業内容**:
+- 始点→終点ドラッグからスパン長（mm）算出
+- スパン長に応じた部材自動生成（布材/柱/ブラケット/アンチ）
+- 方向ルール（左→右=下、上→下=左、右→左=上、下→上=右）の適用
+- `Shift`=ブラケットW/S切替、`Alt`=方向反転
+- `ScaffoldGroup` へのグルーピング
+
+**成果物**:
+- `lib/sax/engine.ts`（generateParts(line, settings)）
+- `types/scaffold.ts`（ScaffoldGroup/Part 型）
+
+**完了条件**:
+- 3600mm入力で要件例どおりの構成が生成される
+- グループ単位で選択/移動が可能
+
+---
+
+### [TASK-304] サックスモード・UI/操作（プレビュー＋確定）
+```yaml
+依存: TASK-303
 並列可: なし
-ブランチ: feature/310-drawing-shortcuts
+ブランチ: feature/304-sax-ui
+優先度: 🔴 最重要
+工数: 6h
+担当技術: React, React-Konva
+```
+
+**作業内容**:
+- ラバーバンド描画中の寸法プレビュー
+- プレビュー中にShift/Alt反映
+- マウスアップで確定→Canvasへ配置
+- グリッドスナップ（150/300）
+
+**成果物**:
+- `components/tools/SaxTool.tsx`
+
+**完了条件**:
+- プレビューと確定配置が直感的に操作できる
+
+---
+
+### [TASK-305] 編集モード・ポップアップUI
+```yaml
+依存: TASK-301
+並列可: TASK-306
+ブランチ: feature/305-edit-popover
+優先度: 🔴 最重要
+工数: 8h
+担当技術: React, shadcn/ui, React-Konva
+```
+
+**作業内容**:
+- 対象クリックで丸角ポップ（対象右上付近）
+- `Esc`で閉じる/`Enter`で確定、即時反映
+- 複数選択（Shift+クリック/投げ縄）
+- セクション別項目（柱/布材/ブラケット/アンチ/階段/梁枠）
+
+**成果物**:
+- `components/edit/EditPopover.tsx`
+
+**完了条件**:
+- 各部材の数量・種別・分割・追加が編集可能
+
+---
+
+### [TASK-306] 柱の高さ計算・マーカー/ジャッキ集計
+```yaml
+依存: TASK-305
+並列可: TASK-307
+ブランチ: feature/306-pillar-height
+優先度: 🟡 重要
+工数: 6h
+担当技術: TypeScript
+```
+
+**作業内容**:
+- `totalHeight=(levels×1900)+jack.height` の導入
+- マーカー（⚪/△/◻）による集計ルール実装
+- 集計値の導出（ジャッキ数量=丸マーカー数）
+
+**成果物**:
+- `lib/scaffold/pillar.ts`（height/marking/aggregate）
+
+**完了条件**:
+- 単体テストで計算/集計が正しい
+
+---
+
+### [TASK-307] メモモード（注記）
+```yaml
+依存: TASK-301
+並列可: TASK-306
+ブランチ: feature/307-memo-mode
+優先度: 🟡 重要
+工数: 4h
+担当技術: React, React-Konva
+```
+
+**作業内容**:
+- クリック配置/直接編集/削除
+- JSONへ `meta.memo` で保存
+- PNG出力時の表示ON/OFF
+
+**成果物**:
+- `components/tools/MemoTool.tsx`
+
+**完了条件**:
+- メモの作成/編集/削除と保存が可能
+
+---
+
+### [TASK-308] ビューモード（ホバーカード）
+```yaml
+依存: TASK-303
+並列可: TASK-310
+ブランチ: feature/308-view-hovercard
+優先度: 🟡 重要
+工数: 6h
+担当技術: React, Tailwind
+```
+
+**作業内容**:
+- 部材ホバーで情報カード表示（白/0.8、radius-2xl）
+- カーソル右上10px、アウト時フェードアウト
+- 表示項目: 種別/数量/段数/タイプ/長さ(mm)
+
+**成果物**:
+- `components/view/HoverCard.tsx`
+
+**完了条件**:
+- 編集無効の閲覧専用で情報確認できる
+
+---
+
+### [TASK-309] 保存・読込（Supabase JSON）＋自動保存
+```yaml
+依存: TASK-301
+並列可: TASK-302
+ブランチ: feature/309-save-load
+優先度: 🔴 最重要
+工数: 8h
+担当技術: Supabase, React
+```
+
+**作業内容**:
+- `stage.toJSON()` ベースで保存/読込
+- 差分自動保存（10秒 or 10アクション）
+- バージョン/プロジェクト紐付け
+
+**成果物**:
+```
+backend/routers/drawings.py
+frontend/hooks/useDrawingSave.ts
+```
+
+**完了条件**:
+- プロジェクト別に保存・復元でき、自動保存が動作
+
+---
+
+### [TASK-310] ショートカットと方向ルールの単体テスト
+```yaml
+依存: TASK-302, TASK-303
+並列可: TASK-308
+ブランチ: feature/310-shortcuts-tests
+優先度: 🟡 重要
+工数: 4h
+担当技術: Vitest
+```
+
+**作業内容**:
+- 1/2/3/4によるモード切替のテスト
+- Shift/Altの切替・反転挙動テスト
+- 方向ルール（描画→外向き）のテスト
+
+**成果物**:
+- `tests/unit/mode-shortcuts.test.ts`
+- `tests/unit/sax-direction.test.ts`
+
+**完了条件**:
+- 全テストがパスし、回帰を防止
+
+---
+
+### [TASK-311] 集計・アンダーバー（数量/座標/寸法）
+```yaml
+依存: TASK-301, TASK-306
+並列可: なし
+ブランチ: feature/311-underbar-aggregate
 優先度: 🟡 重要
 工数: 4h
 担当技術: React
 ```
 
 **作業内容**:
-- キーボードショートカット実装
-  - L: 線ツール
-  - R: 矩形ツール
-  - C: 円ツール
-  - T: テキストツール
-  - Delete: 削除
-  - Ctrl+S: 保存
-  - Ctrl+Z/Y: Undo/Redo
+- 選択情報/マウス座標/現在スパン寸法の表示
+- 柱/布材/ブラケット/アンチ/ジャッキ数量の集計表示
 
 **成果物**:
-- ショートカット機能
+- `components/Underbar.tsx` の集計領域
 
 **完了条件**:
-- 全ショートカットが動作
+- 表示がリアルタイムに更新され正確
 
 ---
 
-### [TASK-311] 作図機能統合テスト
+### [TASK-312] E2E（MVP Done条件）＋PNG出力
 ```yaml
-依存: TASK-301~310（全作図タスク）
+依存: TASK-301~311
 並列可: なし
-ブランチ: feature/311-drawing-integration-test
+ブランチ: feature/312-drawing-e2e
 優先度: 🔴 最重要
-工数: 6h
-担当技術: Playwright, Vitest
+工数: 10h
+担当技術: Playwright, Vitest, React-Konva
 ```
 
 **作業内容**:
-- E2Eテスト（作図〜保存〜DXF出力フロー）
-- ユニットテスト（割付ロジック、DXF変換）
-- バグ修正
+- E2E: 作図→編集→メモ→ビュー→保存→PNG出力
+- 性能計測（主要操作0.2秒以内）
+- バグ修正/安定化
 
 **成果物**:
-- `tests/e2e/drawing.spec.ts`
-- `tests/unit/scaffold.test.ts`
+- `tests/e2e/drawing-mvp.spec.ts`
 
 **完了条件**:
-- 全テストがパス
-
----
-
-### [TASK-312] 作図画面パフォーマンス最適化
-```yaml
-依存: TASK-311
-並列可: なし
-ブランチ: feature/312-drawing-performance
-優先度: 🟡 重要
-工数: 4h
-担当技術: React, Konva.js
-```
-
-**作業内容**:
-- レンダリング最適化
-- 大量図形時の描画速度改善
-- メモリ使用量削減
-
-**成果物**:
-- 最適化されたコード
-
-**完了条件**:
-- 1000個以上の図形でもスムーズに動作
+- 本要件書のDone条件を満たし、E2Eがパス
 
 ---
 
@@ -1615,13 +1563,18 @@ git checkout -b feature/105-api-integration
 #### Phase 3: 作図機能（最大5並列）
 
 **第1波（並列度: 3）**:
-- TASK-301（Konva基盤）
-- TASK-302（ツールパネル）
-- TASK-303（プロパティ）
+- TASK-301（キャンバス基盤・UI）
+- TASK-302（モード切替）
+- TASK-309（保存・自動保存）
 
 **第2波（並列度: 2）**:
-- TASK-305（割付ロジック）
-- TASK-307（DXF出力）
+- TASK-303（サックスCore）
+- TASK-304（サックスUI）
+
+**第3波（並列度: 3）**:
+- TASK-305（編集ポップ）
+- TASK-306（柱高さ/集計）
+- TASK-307（メモ）
 
 ---
 

@@ -178,6 +178,18 @@ git commit -m "修正"  # 具体性がない
 - 🚀 デプロイ関連
 - 🔒 セキュリティ関連
 
+---
+
+## 🎨 UIテーマ（ライトモード方針）
+
+- 対象: ダッシュボードのサイドバー、AIチャットサイドバー（右ペイン）
+- 背景: 透過ガラスのホワイト（`bg-white/70` + `backdrop-blur-lg`）
+- 枠線: ライトは `border-gray-200`、ダークは既存を維持
+- 文字色: ライトは黒（`text-black`）で統一、ダークは既存トークン（`text-foreground` 等）を維持
+- ホバー/アクティブ（ライト）: `hover:bg-white/50`、アクティブは `bg-white/60 ring-1 ring-black/10`
+- 実装箇所: `frontend/src/components/layout/Sidebar.tsx`、`frontend/src/components/layout/ChatSidebar.tsx`
+
+
 ### Git Worktree開発
 
 複数タスクの並列開発にはGit Worktreeを活用します。

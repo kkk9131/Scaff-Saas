@@ -45,14 +45,15 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={cn(
-        // 基本スタイル
-        'rounded-xl border-2 border-gray-200 bg-white text-gray-900',
-        'dark:border-gray-700 dark:bg-slate-800 dark:text-gray-100',
-        'shadow-md',
+        // 基本スタイル（ライト: 柔らかい白カード（bg-card） / ダーク: やわらかい白カード）
+        // 文字色はデザイントークン（--card-foreground）に委譲
+        // ui-card: ダッシュボード用のスコープ指定でスタイルを上書きしやすくするための識別クラス
+        'ui-card rounded-2xl border bg-card text-card-foreground shadow-md',
+        'dark:border-white/10 dark:bg-card dark:text-card-foreground dark:backdrop-blur-md',
         // トランジション
         'transition-all duration-200 ease-out',
         // ホバー効果
-        hoverable && 'hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1',
+        hoverable && 'hover:shadow-lg hover:scale-[1.01] hover:-translate-y-0.5',
         // クリック可能
         clickable && 'cursor-pointer active:scale-[0.98]',
         className
