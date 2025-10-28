@@ -46,6 +46,17 @@ interface DrawingState {
   history: DrawingElement[][];
   historyIndex: number;
 
+  // グリッド設定
+  gridSize: 150 | 300;
+  snapToGrid: boolean;
+  showGrid: boolean;
+  mousePosition: { x: number; y: number };
+
+  // UI状態
+  leftSidebarOpen: boolean;
+  rightSidebarOpen: boolean;
+  underbarVisible: boolean;
+
   // アクション - 要素操作
   addElement: (element: DrawingElement) => void;
   updateElement: (id: string, updates: Partial<DrawingElement>) => void;
@@ -65,6 +76,17 @@ interface DrawingState {
   setCanvasScale: (scale: number) => void;
   setCanvasPosition: (position: { x: number; y: number }) => void;
   resetCanvas: () => void;
+
+  // アクション - グリッド操作
+  setGridSize: (size: 150 | 300) => void;
+  toggleSnapToGrid: () => void;
+  toggleShowGrid: () => void;
+  setMousePosition: (position: { x: number; y: number }) => void;
+
+  // アクション - UI操作
+  toggleLeftSidebar: () => void;
+  toggleRightSidebar: () => void;
+  toggleUnderbar: () => void;
 
   // アクション - 履歴操作
   undo: () => void;
@@ -86,6 +108,17 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   canvasPosition: { x: 0, y: 0 },
   history: [[]],
   historyIndex: 0,
+
+  // グリッド設定の初期状態
+  gridSize: 150, // デフォルトは150mm
+  snapToGrid: true, // デフォルトでスナップON
+  showGrid: true, // デフォルトでグリッド表示ON
+  mousePosition: { x: 0, y: 0 },
+
+  // UI状態の初期状態
+  leftSidebarOpen: true, // デフォルトで左サイドバー表示
+  rightSidebarOpen: true, // デフォルトで右サイドバー表示
+  underbarVisible: true, // デフォルトでアンダーバー表示
 
   // 要素を追加
   addElement: (element) =>
@@ -169,6 +202,48 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
       canvasScale: 1,
       canvasPosition: { x: 0, y: 0 },
     }),
+
+  // グリッドサイズを設定（150mm or 300mm）
+  setGridSize: (size) =>
+    set({
+      gridSize: size,
+    }),
+
+  // スナップのON/OFF切替
+  toggleSnapToGrid: () =>
+    set((state) => ({
+      snapToGrid: !state.snapToGrid,
+    })),
+
+  // グリッド表示のON/OFF切替
+  toggleShowGrid: () =>
+    set((state) => ({
+      showGrid: !state.showGrid,
+    })),
+
+  // マウス座標を更新
+  setMousePosition: (position) =>
+    set({
+      mousePosition: position,
+    }),
+
+  // UI操作 - 左サイドバーの開閉
+  toggleLeftSidebar: () =>
+    set((state) => ({
+      leftSidebarOpen: !state.leftSidebarOpen,
+    })),
+
+  // UI操作 - 右サイドバーの開閉
+  toggleRightSidebar: () =>
+    set((state) => ({
+      rightSidebarOpen: !state.rightSidebarOpen,
+    })),
+
+  // UI操作 - アンダーバーの表示/非表示
+  toggleUnderbar: () =>
+    set((state) => ({
+      underbarVisible: !state.underbarVisible,
+    })),
 
   // 履歴を保存
   saveHistory: () =>

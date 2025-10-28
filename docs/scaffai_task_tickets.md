@@ -731,7 +731,7 @@ docs/
 
 > 参照: `docs/scaffai_drawing_mvp_requirements.md`（MVP要件のソース）
 
-### [TASK-301] キャンバス基盤・UIレイアウト
+### [TASK-301] 🚀 キャンバス基盤・UIレイアウト ✅
 ```yaml
 依存: TASK-108
 並列可: TASK-302, TASK-309

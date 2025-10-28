@@ -354,6 +354,14 @@
   ) {
     color: #fff !important;
   }
+
+  /* ダークモード時はガラスカード内のすべての文字を白へ */
+  .dark .glass-scope,
+  .dark .glass-scope * {
+    color: #fff !important;
+  }
+
+  /* glass-scopeクラス: 削除（コンポーネント側のTailwindクラスのみ使用） */
   /* コンポーネント属性で強制透過（安全ネット） */
   :root :is(aside[data-sidebar-root], aside[data-chat-root]) {
     background-color: transparent !important;
