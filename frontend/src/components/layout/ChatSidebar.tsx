@@ -134,26 +134,27 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
         )}
 
         {/* チャットサイドバー本体 */}
-        <aside
+        <aside data-chat-root
           ref={ref}
           className={cn(
             // 基本レイアウト
             'fixed right-0 top-16 z-40 flex h-[calc(100vh-4rem)] w-96 flex-col',
-            'border-l-2 border-gray-200 bg-white shadow-lg',
-            'dark:border-gray-700 dark:bg-slate-900',
+            // 背景は完全透過（ライト/ダーク共通）
+            'border-l border-gray-200 dark:border-gray-700 bg-transparent text-black',
             // アニメーション
             'transition-transform duration-300 ease-in-out',
             // 開閉状態の制御（全画面サイズで適用）
             isOpen ? 'translate-x-0' : 'translate-x-full',
             className
           )}
+          style={{ backgroundColor: 'transparent' }}
           {...props}
         >
           {/* ヘッダー */}
-          <div className="flex items-center justify-between border-b-2 border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center gap-3">
               {/* AIアイコン */}
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent shadow-md">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-gray-900 to-gray-700 dark:from-primary dark:to-accent shadow-md">
                 <svg
                   className="h-6 w-6 text-white"
                   fill="none"
@@ -168,9 +169,10 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                   />
                 </svg>
               </div>
-              <div>
-                <h3 className="font-bold text-foreground">AIアシスタント</h3>
-                <p className="text-xs text-muted-foreground">
+              <div className="chat-hero">
+                {/* ライトは黒、ダークは白で明瞭に */}
+                <h3 className="font-bold text-black dark:text-white">AIアシスタント</h3>
+                <p className="text-xs text-black/70 dark:text-white">
                   足場設計をサポート
                 </p>
               </div>
@@ -203,14 +205,14 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
             {messages.length === 0 ? (
               // 初期メッセージ
               <div className="flex h-full items-center justify-center">
-                <div className="max-w-sm text-center">
+                <div className="chat-hero max-w-sm text-center">
                   <div className="mb-4 flex justify-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent">
-                      <svg
-                        className="h-8 w-8 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-gray-900 to-gray-700 dark:from-primary dark:to-accent">
+                        <svg
+                          className="h-8 w-8 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
                         strokeWidth={2}
                       >
                         <path
@@ -221,10 +223,10 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                       </svg>
                     </div>
                   </div>
-                  <h4 className="mb-2 text-lg font-bold text-foreground">
+                  <h4 className="mb-2 text-lg font-bold text-black dark:text-white">
                     AIアシスタントにお任せ
                   </h4>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-black/70 dark:text-white">
                     足場設計のことなら何でも聞いてください。
                     <br />
                     自動見積や図面解析もサポートします。
@@ -244,7 +246,7 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                   >
                     {/* AIアバター（アシスタントの場合） */}
                     {message.role === 'assistant' && (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-900 to-gray-700 dark:from-primary dark:to-accent">
                         <svg
                           className="h-4 w-4 text-white"
                           fill="none"
@@ -266,8 +268,8 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                       className={cn(
                         'max-w-[80%] rounded-lg px-4 py-2',
                         message.role === 'user'
-                          ? 'bg-[#6366F1] text-white dark:bg-[#8B5CF6]'
-                          : 'bg-gray-100 text-gray-900 dark:bg-slate-800 dark:text-gray-100'
+                          ? 'bg-white text-black border border-black/10 shadow-sm dark:bg-slate-800 dark:text-white'
+                          : 'bg-gray-100 text-black dark:bg-slate-800 dark:text-gray-100'
                       )}
                     >
                       <p className="text-sm">{message.content}</p>
@@ -276,7 +278,7 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                           'mt-1 text-xs',
                           message.role === 'user'
                             ? 'text-white/70'
-                            : 'text-muted-foreground'
+                            : 'text-black/70 dark:text-muted-foreground'
                         )}
                       >
                         {message.timestamp.toLocaleTimeString('ja-JP', {
@@ -300,7 +302,7 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
           </div>
 
           {/* 入力エリア */}
-          <div className="border-t-2 border-gray-200 dark:border-gray-700 p-4">
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
             <div className="flex gap-2">
               <Input
                 value={inputMessage}
@@ -313,6 +315,7 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                 onClick={handleSend}
                 disabled={!inputMessage.trim()}
                 size="default"
+                className="bg-transparent bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-cyan-500/30 hover:opacity-95 focus-visible:ring-emerald-300"
                 iconLeft={
                   <svg
                     className="h-5 w-5"
@@ -332,7 +335,7 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
                 送信
               </Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-black/70 dark:text-muted-foreground">
               Shift + Enter で改行 | Enter で送信
             </p>
           </div>

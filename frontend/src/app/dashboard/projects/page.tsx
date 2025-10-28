@@ -12,17 +12,16 @@ import Fuse from 'fuse.js'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useRouter } from 'next/navigation'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { ChatSidebar, ChatMessage } from '@/components/layout/ChatSidebar'
-import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import DashboardShell from '@/components/layout/DashboardShell'
+import { type ChatMessage } from '@/components/layout/ChatSidebar'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectCreateModal } from '@/components/projects/ProjectCreateModal'
 import { ConfirmModal, Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { GradientText, Muted, Eyebrow } from '@/components/ui'
 import { Project, ProjectStatus } from '@/types/project'
 import { getProjects, deleteProject, duplicateProject, updateProjectStatus } from '@/lib/api/projects'
-import Image from 'next/image'
 import {
   DndContext,
   DragOverlay,
@@ -122,13 +121,11 @@ function SortableProjectCard({ project, onEdit, onDelete, onDuplicate }: Sortabl
 }
 
 export default function ProjectsPage() {
-  const { user, signOut, loading: authLoading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { isDark } = useTheme()
   const router = useRouter()
 
-  // サイドバーの開閉状態管理
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true)
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false)
+  // チャットメッセージ（AppShellへ渡す）
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
 
   // 検索・フィルター・ソート用の状態管理
@@ -394,17 +391,10 @@ export default function ProjectsPage() {
     setDateRange({ startDate: null, endDate: null })
   }
 
-  // 背景グラデーションと発光装飾（ダッシュボードと統一）
-  const backgroundGradientClass = isDark
-    ? 'bg-gradient-to-br from-sky-950 via-purple-900 to-slate-950'
-    : 'bg-gradient-to-br from-white via-sky-100 to-slate-100'
-  const topGlowClass = isDark ? 'bg-sky-500/40' : 'bg-sky-300/40'
-  const bottomGlowClass = isDark ? 'bg-fuchsia-600/40' : 'bg-rose-200/40'
-  const accentGlowClass = isDark ? 'bg-indigo-700/40' : 'bg-cyan-200/40'
-
-  // ガラスモーフィズムスタイル
-  const glassPanelClass =
-    'relative overflow-hidden rounded-2xl border border-white/30 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/50 backdrop-blur-xl shadow-xl shadow-sky-500/10 dark:shadow-slate-900/50 transition-colors duration-300'
+  // パネル（ダッシュボードと統一したガラスモーフィズム）
+  const glassPanelClass = isDark
+    ? 'relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50 backdrop-blur-md shadow-lg transition-all duration-300'
+    : 'relative overflow-hidden rounded-2xl border border-white/30 bg-card backdrop-blur-xl shadow-lg transition-all duration-300'
 
   /**
    * プロジェクト一覧を取得
@@ -658,10 +648,7 @@ export default function ProjectsPage() {
   /**
    * ログアウト処理
    */
-  const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
-  }
+  // サインアウトやヘッダー操作はAppShell側に委譲
 
   // 初回マウント時にプロジェクトを取得
   useEffect(() => {
@@ -683,110 +670,8 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div
-      className={`relative min-h-screen overflow-hidden transition-colors duration-500 ${backgroundGradientClass}`}
-    >
-      {/* 背景のグロー装飾 */}
-      <div
-        className={`pointer-events-none absolute -top-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl ${topGlowClass}`}
-      />
-      <div
-        className={`pointer-events-none absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 translate-y-1/3 rounded-full blur-3xl ${bottomGlowClass}`}
-      />
-      <div
-        className={`pointer-events-none absolute top-1/2 left-0 h-64 w-64 -translate-x-1/3 -translate-y-1/2 rounded-full blur-3xl ${accentGlowClass}`}
-      />
-
-      <div className="relative z-10">
-        {/* ヘッダー */}
-        <nav className="fixed top-0 left-0 right-0 z-50 border border-white/20 dark:border-slate-700/50 bg-white/70 dark:bg-slate-950/60 backdrop-blur-xl shadow-lg shadow-sky-500/10 dark:shadow-slate-900/40 transition-colors">
-          <div className="flex items-center justify-between h-16 px-4">
-            {/* 左側: サイドバートグル + ロゴ */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-                className="flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 hover:bg-white/40 hover:shadow-inner dark:hover:bg-slate-900/60"
-                aria-label="サイドバーを開閉"
-              >
-                <svg
-                  className="h-6 w-6 text-gray-700 dark:text-gray-200"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center h-10 w-10 rounded-xl border border-white/30 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl shadow-lg shadow-sky-500/20 dark:shadow-indigo-900/40">
-                  <Image
-                    src="/favicon.ico"
-                    alt="ScaffAIのロゴ"
-                    width={32}
-                    height={32}
-                    className="h-8 w-8 object-contain"
-                    priority
-                  />
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">ScaffAI</h1>
-              </div>
-            </div>
-
-            {/* 右側: ユーザー情報 + チャットトグル */}
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:bg-[#06B6D4]/15 dark:hover:bg-[#06B6D4]/30 text-[#06B6D4]"
-                aria-label="AIチャットを開閉"
-              >
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
-                <span className="hidden md:inline font-medium">AIチャット</span>
-              </button>
-              <ThemeToggle />
-              <span className="text-sm text-gray-700 dark:text-gray-200">{user?.email}</span>
-              <button
-                onClick={handleSignOut}
-                className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] shadow-lg shadow-sky-500/20 transition-all duration-300 hover:shadow-sky-500/40 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#6366F1]"
-              >
-                ログアウト
-              </button>
-            </div>
-          </div>
-        </nav>
-
-        {/* 左サイドバー（ナビゲーション） */}
-        <Sidebar
-          isOpen={isLeftSidebarOpen}
-          onClose={() => setIsLeftSidebarOpen(false)}
-          onToggle={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-        />
-
-        {/* メインコンテンツ */}
-        <main
-          className={`
-            pt-16 transition-all duration-300
-            ${isLeftSidebarOpen ? 'md:ml-64' : 'md:ml-20'}
-            ${isRightSidebarOpen ? 'md:mr-96' : 'md:mr-0'}
-          `}
-        >
-          <div className="p-6">
+    <DashboardShell chatMessages={chatMessages} onSendChatMessage={handleSendMessage}>
+      <div className="p-6">
             {/* ページヘッダー */}
             <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
@@ -804,12 +689,12 @@ export default function ProjectsPage() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+                <GradientText as="h1" className="text-3xl md:text-4xl font-bold">
                   プロジェクトボード
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                </GradientText>
+                <Muted>
                   絞り込み結果 {filteredProjectsCount} 件 / 全 {totalProjectsCount} 件
-                </p>
+                </Muted>
               </div>
               <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                 <Button
@@ -820,11 +705,13 @@ export default function ProjectsPage() {
                   onClick={() => setIsSearchPanelOpen((prev) => !prev)}
                   className={`rounded-2xl transition-all duration-300 ${
                     isSearchPanelOpen
-                      ? 'border-transparent bg-gradient-to-r from-[#0EA5E9] to-[#06B6D4] text-white shadow-lg shadow-sky-500/20 hover:-translate-y-0.5 hover:shadow-sky-500/40 dark:shadow-indigo-900/50'
-                      : 'text-slate-700 hover:border-[#06B6D4] hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] dark:text-slate-100 dark:hover:bg-[#06B6D4]/20 dark:hover:text-[#06B6D4]'
+                      ? 'border-transparent bg-gradient-to-r from-[#0EA5E9] to-[#06B6D4] text-black dark:text-white shadow-lg shadow-sky-500/20 hover:-translate-y-0.5 hover:shadow-sky-500/40 dark:shadow-indigo-900/50'
+                      : 'text-black hover:border-[#06B6D4] hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] dark:text-slate-100 dark:hover:bg-[#06B6D4]/20 dark:hover:text-[#06B6D4]'
                   }`}
                 >
-                  {isSearchPanelOpen ? '検索ツールを隠す' : '検索ツールを表示'}
+                  <span className="text-black dark:text-white">
+                    {isSearchPanelOpen ? '検索ツールを隠す' : '検索ツールを表示'}
+                  </span>
                   {isFilterActive && !isSearchPanelOpen && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[#06B6D4]/20 px-2 text-xs font-semibold text-[#06B6D4] dark:bg-[#06B6D4]/30">
                       ON
@@ -938,22 +825,22 @@ export default function ProjectsPage() {
                     >
                       <div className={glassPanelClass}>
                         {/* カラムヘッダー */}
-                        <div className="px-4 py-3 border-b border-white/30 dark:border-slate-700/50">
+                        <div className="px-4 py-3 border-b border-white/30 dark:border-slate-700/50 bg-transparent">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 text-sky-600 shadow-sm shadow-sky-500/10 dark:bg-slate-900/70 dark:text-sky-300 dark:shadow-indigo-900/40">
+                               <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/40 bg-white/10 backdrop-blur-md text-sky-600 shadow-sm shadow-sky-500/10 dark:border-slate-700/50 dark:bg-slate-950/40 dark:text-sky-300 dark:shadow-indigo-900/40">
                                 <column.Icon className="h-5 w-5" aria-hidden="true" />
                               </span>
-                              <h3 className="font-bold text-gray-900 dark:text-slate-100">{column.label}</h3>
+                              <h3 className="font-extrabold text-black dark:text-slate-100 tracking-tight">{column.label}</h3>
                             </div>
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/50 dark:bg-slate-800/50 text-gray-700 dark:text-gray-300">
+                             <span className="px-2 py-1 rounded-full text-xs font-medium border border-white/40 bg-white/10 backdrop-blur-md text-black dark:border-slate-700/50 dark:bg-slate-950/40 dark:text-slate-100">
                               {column.projects.length}件
                             </span>
                           </div>
                         </div>
 
                         {/* プロジェクトカード一覧（ドラッグ可能） */}
-                        <div className="p-4 space-y-3 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto">
+                        <div className="p-4 space-y-3 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto bg-transparent">
                           {column.projects.length === 0 ? (
                             <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                               該当するプロジェクトがありません
@@ -988,18 +875,6 @@ export default function ProjectsPage() {
                 ) : null}
               </DragOverlay>
             </DndContext>
-          </div>
-        </main>
-
-        {/* 右サイドバー（AIチャット） */}
-        <ChatSidebar
-          isOpen={isRightSidebarOpen}
-          onClose={() => setIsRightSidebarOpen(false)}
-          onToggle={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-          messages={chatMessages}
-          onSendMessage={handleSendMessage}
-        />
-
         <ConfirmModal
           isOpen={isDeleteModalOpen}
           onClose={handleDeleteModalClose}
@@ -1061,6 +936,6 @@ export default function ProjectsPage() {
           onSuccess={handleProjectCreated}
         />
       </div>
-    </div>
+    </DashboardShell>
   )
 }

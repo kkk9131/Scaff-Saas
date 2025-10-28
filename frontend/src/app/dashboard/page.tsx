@@ -14,25 +14,11 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { ChatSidebar, ChatMessage } from '@/components/layout/ChatSidebar'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
-import { ProjectStatsWidget } from '@/components/dashboard/ProjectStatsWidget'
-import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget'
+import { BentoGrid, BentoCard } from '@/components/dashboard/BentoGrid'
+import { Muted, GradientText, Eyebrow } from '@/components/ui'
 
 // モックデータ型定義
-interface Project {
-  id: string
-  name: string
-  preview: string
-  date: string
-  overlayGradientClass: string
-  iconBackgroundClass: string
-}
-
-interface ActiveSite {
-  id: string
-  name: string
-  location: string
-  progress: number
-}
+// （削除）最近のプロジェクト・稼働中現場の型は不要になったため除去
 
 interface QuickAction {
   id: string
@@ -54,54 +40,17 @@ export default function DashboardPage() {
   // チャットメッセージの状態管理
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
 
-  // 背景グラデーションと発光装飾（ログイン画面と統一）
-  const backgroundGradientClass = isDark
-    ? 'bg-gradient-to-br from-sky-950 via-purple-900 to-slate-950'
-    : 'bg-gradient-to-br from-white via-sky-100 to-slate-100'
-  const topGlowClass = isDark ? 'bg-sky-500/40' : 'bg-sky-300/40'
-  const bottomGlowClass = isDark ? 'bg-fuchsia-600/40' : 'bg-rose-200/40'
-  const accentGlowClass = isDark ? 'bg-indigo-700/40' : 'bg-cyan-200/40'
-
-  // ガラスモーフィズム風カードの共通クラス
-  const glassCardClass =
-    'group relative overflow-hidden rounded-2xl border border-white/40 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/50 backdrop-blur-xl shadow-lg shadow-sky-500/10 dark:shadow-slate-900/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-sky-500/25 dark:hover:shadow-indigo-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-  const glassPanelClass =
-    'relative overflow-hidden rounded-2xl border border-white/30 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/50 backdrop-blur-xl shadow-xl shadow-sky-500/10 dark:shadow-slate-900/50 transition-colors duration-300'
+  // ライト/ダークで見た目を切替（lightは白カード/ darkは白10%ガラス）
+  const glassCardClass = isDark
+    ? 'group relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50 backdrop-blur-md shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl'
+    : 'group relative overflow-hidden rounded-2xl border border-white/30 bg-card backdrop-blur-xl shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl'
+  const glassPanelClass = isDark
+    ? 'relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50 backdrop-blur-md shadow-lg transition-colors duration-300'
+    : 'relative overflow-hidden rounded-2xl border border-white/30 bg-card backdrop-blur-xl shadow-lg transition-colors duration-300'
   const glassHoverOverlayBase =
     'before:absolute before:inset-0 before:rounded-2xl before:opacity-0 before:transition-opacity before:duration-500 group-hover:before:opacity-100'
   const iconWrapperBase =
-    'relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-white/40 dark:border-slate-700/50 backdrop-blur-xl shadow-md shadow-sky-500/20 dark:shadow-indigo-900/40'
-
-  // モックデータ: 直近3つのプロジェクト（プレビューは絵文字で代用）
-  const recentProjects: Project[] = [
-    {
-      id: '1',
-      name: '〇〇マンション建設プロジェクト',
-      preview: '🏗️',
-      date: '2025-10-20',
-      overlayGradientClass:
-        'before:bg-gradient-to-br before:from-[#06B6D4]/0 before:via-[#6366F1]/0 before:to-[#8B5CF6]/45',
-      iconBackgroundClass: 'bg-gradient-to-br from-[#06B6D4]/25 via-[#6366F1]/30 to-[#8B5CF6]/40',
-    },
-    {
-      id: '2',
-      name: '△△ビル改修工事',
-      preview: '🔧',
-      date: '2025-10-18',
-      overlayGradientClass:
-        'before:bg-gradient-to-br before:from-[#F97316]/0 before:via-[#FB923C]/0 before:to-[#F59E0B]/45',
-      iconBackgroundClass: 'bg-gradient-to-br from-[#F97316]/25 via-[#FB923C]/30 to-[#F59E0B]/35',
-    },
-    {
-      id: '3',
-      name: '□□住宅新築案件',
-      preview: '🏠',
-      date: '2025-10-15',
-      overlayGradientClass:
-        'before:bg-gradient-to-br before:from-[#22C55E]/0 before:via-[#0EA5E9]/0 before:to-[#14B8A6]/45',
-      iconBackgroundClass: 'bg-gradient-to-br from-[#22C55E]/25 via-[#0EA5E9]/30 to-[#14B8A6]/35',
-    },
-  ]
+    'relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-border dark:border-slate-700/50 backdrop-blur-xl shadow-md shadow-sky-500/20 dark:shadow-indigo-900/40'
 
   // モックデータ: クイックアクション（アイコンは絵文字のまま）
   const quickActions: QuickAction[] = [
@@ -139,32 +88,7 @@ export default function DashboardPage() {
     },
   ]
 
-  // モックデータ: 稼働中現場
-  const activeSites: ActiveSite[] = [
-    {
-      id: '1',
-      name: '〇〇マンション',
-      location: '東京都渋谷区',
-      progress: 75,
-    },
-    {
-      id: '2',
-      name: '△△ビル',
-      location: '大阪府大阪市',
-      progress: 45,
-    },
-    {
-      id: '3',
-      name: '□□住宅',
-      location: '福岡県福岡市',
-      progress: 90,
-    },
-  ]
-
-  // モックデータ: 目標売上
-  const targetRevenue = 10000000 // 1000万円
-  const currentRevenue = 6500000 // 650万円
-  const revenueProgress = (currentRevenue / targetRevenue) * 100
+  // （削除）最近のプロジェクト・稼働中現場・目標売上は非表示要件のためデータごと撤去
 
   /**
    * ログアウト処理
@@ -212,22 +136,28 @@ export default function DashboardPage() {
 
   return (
     <div
-      className={`relative min-h-screen overflow-hidden transition-colors duration-500 ${backgroundGradientClass}`}
+      className={`dashboard-scope relative min-h-screen overflow-hidden transition-colors duration-500 ${
+        isDark ? 'aurora-bg text-white' : 'bg-gradient-to-br from-white via-sky-100 to-slate-100'
+      }`}
     >
-      {/* 背景のグロー装飾 */}
-      <div
-        className={`pointer-events-none absolute -top-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl ${topGlowClass}`}
-      />
-      <div
-        className={`pointer-events-none absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 translate-y-1/3 rounded-full blur-3xl ${bottomGlowClass}`}
-      />
-      <div
-        className={`pointer-events-none absolute top-1/2 left-0 h-64 w-64 -translate-x-1/3 -translate-y-1/2 rounded-full blur-3xl ${accentGlowClass}`}
-      />
+      {/* ライトモード時のみ、元のグラデ用グロー装飾を再表示 */}
+      {!isDark && (
+        <>
+          <div className={`pointer-events-none absolute -top-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl bg-sky-300/40`} />
+          <div className={`pointer-events-none absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 translate-y-1/3 rounded-full blur-3xl bg-rose-200/40`} />
+          <div className={`pointer-events-none absolute top-1/2 left-0 h-64 w-64 -translate-x-1/3 -translate-y-1/2 rounded-full blur-3xl bg-cyan-200/40`} />
+        </>
+      )}
 
       <div className="relative z-10">
         {/* ヘッダー */}
-        <nav className="fixed top-0 left-0 right-0 z-50 border border-white/20 dark:border-slate-700/50 bg-white/70 dark:bg-slate-950/60 backdrop-blur-xl shadow-lg shadow-sky-500/10 dark:shadow-slate-900/40 transition-colors">
+        <nav
+          className={`fixed top-0 left-0 right-0 z-50 transition-colors ${
+            isDark
+              ? 'border border-white/10 bg-black/20 backdrop-blur-lg'
+              : 'border border-white/30 bg-white/20 backdrop-blur-lg shadow-md shadow-sky-500/10'
+          }`}
+        >
           <div className="flex items-center justify-between h-16 px-4">
             {/* 左側: サイドバートグル + ロゴ */}
             <div className="flex items-center gap-4">
@@ -251,7 +181,7 @@ export default function DashboardPage() {
                 </svg>
               </button>
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center h-10 w-10 rounded-xl border border-white/30 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl shadow-lg shadow-sky-500/20 dark:shadow-indigo-900/40">
+                <div className="flex items-center justify-center h-10 w-10 rounded-xl border border-white/30 bg-white/20 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
                   <Image
                     src="/favicon.ico"
                     alt="ScaffAIのロゴ"
@@ -261,7 +191,8 @@ export default function DashboardPage() {
                     priority
                   />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">ScaffAI</h1>
+                {/* ブランド見出しもカードと同じライトグレー/ダークは明色に揃える */}
+                <h1 className="text-2xl font-bold text-card-foreground">ScaffAI</h1>
               </div>
             </div>
 
@@ -269,9 +200,9 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:bg-[#06B6D4]/15 dark:hover:bg-[#06B6D4]/30 text-[#06B6D4]"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 hover:scale-[1.02] text-[#06B6D4] hover:bg-[#06B6D4]/15 dark:text-cyan-300 dark:hover:bg-white/10 border border-transparent dark:border-white/10"
                 aria-label="AIチャットを開閉"
-              >
+          >
                 <svg
                   className="h-6 w-6"
                   fill="none"
@@ -288,12 +219,13 @@ export default function DashboardPage() {
                 <span className="hidden md:inline font-medium">AIチャット</span>
               </button>
               <ThemeToggle />
-              <span className="text-sm text-gray-700 dark:text-gray-200">
+              {/* メールアドレスもライトグレー/ダークは明色に統一 */}
+              <span className="text-sm text-card-foreground">
                 {user?.email}
               </span>
               <button
                 onClick={handleSignOut}
-                className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] shadow-lg shadow-sky-500/20 transition-all duration-300 hover:shadow-sky-500/40 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#6366F1]"
+                className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold text-card-foreground bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
               >
                 ログアウト
               </button>
@@ -316,131 +248,43 @@ export default function DashboardPage() {
             ${isRightSidebarOpen ? 'md:mr-96' : 'md:mr-0'}
           `}
         >
-          <div className="p-6 space-y-6">
-            {/* プロジェクト統計セクション */}
-            <ProjectStatsWidget />
-
-            {/* 目標売上セクション */}
-            <div className={`${glassPanelClass} p-6`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">目標売上</h2>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {currentRevenue.toLocaleString()}円 / {targetRevenue.toLocaleString()}円
-                </span>
-              </div>
-              <div className="w-full bg-white/40 dark:bg-slate-800/50 rounded-full h-4 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-[#6366F1] via-[#06B6D4] to-[#8B5CF6] h-4 rounded-full transition-all duration-500"
-                  style={{ width: `${revenueProgress}%` }}
-                />
-              </div>
-              <p className="mt-3 text-sm font-medium text-right text-gray-700 dark:text-gray-200">
-                {revenueProgress.toFixed(1)}% 達成
-              </p>
+          <div className="p-6">
+            {/* タイトル行（GradientTextでかっこよく） */}
+            <div className="mb-6">
+              <GradientText as="h1" className="text-3xl md:text-4xl font-bold">
+                ダッシュボード
+              </GradientText>
+              <Muted className="mt-1">最近のプロジェクトに素早くアクセスできます。</Muted>
             </div>
 
-            {/* 最近のアクティビティウィジェット */}
-            <RecentActivityWidget />
-
-            {/* 直近3つのプロジェクト */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">直近のプロジェクト</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {recentProjects.map((project) => (
-                  <div
-                    key={project.id}
-                    className={`${glassCardClass} cursor-pointer p-6 ${glassHoverOverlayBase} ${project.overlayGradientClass}`}
-                  >
-                    <div className="mb-4 flex justify-center">
-                      <div className={`${iconWrapperBase} ${project.iconBackgroundClass}`}>
-                        <span className="text-3xl drop-shadow-lg" role="img" aria-label={project.name}>
-                          {project.preview}
-                        </span>
-                      </div>
-                    </div>
-                    <h3 className="font-bold text-gray-900 dark:text-slate-100 mb-2 text-center">
-                      {project.name}
-                    </h3>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 text-center">{project.date}</p>
+            {/* Bento Grid */}
+            <BentoGrid>
+              {/* クイックアクション（1列） */}
+              <BentoCard
+                className="force-white-card"
+                header={(
+                  <div>
+                    <Eyebrow>Quick</Eyebrow>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* クイックアクション */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">クイックアクション</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {quickActions.map((action) => (
-                  <button
-                    key={action.id}
-                    className={`${glassCardClass} p-6 ${glassHoverOverlayBase} ${action.overlayGradientClass}`}
-                    type="button"
-                  >
-                    <div className="flex flex-col items-center gap-3">
-                      <div className={`${iconWrapperBase} ${action.iconBackgroundClass}`}>
-                        <span className="text-3xl" role="img" aria-label={action.label}>
-                          {action.icon}
-                        </span>
+                )}
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  {quickActions.map((action) => (
+                    <button key={action.id} className={`${glassCardClass} p-6 ${glassHoverOverlayBase} ${action.overlayGradientClass}`} type="button">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className={`${iconWrapperBase} ${action.iconBackgroundClass}`}>
+                          <span className="text-3xl" role="img" aria-label={action.label}>{action.icon}</span>
+                        </div>
+                        <span className="font-medium text-gray-900 dark:text-slate-100">{action.label}</span>
                       </div>
-                      <span className="font-medium text-gray-900 dark:text-slate-100">{action.label}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+                    </button>
+                  ))}
+                </div>
+              </BentoCard>
 
-            {/* 稼働中現場リスト */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">稼働中現場</h2>
-              <div className={`${glassPanelClass} overflow-hidden`}>
-                <table className="min-w-full divide-y divide-white/40 dark:divide-slate-800/60">
-                  <thead className="bg-white/40 dark:bg-slate-950/40">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-600 dark:text-gray-300 uppercase">
-                        現場名
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-600 dark:text-gray-300 uppercase">
-                        場所
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-600 dark:text-gray-300 uppercase">
-                        進捗
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white/30 dark:bg-slate-950/40 divide-y divide-white/40 dark:divide-slate-800/60">
-                    {activeSites.map((site) => (
-                      <tr
-                        key={site.id}
-                        className="transition-colors duration-200 hover:bg-white/55 dark:hover:bg-slate-900/60"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                            {site.name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-700 dark:text-gray-300">{site.location}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 bg-white/40 dark:bg-slate-800/50 rounded-full h-2 overflow-hidden">
-                              <div
-                                className="h-2 rounded-full bg-gradient-to-r from-[#10B981] via-[#22D3EE] to-[#6366F1] transition-all"
-                                style={{ width: `${site.progress}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900 dark:text-slate-100 w-12 text-right">
-                              {site.progress}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              {/* プロジェクト統計はMVPでは非表示（削除） */}
+              {/* 最近のアクティビティ / 最近のプロジェクト / 稼働中現場 / 目標売上 はライト・ダークともに非表示 */}
+            </BentoGrid>
           </div>
         </main>
 

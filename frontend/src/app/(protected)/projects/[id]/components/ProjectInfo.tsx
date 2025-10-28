@@ -2,15 +2,15 @@
 
 import * as React from 'react';
 import { ProjectStatusBadge } from '@/components/projects/ProjectStatusBadge';
+import { Muted } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import type { Project } from '@/types/project';
 
 /**
- * ガラスモーフィズム調のパネルスタイル
- * ダッシュボード全体で使用している質感に合わせるための共通クラス。
+ * ガラスモーフィズム調のパネル（検索ツールカードと同質感）
  */
 const panelBaseClass =
-  'relative overflow-hidden rounded-2xl border border-white/30 dark:border-slate-700/60 bg-white/60 dark:bg-slate-950/50 backdrop-blur-xl shadow-xl shadow-sky-500/10 dark:shadow-slate-900/50 transition-colors duration-300';
+  'glass-scope group relative overflow-hidden rounded-2xl border border-white/40 dark:border-slate-700/60 bg-transparent dark:bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 dark:shadow-slate-900/50 transition-all duration-300 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30';
 
 /**
  * プロジェクト基本情報カード
@@ -90,7 +90,7 @@ export function ProjectInfo({ project, className }: ProjectInfoProps) {
         </div>
         {/* プロジェクトの説明は任意項目のため、存在する場合のみ表示 */}
         {project.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300">{project.description}</p>
+          <Muted>{project.description}</Muted>
         )}
       </header>
 
@@ -98,7 +98,7 @@ export function ProjectInfo({ project, className }: ProjectInfoProps) {
         {basicInfo.map((item) => (
           <div
             key={item.label}
-            className="rounded-lg border border-dashed border-white/40 bg-white/70 p-4 text-gray-900 shadow-sm dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100"
+            className="rounded-lg border border-dashed border-white/40 bg-transparent backdrop-blur-sm p-4 text-gray-900 shadow-sm dark:text-slate-100 dark:border-slate-700 dark:bg-transparent"
           >
             <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
               {item.label}

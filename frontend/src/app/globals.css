@@ -50,8 +50,8 @@
     --muted: 210 20% 96%;
     --muted-foreground: 220 9% 46%;
 
-    /* Card: 白カード */
-    --card: 0 0% 100%;
+    /* Card: 柔らかい白カード（わずかに落ち着いた白） */
+    --card: 0 0% 98%;
     --card-foreground: 220 13% 26%;
 
     /* Popover: 白ポップオーバー */
@@ -66,15 +66,84 @@
     /* ボーダー半径 */
     --radius: 0.75rem;
   }
+  /* ダッシュボード専用（ライトモード）カード文字色のスコープ調整 */
+  .dashboard-scope {
+    /* ライトモード時はカード内テキストと背景を調整 */
+    --card-foreground: 220 9% 46%;
+    /* 5枚のダッシュボードカードは純白寄りに（グレー見え対策） */
+    --card: 0 0% 100%;
+    /* 背景により馴染む超ライトグレー（タイルや行の面色） */
+    --surface-soft: 210 20% 99%;
+  }
+  /* ダークモードでは従来の明るい文字色を維持 */
+  .dark .dashboard-scope {
+    --card-foreground: 210 40% 98%;
+    /* ダーク時はカード色をダークトークンで上書き（ライト用上書きを打ち消す） */
+    --card: 225 25% 15%;
+    --surface-soft: 225 20% 12%;
+  }
+  /*
+    ダッシュボード内カードの本文テキスト色を統一
+    - 一部の明示的な text-gray-* 指定を上書きするため、スコープ＋やや強めの指定を使用
+  */
+  .dashboard-scope .ui-card,
+  .dashboard-scope .bento-card {
+    color: hsl(var(--card-foreground));
+  }
+  /* ダッシュボード5枚のカードを確実に白系に固定（ライト時） */
+  .dashboard-scope .force-white-card {
+    /* 親カードは透過 */
+    background-color: transparent !important;
+  }
+  /* ネストされたCard類（ui-card等）も同じ白に固定 */
+  .dashboard-scope .force-white-card .ui-card,
+  .dashboard-scope .force-white-card .bento-card,
+  .dashboard-scope .force-white-card .project-card {
+    background-color: hsl(var(--card)) !important;
+  }
+  /* project-cardをライトモード時のみ直接白に */
+  :not(.dark) .dashboard-scope .project-card {
+    background-color: white !important;
+  }
+  /* project-card内のテキストをライトモード時のみ黒に強制（アクションボタンは除外） */
+  :not(.dark) .dashboard-scope .project-card *:not(button):not(button *) {
+    color: black !important;
+  }
+  /* アクションボタンのアイコンは元の色を保持 */
+  :not(.dark) .dashboard-scope .project-card button svg {
+    color: inherit !important;
+  }
+  /* 典型的に使われる濃いグレー指定をカード内ではライトグレーへ矯正（ヘッダー含む） */
+  .dashboard-scope .ui-card .text-gray-900,
+  .dashboard-scope .ui-card .text-gray-800,
+  .dashboard-scope .ui-card .text-gray-700,
+  .dashboard-scope .ui-card .text-gray-600,
+  .dashboard-scope .ui-card .text-gray-600\/90,
+  .dashboard-scope .ui-card .text-gray-500,
+  .dashboard-scope .bento-card .text-gray-900,
+  .dashboard-scope .bento-card .text-gray-800,
+  .dashboard-scope .bento-card .text-gray-700,
+  .dashboard-scope .bento-card .text-gray-600,
+  .dashboard-scope .bento-card .text-gray-600\/90,
+  .dashboard-scope .bento-card .text-gray-500 {
+    color: hsl(var(--card-foreground)) !important;
+  }
+  /* （削除）kanban-panel は不要。検索ツールの3カードのみ調整対象。 */
+  /* プロジェクト一覧ページの検索ボタンと列ヘッダーをライトモード時のみ黒に */
+  :not(.dark) .dashboard-scope button span,
+  :not(.dark) .dashboard-scope h3 {
+    color: black !important;
+  }
 }
 
 /* ダークモードの変数定義 - 青×赤紫のグラデーション + グレー基調 + ブラッドオレンジアクセント */
 .dark {
-  --background: 225 30% 11%; /* ダークブルーグレー背景 */
+  /* ダーク背景カラー（#101c22 近似のHSL） */
+  --background: 200 38% 10%;
   --foreground: 210 40% 98%; /* 明るい文字 */
 
-  /* Primary: 深い青 */
-  --primary: 220 80% 50%;
+  /* Primary: #1193d4 基調（hsl(201,85%,45%) 近似） */
+  --primary: 201 85% 45%;
   --primary-foreground: 0 0% 100%;
 
   /* Secondary: 赤紫 */
@@ -112,7 +181,7 @@
   /* Border & Input: ダークグレー */
   --border: 220 20% 25%;
   --input: 220 20% 25%;
-  --ring: 220 80% 50%; /* 青のフォーカスリング */
+  --ring: 201 85% 45%; /* プライマリに合わせたリング */
 }
 
 /* ============================================
@@ -208,6 +277,98 @@
    カスタムユーティリティ
    ============================================ */
 @layer utilities {
+  /* Loginページ: ライト時は入力欄の背景を純白に強制 */
+  html:not(.dark) .login-page input {
+    background-color: #ffffff !important;
+  }
+  html:not(.dark) .login-page input::-webkit-input-placeholder { color: #64748b !important; }
+  html:not(.dark) .login-page input::placeholder { color: #64748b !important; }
+  /* チャットヒーローテキストの色を明示: ライト=黒、ダーク=白 */
+  html:not(.dark) .chat-hero,
+  html:not(.dark) .chat-hero * {
+    color: #000 !important;
+  }
+  .dark .chat-hero,
+  .dark .chat-hero * {
+    color: #fff !important;
+  }
+  /* ライトモード時、ガラスカード内で white 系の文字だけ黒へ矯正（グレーはそのまま） */
+  html:not(.dark) .glass-scope .text-white,
+  html:not(.dark) .glass-scope .text-slate-50,
+  html:not(.dark) .glass-scope .text-slate-100,
+  html:not(.dark) .glass-scope .text-gray-50,
+  html:not(.dark) .glass-scope .text-neutral-50,
+  html:not(.dark) .glass-scope .text-zinc-50,
+  body:not(.dark) .glass-scope .text-white,
+  body:not(.dark) .glass-scope .text-slate-50,
+  body:not(.dark) .glass-scope .text-slate-100,
+  body:not(.dark) .glass-scope .text-gray-50,
+  body:not(.dark) .glass-scope .text-neutral-50,
+  body:not(.dark) .glass-scope .text-zinc-50 {
+    color: #000 !important;
+  }
+
+  /* 追加: ライトモード時、ガラスカード内のグレー系も黒へ（他の色系は維持） */
+  html:not(.dark) .glass-scope :is(
+    [class^="text-gray-"], [class*=" text-gray-"],
+    [class^="text-slate-"], [class*=" text-slate-"],
+    [class^="text-neutral-"], [class*=" text-neutral-"],
+    [class^="text-zinc-"], [class*=" text-zinc-"],
+    [class^="text-stone-"], [class*=" text-stone-"]
+  ) {
+    color: #000 !important;
+  }
+  body:not(.dark) .glass-scope :is(
+    [class^="text-gray-"], [class*=" text-gray-"],
+    [class^="text-slate-"], [class*=" text-slate-"],
+    [class^="text-neutral-"], [class*=" text-neutral-"],
+    [class^="text-zinc-"], [class*=" text-zinc-"],
+    [class^="text-stone-"], [class*=" text-stone-"]
+  ) {
+    color: #000 !important;
+  }
+
+  /* 変数ベースの前景色を使う要素も黒へ寄せる */
+  html:not(.dark) .glass-scope,
+  body:not(.dark) .glass-scope {
+    --foreground: 0 0% 0%;
+    --card-foreground: 0 0% 0%;
+  }
+
+  /* 最終保険: ライト時はガラスカード内のすべての文字を黒へ */
+  html:not(.dark) .glass-scope,
+  html:not(.dark) .glass-scope *,
+  body:not(.dark) .glass-scope,
+  body:not(.dark) .glass-scope * {
+    color: #000 !important;
+  }
+
+  /* ダークモード時は白系のテキストを白のままに固定（ライト用の上書きは影響なし） */
+  .dark .glass-scope :is(
+    .text-white,
+    .text-slate-50,
+    .text-slate-100,
+    .text-gray-50,
+    .text-neutral-50,
+    .text-zinc-50
+  ) {
+    color: #fff !important;
+  }
+  /* コンポーネント属性で強制透過（安全ネット） */
+  :root :is(aside[data-sidebar-root], aside[data-chat-root]) {
+    background-color: transparent !important;
+  }
+  /* オーロラ風の背景（ダーク基調） */
+  .aurora-bg {
+    background-color: #0d1117; /* ベース */
+    background-image:
+      radial-gradient(at 20% 15%, hsla(168, 70%, 50%, 0.10) 0px, transparent 50%),
+      radial-gradient(at 80% 20%, hsla(190, 80%, 60%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 10% 85%, hsla(242, 70%, 70%, 0.20) 0px, transparent 50%),
+      radial-gradient(at 75% 90%, hsla(260, 60%, 65%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, hsla(220, 70%, 40%, 0.10) 0px, transparent 70%);
+    background-attachment: fixed;
+  }
   /* ガラスモルフィズム効果 */
   .glass {
     background: rgba(255, 255, 255, 0.8);
@@ -260,5 +421,41 @@
   .animate-slide-in-right {
     animation: slide-in-right 0.4s ease-out;
   }
-}
 
+  /* サイドバー/チャット用のホワイトガラス（ライト専用上書き） */
+  .sidebar-glass {
+    /* ライト時は純白ガラスを強制（紺色被り対策でimportant） */
+    background-color: rgba(255, 255, 255, 0.88) !important;
+    -webkit-backdrop-filter: saturate(1.5) blur(12px);
+    backdrop-filter: saturate(1.5) blur(12px);
+  }
+  .chat-glass {
+    background-color: rgba(255, 255, 255, 0.88) !important;
+    -webkit-backdrop-filter: saturate(1.5) blur(12px);
+    backdrop-filter: saturate(1.5) blur(12px);
+  }
+  /* 完全透過（背景そのまま見せるガラス） */
+  .sidebar-glass-transparent {
+    background-color: transparent !important;
+    -webkit-backdrop-filter: brightness(1.1) saturate(1.2) blur(12px);
+    backdrop-filter: brightness(1.1) saturate(1.2) blur(12px);
+  }
+  .chat-glass-transparent {
+    background-color: transparent !important;
+    -webkit-backdrop-filter: brightness(1.1) saturate(1.2) blur(12px);
+    backdrop-filter: brightness(1.1) saturate(1.2) blur(12px);
+  }
+  /* ダーク時は従来のダーク面へ戻す */
+  .dark .sidebar-glass,
+  .dark .chat-glass {
+    background-color: rgb(15, 23, 42) !important; /* slate-900 */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .dark .sidebar-glass-transparent,
+  .dark .chat-glass-transparent {
+    background-color: rgba(2, 6, 23, 0.6) !important; /* slate-950/60 */
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}

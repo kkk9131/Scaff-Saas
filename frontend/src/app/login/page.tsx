@@ -73,10 +73,12 @@ export default function LoginPage() {
     throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID must be set in production')
   }
 
-  // テーマに応じた背景グラデーションと装飾色を計算
+  // テーマに応じた背景（新デフォルトに統一）
+  // - ダーク: ダッシュボードと同じ aurora-bg
+  // - ライト: ホワイト→スカイ→スレートの柔らかいグラデ
   const backgroundGradientClass =
     themeMode === 'dark'
-      ? 'bg-gradient-to-br from-sky-950 via-purple-900 to-slate-950'
+      ? 'aurora-bg text-white'
       : 'bg-gradient-to-br from-white via-sky-100 to-slate-100'
 
   const topGlowClass =
@@ -207,7 +209,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className={`min-h-screen flex items-center justify-center ${backgroundGradientClass} py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden`}
+      className={`login-page min-h-screen flex items-center justify-center ${backgroundGradientClass} py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden`}
     >
       <Script
         src="https://accounts.google.com/gsi/client"
@@ -225,22 +227,20 @@ export default function LoginPage() {
         <ThemeToggle />
       </div>
 
-      {/* 背景装飾 */}
+      {/* 背景装飾（ダッシュボードと同型のオブジェクト） */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* ダーク/ライトで色味だけ切替 */}
         <div className={`absolute -top-48 -right-40 w-[32rem] h-[32rem] ${topGlowClass} rounded-full blur-3xl`}></div>
         <div className={`absolute -bottom-48 -left-40 w-[36rem] h-[36rem] ${bottomGlowClass} rounded-full blur-[120px]`}></div>
         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] ${accentGlowClass} rounded-full blur-[90px] opacity-70`}></div>
-        {themeMode === 'dark' ? (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.25),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.15),transparent_40%),radial-gradient(circle_at_60%_80%,rgba(255,255,255,0.1),transparent_45%)]" />
-        ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,rgba(255,255,255,0.65),transparent_50%),radial-gradient(circle_at_70%_20%,rgba(255,255,255,0.45),transparent_45%),radial-gradient(circle_at_50%_75%,rgba(255,255,255,0.55),transparent_50%)]" />
-        )}
       </div>
 
       {/* ログインカード */}
       <div className="max-w-md w-full space-y-8 relative z-10">
         {/* カード */}
-        <div className="bg-card/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 p-8 sm:p-10 animate-fade-in-up">
+        <div
+          className="glass-scope group relative overflow-hidden rounded-2xl border border-white/40 dark:border-slate-700/60 bg-transparent dark:bg-transparent backdrop-blur-xl shadow-2xl shadow-sky-500/10 dark:shadow-slate-900/50 p-8 sm:p-10 animate-fade-in-up before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-30 before:bg-gradient-to-br before:from-[#06B6D4]/0 before:via-[#22D3EE]/0 before:to-[#6366F1]/25"
+        >
           {/* ヘッダー */}
           <div className="text-center space-y-4">
             {/* ロゴ */}
@@ -261,7 +261,7 @@ export default function LoginPage() {
 
             {/* タイトル */}
             <div className="space-y-2">
-              <h2 className="text-3xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+              <h2 className="text-3xl font-extrabold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent dark:!text-white dark:bg-none">
                 ScaffAI にログイン
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -302,7 +302,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 relative z-10 bg-white dark:!bg-slate-900/80"
                     placeholder="your@email.com"
                     disabled={loading}
                   />
@@ -325,6 +325,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  className="relative z-10 bg-white dark:!bg-slate-900/80"
                   disabled={loading}
                 />
               </div>
@@ -352,7 +353,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-indigo-500 hover:from-emerald-400/90 hover:via-cyan-400/90 hover:to-indigo-500/90 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-cyan-500/30 focus-visible:ring-emerald-300 transition-all duration-200"
               size="lg"
             >
               {loading ? (
