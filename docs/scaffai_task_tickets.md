@@ -731,7 +731,7 @@ docs/
 
 > 参照: `docs/scaffai_drawing_mvp_requirements.md`（MVP要件のソース）
 
-### [TASK-301] 🚀 キャンバス基盤・UIレイアウト ✅
+### [TASK-301] 🚀 キャンバス基盤・UIレイアウト ✅ 🚀
 ```yaml
 依存: TASK-108
 並列可: TASK-302, TASK-309
@@ -764,7 +764,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-302] 🚀 モード切替（タブ＋ショートカット1〜4）
+### [TASK-302] 🚀 モード切替（タブ＋ショートカット1〜4） 🚀
 ```yaml
 依存: TASK-301
 並列可: TASK-303, TASK-309
@@ -788,7 +788,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-303] 🚀 サックスモード・スパン自動生成エンジン（Core）
+### [TASK-303] 🚀 サックスモード・スパン自動生成エンジン（Core） 🚀
 ```yaml
 依存: TASK-302
 並列可: TASK-304
@@ -815,7 +815,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-304] 🚀 サックスモード・UI/操作（プレビュー＋確定）
+### [TASK-304] 🚀 サックスモード・UI/操作（プレビュー＋確定） 🚀
 ```yaml
 依存: TASK-303
 並列可: なし

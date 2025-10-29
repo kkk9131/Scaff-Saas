@@ -10,11 +10,11 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useDrawingModeStore, DrawingMode, MODES } from '@/stores/drawingModeStore';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PencilRuler, Wrench, StickyNote, Eye } from 'lucide-react';
 
 /**
  * ModeTabsコンポーネント
@@ -22,8 +22,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
  */
 export default function ModeTabs() {
   const { currentMode, setMode } = useDrawingModeStore();
-  const { modeTabsVisible, toggleModeTabs } = useDrawingStore();
+  const { modeTabsVisible, toggleModeTabs, leftSidebarOpen } = useDrawingStore();
   const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   // ショートカットキー（1/2/3/4）のグローバルリスナー
   useEffect(() => {
@@ -74,12 +75,27 @@ export default function ModeTabs() {
   // モードの配列
   const modeList: DrawingMode[] = ['draw', 'edit', 'memo', 'view'];
 
+  // 絵文字ではなくアイコン（lucide-react）を使用
+  const MODE_ICONS: Record<DrawingMode, ReactNode> = {
+    draw: <PencilRuler size={18} />,
+    edit: <Wrench size={18} />,
+    memo: <StickyNote size={18} />,
+    view: <Eye size={18} />,
+  };
+
   // 折りたたみ状態の場合
+  // サイドバー開閉に応じて左位置を可変に（重なり回避）
+  const leftClass = leftSidebarOpen ? 'left-24' : 'left-4';
+
   if (!modeTabsVisible) {
     return (
       <button
         onClick={toggleModeTabs}
-        className="glass-scope fixed top-20 left-4 z-20 rounded-xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 p-2 transition-all hover:bg-white/10 before:absolute before:inset-0 before:rounded-xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
+        /*
+         * サイドバー開時に重ならないよう、左位置を動的に（left-24）
+         * 縦位置はサイドバー(top-20)より少し下の top-40 に配置
+         */
+        className={`glass-scope fixed top-40 ${leftClass} z-20 rounded-xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 p-2 transition-all hover:bg-white/10 before:absolute before:inset-0 before:rounded-xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50`}
         title="モードタブを表示"
         aria-label="モードタブを表示"
       >
@@ -89,8 +105,8 @@ export default function ModeTabs() {
   }
 
   return (
-    <div className="glass-scope fixed top-20 left-4 z-20 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50">
-      {/* 折りたたみボタン */}
+    <div className={`glass-scope fixed top-20 ${leftClass} z-20 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50`}>
+      
       <div className="relative flex justify-end p-2 border-b border-white/20 dark:border-slate-700/50">
         <button
           onClick={toggleModeTabs}
@@ -107,50 +123,48 @@ export default function ModeTabs() {
           const modeInfo = MODES[mode];
           const isActive = currentMode === mode;
 
+          // グローオーバーレイはビルドエラー回避のため一旦無効化（必要なら別実装で復活）
+
+          // ボタンのクラスを事前計算
+          const baseBtnClass = 'group relative flex items-center justify-center rounded-xl p-3 transition-all duration-200';
+          const stateClass = isActive
+            ? 'bg-gradient-to-r from-sky-500/20 to-indigo-500/20 text-sky-500 dark:text-sky-300 shadow-md shadow-sky-500/20'
+            : 'text-slate-600 hover:bg-white/10 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white';
+          const btnClassName = baseBtnClass + ' ' + stateClass;
+
+          // ツールチップのクラス（テーマに合わせて明暗を完全指定）
+          const tooltipClass =
+            'pointer-events-none absolute left-full top-1/2 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-lg border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-50 ' +
+            (isDark
+              ? 'border-slate-700 bg-black text-white'
+              : 'border-slate-300 bg-white text-black');
+
           return (
             <button
               key={mode}
               onClick={() => handleModeClick(mode)}
-              className={`
-                group relative flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200
-                ${
-                  isActive
-                    ? 'bg-gradient-to-r from-sky-500/20 to-indigo-500/20 text-slate-900 dark:text-white shadow-md shadow-sky-500/20'
-                    : 'text-slate-600 hover:bg-white/10 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }
-              `}
+              className={btnClassName}
               title={`${modeInfo.name} (ショートカット: ${modeInfo.shortcutKey})`}
-              aria-label={`${modeInfo.name} - ${modeInfo.description}`}
+              aria-label={`${modeInfo.name}`}
             >
-              {/* アクティブ時の左側インジケーター */}
-              {isActive && (
+              
+              {isActive ? (
                 <div className="absolute left-0 top-1/2 h-1/2 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-sky-500 to-indigo-500" />
-              )}
+              ) : null}
 
-              {/* アイコン */}
-              <span className="text-xl">{modeInfo.icon}</span>
+              
+              <span className="text-xl flex items-center justify-center">
+                {MODE_ICONS[mode]}
+              </span>
 
-              {/* モード名とショートカット */}
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-semibold">{modeInfo.name}</span>
-                <span className="text-xs opacity-60">{modeInfo.shortcutKey}</span>
+              <div className={tooltipClass} role="tooltip">
+                {modeInfo.name}（{modeInfo.shortcutKey}）
               </div>
-
-              {/* ホバー時のグロー効果 */}
-              {!isActive && (
-                <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity group-hover:opacity-100 bg-gradient-to-r from-sky-400/10 to-indigo-400/10" />
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* 説明テキスト */}
-      <div className="relative border-t border-white/20 dark:border-slate-700/50 px-4 py-2">
-        <p className="text-xs text-slate-600 dark:text-slate-400">
-          {MODES[currentMode].description}
-        </p>
-      </div>
     </div>
   );
 }

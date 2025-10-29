@@ -13,6 +13,7 @@
 import { Line } from 'react-konva';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
+import { DEFAULT_SCALE } from '@/lib/utils/scale';
 
 interface GridOverlayProps {
   width: number;
@@ -46,8 +47,9 @@ export default function GridOverlay({
   const mainLineColor = theme === 'dark' ? '#94a3b8' : '#64748b'; // ダーク: slate-400, ライト: slate-500
   const subLineColor = theme === 'dark' ? '#cbd5e1' : '#94a3b8'; // ダーク: slate-300, ライト: slate-400
 
-  // グリッド間隔をピクセル単位に変換（1mm = 1px想定）
-  const gridSpacing = gridSize;
+  // グリッド間隔をピクセル単位に変換（DEFAULT_SCALE = 10mm/pxを考慮）
+  // 例: gridSize=150mm → gridSpacing=15px → 実際の距離=15px×10mm/px=150mm
+  const gridSpacing = gridSize / DEFAULT_SCALE;
 
   // 表示領域のキャンバス座標を計算（スケールとポジションを考慮）
   const startX = Math.floor(-position.x / scale / gridSpacing) * gridSpacing;

@@ -20,6 +20,7 @@ import { generateScaffoldSpan } from '@/lib/sax/spanGenerator';
 import { snapPositionToGrid, DEFAULT_SCALE } from '@/lib/utils/scale';
 import GridOverlay from './GridOverlay';
 import SaxTool from './SaxTool';
+import ScaffoldRenderer from './ScaffoldRenderer';
 
 /**
  * CanvasStageコンポーネント
@@ -135,13 +136,13 @@ export default function CanvasStage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Shiftキーでブラケットサイズを切替（W ⇔ S）
-      if (e.key === 'Shift' && currentMode === 'draw' && currentTool === 'scaffold') {
+      if (e.key === 'Shift' && currentMode === 'draw') {
         e.preventDefault();
         setBracketSize(bracketSize === 'W' ? 'S' : 'W');
       }
 
       // Altキーで方向反転フラグをON
-      if (e.key === 'Alt' && currentMode === 'draw' && currentTool === 'scaffold') {
+      if (e.key === 'Alt' && currentMode === 'draw') {
         e.preventDefault();
         setDirectionReversed(true);
       }
@@ -214,8 +215,8 @@ export default function CanvasStage() {
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
-    // サックスモードでのスパン描画開始
-    if (currentMode === 'draw' && currentTool === 'scaffold' && !isPanning) {
+    // サックスモードでのスパン描画開始（モードがdrawであれば描画可能）
+    if (currentMode === 'draw' && !isPanning) {
       // キャンバス座標系に変換（スケールとポジションを考慮）
       let canvasX = (pos.x - canvasPosition.x) / canvasScale;
       let canvasY = (pos.y - canvasPosition.y) / canvasScale;
@@ -379,7 +380,8 @@ export default function CanvasStage() {
             currentPoint={spanCurrent}
             color={currentColor}
           />
-          {/* ここに足場の図形要素が描画される（将来実装） */}
+          {/* サックスモード生成済みの足場グループを描画 */}
+          <ScaffoldRenderer />
         </Layer>
 
         {/* 注記レイヤー（メモやテキスト） */}
