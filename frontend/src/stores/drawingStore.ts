@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { BracketSize, ScaffoldGroup } from '@/types/scaffold';
+import type { BracketSize, ScaffoldGroup, ScaffoldPartType } from '@/types/scaffold';
 
 // 作図要素の型定義
 export interface DrawingElement {
@@ -58,6 +58,13 @@ interface DrawingState {
   bracketSize: BracketSize;
   directionReversed: boolean;
 
+  // 編集モード設定
+  /**
+   * 編集対象の部材種別
+   * - 編集モード時に左サイドバーで選択する対象（柱/布材/ブラケット/アンチ/階段/梁枠）
+   */
+  editTargetType: ScaffoldPartType;
+
   // 足場グループ
   scaffoldGroups: ScaffoldGroup[];
 
@@ -98,6 +105,13 @@ interface DrawingState {
   setBracketSize: (size: BracketSize) => void;
   setDirectionReversed: (reversed: boolean) => void;
   toggleDirectionReversed: () => void;
+
+  // アクション - 編集モード操作
+  /**
+   * 編集対象の部材種別を設定
+   * @param type - '柱' | '布材' | 'ブラケット' | 'アンチ' | '階段' | '梁枠'
+   */
+  setEditTargetType: (type: ScaffoldPartType) => void;
 
   // アクション - 足場グループ操作
   addScaffoldGroup: (group: ScaffoldGroup) => void;
@@ -143,6 +157,9 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   bracketSize: 'W', // デフォルトはW（600mm）
   directionReversed: false, // デフォルトは通常方向
   scaffoldGroups: [], // 足場グループは空
+
+  // 編集モード設定の初期状態
+  editTargetType: '柱', // デフォルトは柱を編集対象にする
 
   // UI状態の初期状態
   leftSidebarOpen: true, // デフォルトで左サイドバー表示
@@ -341,6 +358,12 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
     set((state) => ({
       directionReversed: !state.directionReversed,
     })),
+
+  // 編集モード操作 - 編集対象部材の設定
+  setEditTargetType: (type) =>
+    set({
+      editTargetType: type,
+    }),
 
   // 足場グループを追加
   addScaffoldGroup: (group) =>

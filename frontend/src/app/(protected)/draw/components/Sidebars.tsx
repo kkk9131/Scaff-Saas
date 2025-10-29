@@ -11,6 +11,8 @@
 'use client';
 
 import { useDrawingStore } from '@/stores/drawingStore';
+import { useDrawingModeStore } from '@/stores/drawingModeStore';
+import type { ScaffoldPartType } from '@/types/scaffold';
 import {
   Grid3x3,
   Magnet,
@@ -43,7 +45,10 @@ function LeftSidebar() {
     setCurrentColor,
     leftSidebarOpen,
     toggleLeftSidebar,
+    editTargetType,
+    setEditTargetType,
   } = useDrawingStore();
+  const { currentMode } = useDrawingModeStore();
 
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -72,13 +77,41 @@ function LeftSidebar() {
     </button>
   );
 
+  /**
+   * 編集対象の部材ボタン
+   * - 編集モード時のみ表示
+   * - 6種（柱/布材/ブラケット/アンチ/階段/梁枠）
+   */
+  const EditTargetButton = ({
+    type,
+    glyph,
+  }: {
+    type: ScaffoldPartType;
+    /** 小さな表示文字（1～2文字） */
+    glyph: string;
+  }) => (
+    <button
+      onClick={() => setEditTargetType(type)}
+      className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold transition-all select-none ${
+        editTargetType === type
+          ? 'bg-gradient-to-br from-cyan-400/20 via-sky-400/20 to-indigo-500/20 outline outline-2 outline-cyan-400 text-sky-300'
+          : 'text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+      }`}
+      aria-label={`編集対象: ${type}`}
+      title={`編集対象: ${type}`}
+    >
+      <span>{glyph}</span>
+      <div className={tooltipCls} role="tooltip">編集対象: {type}</div>
+    </button>
+  );
+
   return (
     <aside
-      className={`glass-scope fixed left-4 top-20 z-10 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50 transition-all duration-300 ${
+      className={`glass-scope fixed left-4 top-20 bottom-20 z-10 overflow-hidden rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50 transition-all duration-300 ${
         leftSidebarOpen ? 'w-16' : 'w-12'
       }`}
     >
-      <div className="relative flex flex-col gap-2 p-3">
+      <div className="relative flex h-full flex-col gap-2 p-3 overflow-y-auto overscroll-contain">
         <button
           onClick={toggleLeftSidebar}
           className="flex h-8 w-full items-center justify-center rounded-lg text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all mb-2"
@@ -175,6 +208,28 @@ function LeftSidebar() {
               <Swatch color="blue" label="Blue" />
               <Swatch color="green" label="Green" />
             </div>
+
+            {/* 編集モード時のみ: 編集対象の部材選択 */}
+            {currentMode === 'edit' && (
+              <>
+                {/* 区切り */}
+                <div className="my-2 h-px bg-white/20 dark:bg-slate-700/50" />
+                {/* セクション見出し（視覚的な説明） */}
+                <div className="mb-1 text-[10px] font-semibold tracking-wider text-slate-600 dark:text-slate-400 text-center">編集対象</div>
+                {/* 6種の部材タイプ選択（2列） */}
+                <div className="grid grid-cols-1 gap-2">
+                  {/* 柱 / 布材 */}
+                  <EditTargetButton type="柱" glyph="柱" />
+                  <EditTargetButton type="布材" glyph="布" />
+                  {/* ブラケット / アンチ */}
+                  <EditTargetButton type="ブラケット" glyph="ブ" />
+                  <EditTargetButton type="アンチ" glyph="ア" />
+                  {/* 階段 / 梁枠 */}
+                  <EditTargetButton type="階段" glyph="階" />
+                  <EditTargetButton type="梁枠" glyph="梁" />
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
