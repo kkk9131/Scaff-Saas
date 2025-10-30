@@ -21,6 +21,7 @@ import { snapPositionToGrid, DEFAULT_SCALE } from '@/lib/utils/scale';
 import GridOverlay from './GridOverlay';
 import SaxTool from './SaxTool';
 import ScaffoldRenderer from './ScaffoldRenderer';
+import PillarQuantityCard from './PillarQuantityCard';
 
 /**
  * CanvasStageコンポーネント
@@ -73,6 +74,19 @@ export default function CanvasStage() {
   } | null>(null);
 
   /**
+   * 柱数量カードの状態
+   * - オーバーレイはStageコンテナ内で絶対配置
+   */
+  const [pillarCard, setPillarCard] = useState<
+    | {
+        anchor: { x: number; y: number };
+        groupId: string;
+        partId: string;
+      }
+    | null
+  >(null);
+
+  /**
    * リサイズハンドラー
    * ウィンドウサイズ変更時にStageサイズを更新
    */
@@ -95,7 +109,7 @@ export default function CanvasStage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // スペースキーが押されたらパンモードに切替
-      if (e.code === 'Space' && !isPanning) {
+      if (e.code === 'Space' && !isPanning && currentMode === 'draw') {
         e.preventDefault();
         setIsPanning(true);
         // カーソルをgrabに変更
@@ -381,7 +395,13 @@ export default function CanvasStage() {
             color={currentColor}
           />
           {/* サックスモード生成済みの足場グループを描画 */}
-          <ScaffoldRenderer />
+          <ScaffoldRenderer
+            stageWidth={stageSize.width}
+            stageHeight={stageSize.height}
+            onPillarClick={({ anchor, groupId, partId }) => {
+              setPillarCard({ anchor, groupId, partId });
+            }}
+          />
         </Layer>
 
         {/* 注記レイヤー（メモやテキスト） */}
@@ -389,6 +409,20 @@ export default function CanvasStage() {
           {/* ここに注記・メモが描画される（将来実装） */}
         </Layer>
       </Stage>
+
+      {/* 柱の数量調整カード（オーバーレイ） */}
+      {pillarCard && (
+        <PillarQuantityCard
+          groupId={pillarCard.groupId}
+          partId={pillarCard.partId}
+          screenPosition={{
+            // キャンバス座標 → スクリーン座標へ変換し、少し右下へオフセット
+            left: pillarCard.anchor.x * canvasScale + canvasPosition.x + 12,
+            top: pillarCard.anchor.y * canvasScale + canvasPosition.y + 12,
+          }}
+          onClose={() => setPillarCard(null)}
+        />
+      )}
     </div>
   );
 }

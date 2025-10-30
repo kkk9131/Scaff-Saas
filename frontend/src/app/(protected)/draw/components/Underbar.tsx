@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { Keyboard, ArrowUp, MousePointer2, ZoomIn, X } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 /**
  * Underbarコンポーネント
@@ -30,6 +31,13 @@ export default function Underbar() {
   const [shiftDown, setShiftDown] = useState(false);
   const [altDown, setAltDown] = useState(false);
   const [spaceDown, setSpaceDown] = useState(false);
+
+  // サイドバーのツールチップスタイルと統一
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const tooltipCls = `pointer-events-none absolute left-full top-1/2 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-50 ${
+    isDark ? 'border-slate-700 bg-black text-white' : 'border-slate-300 bg-white text-black'
+  }`;
 
   /**
    * グローバルなキーダウン/アップを監視して状態を更新
@@ -74,9 +82,7 @@ export default function Underbar() {
                 <ArrowUp size={12} />
                 <span>Shift</span>
               </div>
-              <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity border-slate-300 bg-white text-black dark:border-slate-700 dark:bg-black dark:text-white">
-                ブラケットW/S切替（押下でトグル）
-              </div>
+              <div className={tooltipCls}>ブラケットW/S切替（押下でトグル）</div>
             </div>
 
             {/* Alt */}
@@ -86,9 +92,7 @@ export default function Underbar() {
               <div className="flex items-center gap-1">
                 <span className="text-[10px]">Alt</span>
               </div>
-              <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity border-slate-300 bg-white text-black dark:border-slate-700 dark:bg-black dark:text-white">
-                方向反転（押下中のみ有効）
-              </div>
+              <div className={tooltipCls}>方向反転（押下中のみ有効）</div>
             </div>
 
             {/* Space */}
@@ -99,9 +103,7 @@ export default function Underbar() {
                 <MousePointer2 size={12} />
                 <span>Space</span>
               </div>
-              <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity border-slate-300 bg-white text-black dark:border-slate-700 dark:bg-black dark:text-white">
-                パンモード（押下中のみ有効）
-              </div>
+              <div className={tooltipCls}>パンモード（押下中のみ有効）</div>
             </div>
           </div>
         </div>
@@ -126,11 +128,11 @@ export default function Underbar() {
         {/* 非表示ボタン */}
         <button
           onClick={toggleUnderbar}
-          className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all"
-          title="ステータスバーを非表示"
+          className="group relative flex h-6 w-6 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all"
           aria-label="ステータスバーを非表示"
         >
           <X size={14} />
+          <div className={tooltipCls}>ステータスバーを非表示</div>
         </button>
       </div>
     </footer>

@@ -10,7 +10,10 @@
 
 'use client';
 
-import { Group, Line, Circle, Rect, Text } from 'react-konva';
+import * as React from 'react';
+import { v4 as uuidv4 } from 'uuid';
+
+import { Group, Line, Circle, Rect, Text, RegularPolygon } from 'react-konva';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import type { ScaffoldGroup, ScaffoldPart } from '@/types/scaffold';
@@ -80,10 +83,32 @@ function translateGroup(
  * - ストアから足場グループを取得し、Konva要素として描画
  * - グループ単位でドラッグ可能
  */
-export default function ScaffoldRenderer() {
-  const { scaffoldGroups, updateScaffoldGroup, editTargetType, canvasScale } = useDrawingStore();
+export default function ScaffoldRenderer({
+  stageWidth,
+  stageHeight,
+  onPillarClick,
+}: {
+  stageWidth: number;
+  stageHeight: number;
+  /**
+   * 柱の黄色発光部分クリック時に呼び出されるコールバック
+   * 画面外HTMLオーバーレイを出すためにキャンバス座標のアンカーと対象IDを渡す
+   */
+  onPillarClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+}) {
+  const { scaffoldGroups, updateScaffoldGroup, editTargetType, canvasScale, canvasPosition } = useDrawingStore();
   const { currentMode } = useDrawingModeStore();
   const { isDark } = useTheme();
+
+  // ホバー中の柱（マーカー変更対象）
+  const [hoveredPillar, setHoveredPillar] = React.useState<
+    | { groupId: string; partId: string }
+    | null
+  >(null);
 
   // ダーク/ライトでの白色変換対応
   const colorToStroke = (color: string) =>
@@ -99,6 +124,50 @@ export default function ScaffoldRenderer() {
     coreRadius: 5 * invScale,
     shadowBlur: 14 * invScale,
   } as const;
+
+  // 画面内判定（キャンバス座標→スクリーン座標へ変換して可視チェック）
+  const isOnScreenPoint = (x: number, y: number, margin = 48) => {
+    const sx = x * canvasScale + canvasPosition.x;
+    const sy = y * canvasScale + canvasPosition.y;
+    return sx >= -margin && sy >= -margin && sx <= stageWidth + margin && sy <= stageHeight + margin;
+  };
+
+  // 簡易ハッシュ（0..1）: 各IDに位相オフセットを付与して群れの同期を避ける
+  const hash01 = (s: string) => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return (h % 1000) / 1000;
+  };
+
+  // パルスアニメーション（編集モード中のみ駆動、約30fps）
+  const [pulseTime, setPulseTime] = React.useState(0);
+  React.useEffect(() => {
+    if (currentMode !== 'edit') return; // 編集時のみ
+    let raf = 0;
+    let last = 0;
+    const loop = (t: number) => {
+      if (t - last >= 33) {
+        setPulseTime(t / 1000);
+        last = t;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [currentMode]);
+
+  // パルスから不透明度・半径スケールを算出
+  const getPulseOpacity = (base: number, id: string, anchor: { x: number; y: number }) => {
+    if (!isOnScreenPoint(anchor.x, anchor.y)) return base;
+    const off = hash01(id) * Math.PI * 2;
+    const wave = 0.7 + 0.3 * Math.sin(pulseTime * 2.0 + off);
+    return Math.max(0, Math.min(1, base * wave));
+  };
+  const getRadiusScale = (id: string, anchor: { x: number; y: number }) => {
+    if (!isOnScreenPoint(anchor.x, anchor.y)) return 1;
+    const off = hash01(id) * Math.PI * 2;
+    return 0.95 + 0.10 * Math.sin(pulseTime * 1.6 + off);
+  };
   const TIP_GLOW = {
     gradRadius: 9 * invScale,
     ringRadius: 6.5 * invScale,
@@ -144,6 +213,53 @@ export default function ScaffoldRenderer() {
 
   return (
     <>
+      {/* スペースキーでマーカー種別を切替（ホバー中の柱が対象） */}
+      {React.useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+          if (e.code !== 'Space') return;
+          if (!hoveredPillar) return;
+          if (!(currentMode === 'edit' && editTargetType === '柱')) return;
+          e.preventDefault();
+          const { groupId, partId } = hoveredPillar;
+          // 現在のグループを取得
+          const group = scaffoldGroups.find((g) => g.id === groupId);
+          if (!group) return;
+          const parts = group.parts.map((p) => {
+            if (p.id !== partId) return p;
+            // 現在のマーカー種別と方向を取得
+            const current = p.marker || 'circle';
+            const dir = typeof p.meta?.markerDirection === 'number' ? p.meta!.markerDirection : 0;
+            let nextMarker: 'circle' | 'triangle' | 'square' = 'circle';
+            let nextDir = 0;
+            if (current === 'circle') {
+              nextMarker = 'triangle';
+              nextDir = 0; // 右（0°）
+            } else if (current === 'triangle') {
+              // 0→90→180→270→square
+              const seq = [0, 90, 180, 270] as const;
+              const idx = Math.max(0, seq.indexOf(dir as any));
+              if (idx < seq.length - 1) {
+                nextMarker = 'triangle';
+                nextDir = seq[idx + 1];
+              } else {
+                nextMarker = 'square';
+                nextDir = 0;
+              }
+            } else if (current === 'square') {
+              nextMarker = 'circle';
+              nextDir = 0;
+            }
+            return {
+              ...p,
+              marker: nextMarker,
+              meta: { ...(p.meta || {}), markerDirection: nextDir },
+            };
+          });
+          updateScaffoldGroup(groupId, { parts });
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+      }, [hoveredPillar, currentMode, editTargetType, scaffoldGroups, updateScaffoldGroup])}
       {scaffoldGroups.map((group) => {
         // スパン方向の単位ベクトル（px）を計算（布材・アンチ描画に使用）
         const t = group.meta?.line
@@ -234,20 +350,58 @@ export default function ScaffoldRenderer() {
               switch (part.type) {
                 case '柱':
                   return (
-                    <Group key={part.id}>
+                    <Group
+                      key={part.id}
+                      onClick={(e) => {
+                        // 編集モードで柱が対象のときのみクリックを処理
+                        if (!(currentMode === 'edit' && editTargetType === '柱')) return;
+                        e.cancelBubble = true; // 親のドラッグ等へバブルさせない
+                        onPillarClick?.({
+                          anchor: { x: part.position.x, y: part.position.y },
+                          groupId: group.id,
+                          partId: part.id,
+                        });
+                      }}
+                      onTap={(e) => {
+                        if (!(currentMode === 'edit' && editTargetType === '柱')) return;
+                        e.cancelBubble = true;
+                        onPillarClick?.({
+                          anchor: { x: part.position.x, y: part.position.y },
+                          groupId: group.id,
+                          partId: part.id,
+                        });
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentMode === 'edit' && editTargetType === '柱') {
+                          e.target.getStage()?.container().style &&
+                            (e.target.getStage()!.container().style.cursor = 'pointer');
+                          setHoveredPillar({ groupId: group.id, partId: part.id });
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.getStage()?.container().style &&
+                          (e.target.getStage()!.container().style.cursor = 'default');
+                        setHoveredPillar((h) => (h && h.partId === part.id ? null : h));
+                      }}
+                    >
                       {/* 発光レイヤー（控えめ・ズーム追従） */}
-                      {isPillarHighlighted && (
+                      {isPillarHighlighted && (() => {
+                        const anchor = { x: part.position.x, y: part.position.y };
+                        const rScale = getRadiusScale(part.id, anchor);
+                        const opGrad = getPulseOpacity(0.9, part.id, anchor);
+                        const opRing = getPulseOpacity(0.95, part.id, anchor);
+                        return (
                         <>
                           {/* 放射グロー（加算合成） */}
                           <Circle
                             x={part.position.x}
                             y={part.position.y}
-                            radius={GLOW.gradRadius}
+                            radius={GLOW.gradRadius * rScale}
                             listening={false}
                             fillRadialGradientStartPoint={{ x: 0, y: 0 }}
                             fillRadialGradientStartRadius={0}
                             fillRadialGradientEndPoint={{ x: 0, y: 0 }}
-                            fillRadialGradientEndRadius={GLOW.gradRadius}
+                            fillRadialGradientEndRadius={GLOW.gradRadius * rScale}
                             fillRadialGradientColorStops={[
                               0,
                               highlightPillarBlue
@@ -258,17 +412,17 @@ export default function ScaffoldRenderer() {
                                 ? 'rgba(59,130,246,0)'
                                 : 'rgba(250,204,21,0)',
                             ]}
-                            opacity={0.9}
+                            opacity={opGrad}
                             globalCompositeOperation="lighter"
                           />
                           {/* 外周リング（加算合成） */}
                           <Circle
                             x={part.position.x}
                             y={part.position.y}
-                            radius={GLOW.ringRadius}
+                            radius={GLOW.ringRadius * rScale}
                             stroke={highlightPillarBlue ? '#60A5FA' : '#FACC15'}
                             strokeWidth={GLOW.ringStroke}
-                            opacity={0.95}
+                            opacity={opRing}
                             shadowColor={highlightPillarBlue ? '#60A5FA' : '#FACC15'}
                             shadowBlur={GLOW.shadowBlur}
                             shadowOpacity={0.9}
@@ -276,49 +430,87 @@ export default function ScaffoldRenderer() {
                             listening={false}
                           />
                         </>
-                      )}
-                      {/* 本体（マーカー自体も軽く発光） */}
-                      <Circle
-                        x={part.position.x}
-                        y={part.position.y}
-                        radius={5}
-                        fill={stroke}
-                        stroke={isDark ? '#0f172a' : '#334155'}
-                        strokeWidth={1}
-                        shadowColor={
-                          isPillarHighlighted
+                        );
+                      })()}
+                      {/* 本体（マーカー自体も軽く発光）: circle / triangle / square */}
+                      {(() => {
+                        const marker = part.marker || 'circle';
+                        const commonProps = {
+                          x: part.position.x,
+                          y: part.position.y,
+                          fill: stroke,
+                          stroke: isDark ? '#0f172a' : '#334155',
+                          strokeWidth: 1,
+                          shadowColor: isPillarHighlighted
                             ? highlightPillarBlue
                               ? '#60A5FA'
                               : '#FACC15'
-                            : undefined
+                            : undefined,
+                          shadowBlur: isPillarHighlighted ? GLOW.shadowBlur : 0,
+                          shadowOpacity: isPillarHighlighted ? 0.8 : 0,
+                        } as any;
+                        if (marker === 'square') {
+                          const size = 10;
+                          return (
+                            <Rect
+                              {...commonProps}
+                              width={size}
+                              height={size}
+                              offsetX={size / 2}
+                              offsetY={size / 2}
+                              cornerRadius={2}
+                            />
+                          );
                         }
-                        shadowBlur={isPillarHighlighted ? GLOW.shadowBlur : 0}
-                        shadowOpacity={isPillarHighlighted ? 0.8 : 0}
-                      />
-                      {isPillarHighlighted && (
+                        if (marker === 'triangle') {
+                          // マーカー方向（0=右,90=下,180=左,270=上）をKonva回転へ変換（0=上基準のため+90）
+                          const rotation = ((part.meta?.markerDirection ?? 0) + 90) % 360 as number;
+                          return (
+                            <RegularPolygon
+                              {...commonProps}
+                              sides={3}
+                              radius={7}
+                              rotation={rotation}
+                            />
+                          );
+                        }
+                        // circle (default)
+                        return <Circle {...commonProps} radius={5} />;
+                      })()}
+                      {isPillarHighlighted && (() => {
+                        const anchor = { x: part.position.x, y: part.position.y };
+                        const rScale = getRadiusScale(part.id, anchor);
+                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        return (
                         <Circle
                           x={part.position.x}
                           y={part.position.y}
-                          radius={GLOW.coreRadius}
+                          radius={GLOW.coreRadius * rScale}
                           fill={
                             highlightPillarBlue
                               ? 'rgba(59,130,246,0.85)'
                               : 'rgba(250,204,21,0.85)'
                           }
-                          opacity={0.9}
+                          opacity={op}
                           globalCompositeOperation="lighter"
                           listening={false}
                         />
-                      )}
+                        );
+                      })()}
                     </Group>
                   );
 
                 case '布材': {
-                  // 布材はラインと平行に1800mm描画
+                  // 布材の向き: meta.direction があればそれを優先（ブラケットと同方向に重ねる用途）
+                  // 無ければスパン方向ベクトル t（通常の布材）
                   const clothLengthMm = part.meta?.length ?? 1800;
                   const lengthPx = mmToPx(clothLengthMm, DEFAULT_SCALE);
-                  const x2 = part.position.x + t.x * lengthPx;
-                  const y2 = part.position.y + t.y * lengthPx;
+                  const dirVec =
+                    typeof part.meta?.direction === 'number'
+                      ? degToUnitVector(part.meta.direction)
+                      : t;
+                  const x2 = part.position.x + dirVec.x * lengthPx;
+                  const y2 = part.position.y + dirVec.y * lengthPx;
                   const highlightCloth =
                     currentMode === 'edit' && editTargetType === '布材' && part.type === '布材';
                   // 階段選択時: 1800 or 900 の布材のみ対象
@@ -344,24 +536,28 @@ export default function ScaffoldRenderer() {
                   // 階段は 1800/900 のみ中点発光
                   const showMidGlowStair = highlightStairCloth;
                   // 中点座標（各スパンの中心）
-                  const midX = part.position.x + t.x * (lengthPx / 2);
-                  const midY = part.position.y + t.y * (lengthPx / 2);
+                  const midX = part.position.x + dirVec.x * (lengthPx / 2);
+                  const midY = part.position.y + dirVec.y * (lengthPx / 2);
                   return (
                     <Group key={part.id}>
                       {/* 発光下地（太めのイエロー、加算合成） */}
-                      {highlightClothLine && (
-                        <Line
-                          points={[part.position.x, part.position.y, x2, y2]}
-                          stroke={highlightFrameCloth ? frameStroke : '#FACC15'}
-                          strokeWidth={CLOTH_GLOW.glowWidth}
-                          opacity={0.9}
-                          shadowColor={highlightFrameCloth ? frameStroke : '#FACC15'}
-                          shadowBlur={CLOTH_GLOW.shadowBlur}
-                          shadowOpacity={0.95}
-                          globalCompositeOperation="lighter"
-                          listening={false}
-                        />
-                      )}
+                      {highlightClothLine && (() => {
+                        const anchor = { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 };
+                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        return (
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={highlightFrameCloth ? frameStroke : '#FACC15'}
+                            strokeWidth={CLOTH_GLOW.glowWidth}
+                            opacity={op}
+                            shadowColor={highlightFrameCloth ? frameStroke : '#FACC15'}
+                            shadowBlur={CLOTH_GLOW.shadowBlur}
+                            shadowOpacity={0.95}
+                            globalCompositeOperation="lighter"
+                            listening={false}
+                          />
+                        );
+                      })()}
                       {/* 本体ライン */}
                       <Line
                         points={[part.position.x, part.position.y, x2, y2]}
@@ -372,45 +568,52 @@ export default function ScaffoldRenderer() {
                         shadowOpacity={highlightClothLine ? 0.7 : 0}
                       />
                       {/* 中点の青色発光（加算合成の○） */}
-                      {(showMidGlowCloth || showMidGlowStair) && (
-                        <>
-                          <Circle
-                            x={midX}
-                            y={midY}
-                            radius={CLOTH_MID_GLOW.gradRadius}
-                            listening={false}
-                            fillRadialGradientStartPoint={{ x: 0, y: 0 }}
-                            fillRadialGradientStartRadius={0}
-                            fillRadialGradientEndPoint={{ x: 0, y: 0 }}
-                            fillRadialGradientEndRadius={CLOTH_MID_GLOW.gradRadius}
-                            fillRadialGradientColorStops={[0, 'rgba(59,130,246,0.95)', 1, 'rgba(59,130,246,0)']}
-                            opacity={0.95}
-                            globalCompositeOperation="lighter"
-                          />
-                          <Circle
-                            x={midX}
-                            y={midY}
-                            radius={CLOTH_MID_GLOW.ringRadius}
-                            stroke={CLOTH_MID_GLOW.colorRing}
-                            strokeWidth={CLOTH_MID_GLOW.ringStroke}
-                            opacity={0.95}
-                            shadowColor={CLOTH_MID_GLOW.colorRing}
-                            shadowBlur={CLOTH_MID_GLOW.shadowBlur}
-                            shadowOpacity={0.9}
-                            globalCompositeOperation="lighter"
-                            listening={false}
-                          />
-                          <Circle
-                            x={midX}
-                            y={midY}
-                            radius={CLOTH_MID_GLOW.coreRadius}
-                            fill={CLOTH_MID_GLOW.colorCore}
-                            opacity={0.9}
-                            globalCompositeOperation="lighter"
-                            listening={false}
-                          />
-                        </>
-                      )}
+                      {(showMidGlowCloth || showMidGlowStair) && (() => {
+                        const anchor = { x: midX, y: midY };
+                        const rScale = getRadiusScale(part.id + '-mid', anchor);
+                        const opGrad = getPulseOpacity(0.95, part.id + '-mid', anchor);
+                        const opRing = getPulseOpacity(0.95, part.id + '-mid', anchor);
+                        const opCore = getPulseOpacity(0.9, part.id + '-mid', anchor);
+                        return (
+                          <>
+                            <Circle
+                              x={midX}
+                              y={midY}
+                              radius={CLOTH_MID_GLOW.gradRadius * rScale}
+                              listening={false}
+                              fillRadialGradientStartPoint={{ x: 0, y: 0 }}
+                              fillRadialGradientStartRadius={0}
+                              fillRadialGradientEndPoint={{ x: 0, y: 0 }}
+                              fillRadialGradientEndRadius={CLOTH_MID_GLOW.gradRadius * rScale}
+                              fillRadialGradientColorStops={[0, 'rgba(59,130,246,0.95)', 1, 'rgba(59,130,246,0)']}
+                              opacity={opGrad}
+                              globalCompositeOperation="lighter"
+                            />
+                            <Circle
+                              x={midX}
+                              y={midY}
+                              radius={CLOTH_MID_GLOW.ringRadius * rScale}
+                              stroke={CLOTH_MID_GLOW.colorRing}
+                              strokeWidth={CLOTH_MID_GLOW.ringStroke}
+                              opacity={opRing}
+                              shadowColor={CLOTH_MID_GLOW.colorRing}
+                              shadowBlur={CLOTH_MID_GLOW.shadowBlur}
+                              shadowOpacity={0.9}
+                              globalCompositeOperation="lighter"
+                              listening={false}
+                            />
+                            <Circle
+                              x={midX}
+                              y={midY}
+                              radius={CLOTH_MID_GLOW.coreRadius * rScale}
+                              fill={CLOTH_MID_GLOW.colorCore}
+                              opacity={opCore}
+                              globalCompositeOperation="lighter"
+                              listening={false}
+                            />
+                          </>
+                        );
+                      })()}
                     </Group>
                   );
                 }
@@ -428,44 +631,54 @@ export default function ScaffoldRenderer() {
                   return (
                     <Group key={part.id}>
                       {/* ブラケットラインの黄色発光（編集対象がブラケットのとき） */}
-                      {highlightBracketLine && (
-                        <Line
-                          points={[part.position.x, part.position.y, x2, y2]}
-                          stroke={'#FACC15'}
-                          strokeWidth={BRACKET_GLOW.glowWidth}
-                          opacity={0.9}
-                          shadowColor={'#FACC15'}
-                          shadowBlur={BRACKET_GLOW.shadowBlur}
-                          shadowOpacity={0.95}
-                          globalCompositeOperation="lighter"
-                          listening={false}
-                        />
-                      )}
+                      {highlightBracketLine && (() => {
+                        const anchor = { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 };
+                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        return (
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#FACC15'}
+                            strokeWidth={BRACKET_GLOW.glowWidth}
+                            opacity={op}
+                            shadowColor={'#FACC15'}
+                            shadowBlur={BRACKET_GLOW.shadowBlur}
+                            shadowOpacity={0.95}
+                            globalCompositeOperation="lighter"
+                            listening={false}
+                          />
+                        );
+                      })()}
                       {/* 先端の青色発光（柱編集時） */}
-                      {highlightBracketTip && (
+                      {highlightBracketTip && (() => {
+                        const anchor = { x: x2, y: y2 };
+                        const rScale = getRadiusScale(part.id + '-tip', anchor);
+                        const opGrad = getPulseOpacity(0.95, part.id + '-tip', anchor);
+                        const opRing = getPulseOpacity(0.95, part.id + '-tip', anchor);
+                        const opCore = getPulseOpacity(0.9, part.id + '-tip', anchor);
+                        return (
                         <>
                           {/* 放射グロー（青） */}
                           <Circle
                             x={x2}
                             y={y2}
-                            radius={TIP_GLOW.gradRadius}
+                            radius={TIP_GLOW.gradRadius * rScale}
                             listening={false}
                             fillRadialGradientStartPoint={{ x: 0, y: 0 }}
                             fillRadialGradientStartRadius={0}
                             fillRadialGradientEndPoint={{ x: 0, y: 0 }}
-                            fillRadialGradientEndRadius={TIP_GLOW.gradRadius}
+                            fillRadialGradientEndRadius={TIP_GLOW.gradRadius * rScale}
                             fillRadialGradientColorStops={[0, 'rgba(59,130,246,0.95)', 1, 'rgba(59,130,246,0)']}
-                            opacity={0.95}
+                            opacity={opGrad}
                             globalCompositeOperation="lighter"
                           />
                           {/* 外周リング（青） */}
                           <Circle
                             x={x2}
                             y={y2}
-                            radius={TIP_GLOW.ringRadius}
+                            radius={TIP_GLOW.ringRadius * rScale}
                             stroke={'#60A5FA'}
                             strokeWidth={TIP_GLOW.ringStroke}
-                            opacity={0.95}
+                            opacity={opRing}
                             shadowColor={'#60A5FA'}
                             shadowBlur={TIP_GLOW.shadowBlur}
                             shadowOpacity={0.9}
@@ -476,14 +689,113 @@ export default function ScaffoldRenderer() {
                           <Circle
                             x={x2}
                             y={y2}
-                            radius={TIP_GLOW.coreRadius}
+                            radius={TIP_GLOW.coreRadius * rScale}
                             fill={'rgba(59,130,246,0.85)'}
-                            opacity={0.9}
+                            opacity={opCore}
                             globalCompositeOperation="lighter"
                             listening={false}
                           />
+                          {/* クリック領域（透明）: 青色発光部をクリックで柱を追加 */}
+                          <Circle
+                            x={x2}
+                            y={y2}
+                            radius={Math.max(TIP_GLOW.ringRadius * rScale + 8, 16 * invScale)}
+                            fill={'rgba(0,0,0,0)'}
+                            listening={true}
+                            onClick={(e) => {
+                              e.cancelBubble = true;
+                              // 作図モードで生成される柱と同じ仕様で追加
+                              const newPillar = {
+                                id: uuidv4(),
+                                type: '柱' as const,
+                                position: { x: x2, y: y2 }, // 先端を中心に配置
+                                color: part.color,
+                                marker: 'circle' as const,
+                                meta: {
+                                  direction: part.meta?.direction, // 外向き
+                                  offsetMm: part.meta?.offsetMm, // ライン上の位置
+                                },
+                              };
+                              // 追加: ブラケットと同じ長さの布材を同境界位置に作図（スパン方向）
+                              let nextParts = [...group.parts, newPillar];
+                              try {
+                                const offsetMm = part.meta?.offsetMm as number | undefined;
+                                const spanLenMm = group.meta?.spanLength as number | undefined;
+                                const line = group.meta?.line;
+                                const lengthMm = part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355);
+                                const bracketDir = part.meta?.direction ?? 0;
+                                if (offsetMm != null && spanLenMm && line && lengthMm) {
+                                  // ブラケットと同じ向き（法線方向）で布材を作図
+                                  const ratio = Math.max(0, Math.min(1, offsetMm / spanLenMm));
+                                  const startX = line.start.x + (line.end.x - line.start.x) * ratio;
+                                  const startY = line.start.y + (line.end.y - line.start.y) * ratio;
+                                  nextParts = [
+                                    ...group.parts,
+                                    newPillar,
+                                    {
+                                      id: uuidv4(),
+                                      type: '布材',
+                                      position: { x: startX, y: startY },
+                                      color: part.color,
+                                      meta: {
+                                        length: lengthMm,
+                                        direction: bracketDir,
+                                        offsetMm: offsetMm,
+                                      },
+                                    },
+                                  ];
+                                }
+                              } catch {}
+                              updateScaffoldGroup(group.id, { parts: nextParts });
+                            }}
+                            onTap={(e) => {
+                              e.cancelBubble = true;
+                              const newPillar = {
+                                id: uuidv4(),
+                                type: '柱' as const,
+                                position: { x: x2, y: y2 },
+                                color: part.color,
+                                marker: 'circle' as const,
+                                meta: {
+                                  direction: part.meta?.direction,
+                                  offsetMm: part.meta?.offsetMm,
+                                },
+                              };
+                              let nextParts = [...group.parts, newPillar];
+                              try {
+                                const offsetMm = part.meta?.offsetMm as number | undefined;
+                                const spanLenMm = group.meta?.spanLength as number | undefined;
+                                const line = group.meta?.line;
+                                const lengthMm = part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355);
+                                const bracketDir = part.meta?.direction ?? 0;
+                                if (offsetMm != null && spanLenMm && line && lengthMm) {
+                                  // ブラケットと同じ向きで布材を作図
+                                  const ratio = Math.max(0, Math.min(1, offsetMm / spanLenMm));
+                                  const startX = line.start.x + (line.end.x - line.start.x) * ratio;
+                                  const startY = line.start.y + (line.end.y - line.start.y) * ratio;
+                                  nextParts = [
+                                    ...group.parts,
+                                    newPillar,
+                                    {
+                                      id: uuidv4(),
+                                      type: '布材',
+                                      position: { x: startX, y: startY },
+                                      color: part.color,
+                                      meta: {
+                                        length: lengthMm,
+                                        direction: bracketDir,
+                                        offsetMm: offsetMm,
+                                      },
+                                    },
+                                  ];
+                                }
+                              } catch {}
+                              updateScaffoldGroup(group.id, { parts: nextParts });
+                            }}
+                          />
                         </>
-                      )}
+                        );
+                      })()}
                       {/* 本体ライン */}
                       <Line
                         points={[part.position.x, part.position.y, x2, y2]}
@@ -510,26 +822,30 @@ export default function ScaffoldRenderer() {
                   return (
                     <Group key={part.id} listening={false}>
                       {/* アンチの黄色発光（枠の外周・加算合成） */}
-                      {highlightAnti && (
-                        <Rect
-                          x={part.position.x}
-                          y={part.position.y}
-                          width={lengthPx}
-                          height={widthPx}
-                          offsetX={lengthPx / 2}
-                          offsetY={widthPx / 2}
-                          rotation={angle}
-                          stroke={'#FACC15'}
-                          strokeWidth={ANTI_GLOW.ringStroke}
-                          opacity={0.95}
-                          shadowColor={'#FACC15'}
-                          shadowBlur={ANTI_GLOW.shadowBlur}
-                          shadowOpacity={0.95}
-                          globalCompositeOperation="lighter"
-                          listening={false}
-                          cornerRadius={2}
-                        />
-                      )}
+                      {highlightAnti && (() => {
+                        const anchor = { x: part.position.x, y: part.position.y };
+                        const op = getPulseOpacity(0.95, part.id, anchor);
+                        return (
+                          <Rect
+                            x={part.position.x}
+                            y={part.position.y}
+                            width={lengthPx}
+                            height={widthPx}
+                            offsetX={lengthPx / 2}
+                            offsetY={widthPx / 2}
+                            rotation={angle}
+                            stroke={'#FACC15'}
+                            strokeWidth={ANTI_GLOW.ringStroke}
+                            opacity={op}
+                            shadowColor={'#FACC15'}
+                            shadowBlur={ANTI_GLOW.shadowBlur}
+                            shadowOpacity={0.95}
+                            globalCompositeOperation="lighter"
+                            listening={false}
+                            cornerRadius={2}
+                          />
+                        );
+                      })()}
                       <Rect
                         x={part.position.x}
                         y={part.position.y}
@@ -544,45 +860,52 @@ export default function ScaffoldRenderer() {
                         cornerRadius={2}
                       />
                       {/* アンチの中点に青色発光○（中心はpart.position） */}
-                      {highlightAnti && (
-                        <>
-                          <Circle
-                            x={part.position.x}
-                            y={part.position.y}
-                            radius={ANTI_MID_GLOW.gradRadius}
-                            listening={false}
-                            fillRadialGradientStartPoint={{ x: 0, y: 0 }}
-                            fillRadialGradientStartRadius={0}
-                            fillRadialGradientEndPoint={{ x: 0, y: 0 }}
-                            fillRadialGradientEndRadius={ANTI_MID_GLOW.gradRadius}
-                            fillRadialGradientColorStops={[0, 'rgba(59,130,246,0.95)', 1, 'rgba(59,130,246,0)']}
-                            opacity={0.95}
-                            globalCompositeOperation="lighter"
-                          />
-                          <Circle
-                            x={part.position.x}
-                            y={part.position.y}
-                            radius={ANTI_MID_GLOW.ringRadius}
-                            stroke={ANTI_MID_GLOW.colorRing}
-                            strokeWidth={ANTI_MID_GLOW.ringStroke}
-                            opacity={0.95}
-                            shadowColor={ANTI_MID_GLOW.colorRing}
-                            shadowBlur={ANTI_MID_GLOW.shadowBlur}
-                            shadowOpacity={0.9}
-                            globalCompositeOperation="lighter"
-                            listening={false}
-                          />
-                          <Circle
-                            x={part.position.x}
-                            y={part.position.y}
-                            radius={ANTI_MID_GLOW.coreRadius}
-                            fill={ANTI_MID_GLOW.colorCore}
-                            opacity={0.9}
-                            globalCompositeOperation="lighter"
-                            listening={false}
-                          />
-                        </>
-                      )}
+                      {highlightAnti && (() => {
+                        const anchor = { x: part.position.x, y: part.position.y };
+                        const rScale = getRadiusScale(part.id + '-anti-mid', anchor);
+                        const opGrad = getPulseOpacity(0.95, part.id + '-anti-mid', anchor);
+                        const opRing = getPulseOpacity(0.95, part.id + '-anti-mid', anchor);
+                        const opCore = getPulseOpacity(0.9, part.id + '-anti-mid', anchor);
+                        return (
+                          <>
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={ANTI_MID_GLOW.gradRadius * rScale}
+                              listening={false}
+                              fillRadialGradientStartPoint={{ x: 0, y: 0 }}
+                              fillRadialGradientStartRadius={0}
+                              fillRadialGradientEndPoint={{ x: 0, y: 0 }}
+                              fillRadialGradientEndRadius={ANTI_MID_GLOW.gradRadius * rScale}
+                              fillRadialGradientColorStops={[0, 'rgba(59,130,246,0.95)', 1, 'rgba(59,130,246,0)']}
+                              opacity={opGrad}
+                              globalCompositeOperation="lighter"
+                            />
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={ANTI_MID_GLOW.ringRadius * rScale}
+                              stroke={ANTI_MID_GLOW.colorRing}
+                              strokeWidth={ANTI_MID_GLOW.ringStroke}
+                              opacity={opRing}
+                              shadowColor={ANTI_MID_GLOW.colorRing}
+                              shadowBlur={ANTI_MID_GLOW.shadowBlur}
+                              shadowOpacity={0.9}
+                              globalCompositeOperation="lighter"
+                              listening={false}
+                            />
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={ANTI_MID_GLOW.coreRadius * rScale}
+                              fill={ANTI_MID_GLOW.colorCore}
+                              opacity={opCore}
+                              globalCompositeOperation="lighter"
+                              listening={false}
+                            />
+                          </>
+                        );
+                      })()}
                       {lengthMm !== 1800 ? (
                         <Group x={part.position.x} y={part.position.y} rotation={angle} listening={false}>
                           <Text

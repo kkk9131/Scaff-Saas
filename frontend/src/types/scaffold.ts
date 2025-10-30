@@ -17,6 +17,12 @@ export type ScaffoldPartType = '柱' | '布材' | 'ブラケット' | 'アンチ
 export type MarkerType = 'circle' | 'triangle' | 'square';
 
 /**
+ * 柱の種別（新）
+ * - A, C, D, E, G, DG, EG, C-47, KD
+ */
+export type PillarType = 'A' | 'C' | 'D' | 'E' | 'G' | 'DG' | 'EG' | 'C-47' | 'KD';
+
+/**
  * ブラケットのサイズ
  * - W: 600mm
  * - S: 355mm
@@ -45,6 +51,12 @@ export interface ScaffoldPart {
 
   /** メタデータ（寸法、数量などの追加情報） */
   meta?: {
+    /**
+     * 柱の種別
+     * - A, C, D, E, G, DG, EG, C-47, KD
+     * - 柱以外では未設定
+     */
+    pillarType?: 'A' | 'C' | 'D' | 'E' | 'G' | 'DG' | 'EG' | 'C-47' | 'KD';
     /** 長さ（mm） */
     length?: number;
 
@@ -54,8 +66,15 @@ export interface ScaffoldPart {
     /** 高さ（mm） */
     height?: number;
 
-    /** 数量 */
+    /** 数量（旧: 単一指定用） */
     quantity?: number;
+
+    /**
+     * 柱の複数種別カウント（新）
+     * - 例: { A: 2, C: 3 }
+     * - 0や未指定のキーは保存時に省略
+     */
+    pillarCounts?: Partial<Record<PillarType, number>>;
 
     /** ブラケットサイズ（ブラケットの場合） */
     bracketSize?: BracketSize;
