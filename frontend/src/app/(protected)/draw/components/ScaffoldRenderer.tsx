@@ -20,6 +20,7 @@ import type { ScaffoldGroup, ScaffoldPart } from '@/types/scaffold';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCanvasColor } from '@/lib/utils/colorUtils';
 import { mmToPx, DEFAULT_SCALE } from '@/lib/utils/scale';
+import { calculateDirection } from '@/lib/sax/directionRules';
 
 /**
  * 角度（度）から単位ベクトル（px座標系）へ変換
@@ -87,6 +88,14 @@ export default function ScaffoldRenderer({
   stageWidth,
   stageHeight,
   onPillarClick,
+  onClothClick,
+  onStairClick,
+  onStairBraceClick,
+  onBracketClick,
+  onAntiClick,
+  onAntiLevelClick,
+  onBracketConfigClick,
+  onClothSplitStart,
 }: {
   stageWidth: number;
   stageHeight: number;
@@ -99,6 +108,64 @@ export default function ScaffoldRenderer({
     groupId: string;
     partId: string;
   }) => void;
+  /**
+   * 布材編集時の黄色発光ラインクリックで呼び出すコールバック
+   */
+  onClothClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
+   * 階段編集時の黄色発光ラインクリックで呼び出すコールバック
+   */
+  onStairClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
+   * 階段編集時の青色発光「中点」クリックで呼び出すコールバック（筋交数量カード）
+   */
+  onStairBraceClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
+   * ブラケット編集時の黄色発光ラインクリックで呼び出すコールバック
+   */
+  onBracketClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
+   * アンチ編集時の黄色発光矩形クリックで呼び出すコールバック
+   */
+  onAntiClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
+   * アンチ編集時の青色発光円クリックで呼び出すコールバック（段数調整）
+   */
+  onAntiLevelClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
+   * ブラケット編集時の青色発光柱クリックで呼び出すコールバック（方向と寸法選択）
+   */
+  onBracketConfigClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /** 布材のスパン分割（ドラッグ開始） */
+  onClothSplitStart?: (args: { groupId: string; partId: string }) => void;
 }) {
   const { scaffoldGroups, updateScaffoldGroup, editTargetType, canvasScale, canvasPosition } = useDrawingStore();
   const { currentMode } = useDrawingModeStore();
@@ -106,6 +173,11 @@ export default function ScaffoldRenderer({
 
   // ホバー中の柱（マーカー変更対象）
   const [hoveredPillar, setHoveredPillar] = React.useState<
+    | { groupId: string; partId: string }
+    | null
+  >(null);
+  // 階段の矢印ホバー中（スペースキーで数量追加用）
+  const [hoveredStair, setHoveredStair] = React.useState<
     | { groupId: string; partId: string }
     | null
   >(null);
@@ -155,6 +227,31 @@ export default function ScaffoldRenderer({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [currentMode]);
+
+  // スペースキー: 階段（1800）矢印ホバー中に数量を+1
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (!(currentMode === 'edit' && editTargetType === '階段')) return;
+      if (!hoveredStair) return;
+      e.preventDefault();
+      const { groupId, partId } = hoveredStair;
+      const group = useDrawingStore.getState().scaffoldGroups.find((g) => g.id === groupId);
+      if (!group) return;
+      const target = group.parts.find((p) => p.id === partId);
+      if (!target || target.type !== '階段') return;
+      const len = Number(target.meta?.length ?? 0);
+      if (len !== 1800) return; // 対象は1800のみ
+      const nextQty = Math.max(1, Number(target.meta?.quantity ?? 1) + 1);
+      useDrawingStore.getState().updateScaffoldGroup(groupId, {
+        parts: group.parts.map((p) =>
+          p.id === partId ? ({ ...p, meta: { ...(p.meta || {}), quantity: nextQty } } as any) : p
+        ),
+      });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [hoveredStair, currentMode, editTargetType]);
 
   // パルスから不透明度・半径スケールを算出
   const getPulseOpacity = (base: number, id: string, anchor: { x: number; y: number }) => {
@@ -353,6 +450,25 @@ export default function ScaffoldRenderer({
                     <Group
                       key={part.id}
                       onClick={(e) => {
+                        // ブラケット編集時は設定カードを表示
+                        if (currentMode === 'edit' && editTargetType === 'ブラケット') {
+                          e.cancelBubble = true;
+                          // この柱に関連するブラケットを探す
+                          const relatedBracket = group.parts.find(
+                            (p) =>
+                              p.type === 'ブラケット' &&
+                              Math.abs(p.position.x - part.position.x) < 1 &&
+                              Math.abs(p.position.y - part.position.y) < 1
+                          );
+                          if (relatedBracket) {
+                            onBracketConfigClick?.({
+                              anchor: { x: part.position.x, y: part.position.y },
+                              groupId: group.id,
+                              partId: relatedBracket.id,
+                            });
+                          }
+                          return;
+                        }
                         // 編集モードで柱が対象のときのみクリックを処理
                         if (!(currentMode === 'edit' && editTargetType === '柱')) return;
                         e.cancelBubble = true; // 親のドラッグ等へバブルさせない
@@ -363,6 +479,25 @@ export default function ScaffoldRenderer({
                         });
                       }}
                       onTap={(e) => {
+                        // ブラケット編集時は設定カードを表示
+                        if (currentMode === 'edit' && editTargetType === 'ブラケット') {
+                          e.cancelBubble = true;
+                          // この柱に関連するブラケットを探す
+                          const relatedBracket = group.parts.find(
+                            (p) =>
+                              p.type === 'ブラケット' &&
+                              Math.abs(p.position.x - part.position.x) < 1 &&
+                              Math.abs(p.position.y - part.position.y) < 1
+                          );
+                          if (relatedBracket) {
+                            onBracketConfigClick?.({
+                              anchor: { x: part.position.x, y: part.position.y },
+                              groupId: group.id,
+                              partId: relatedBracket.id,
+                            });
+                          }
+                          return;
+                        }
                         if (!(currentMode === 'edit' && editTargetType === '柱')) return;
                         e.cancelBubble = true;
                         onPillarClick?.({
@@ -372,10 +507,12 @@ export default function ScaffoldRenderer({
                         });
                       }}
                       onMouseEnter={(e) => {
-                        if (currentMode === 'edit' && editTargetType === '柱') {
+                        if (currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ブラケット')) {
                           e.target.getStage()?.container().style &&
                             (e.target.getStage()!.container().style.cursor = 'pointer');
-                          setHoveredPillar({ groupId: group.id, partId: part.id });
+                          if (editTargetType === '柱') {
+                            setHoveredPillar({ groupId: group.id, partId: part.id });
+                          }
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -513,12 +650,47 @@ export default function ScaffoldRenderer({
                   const y2 = part.position.y + dirVec.y * lengthPx;
                   const highlightCloth =
                     currentMode === 'edit' && editTargetType === '布材' && part.type === '布材';
-                  // 階段選択時: 1800 or 900 の布材のみ対象
-                  const highlightStairCloth =
+                  // 階段編集: ライン黄色発光は 1800/900 の布材すべて対象
+                  const highlightStairLine =
                     currentMode === 'edit' &&
                     editTargetType === '階段' &&
                     part.type === '布材' &&
                     (clothLengthMm === 1800 || clothLengthMm === 900);
+                  // 中点の青色発光は「階段が作図されたスパン」に限定
+                  const highlightStairHasStair = (() => {
+                    if (!(currentMode === 'edit' && editTargetType === '階段')) return false;
+                    if (!(part.type === '布材' && (clothLengthMm === 1800 || clothLengthMm === 900))) return false;
+                    const off = Number(part.meta?.offsetMm ?? NaN);
+                    if (!Number.isFinite(off)) return false;
+                    const centerMm = off + clothLengthMm / 2;
+                    return group.parts.some(
+                      (q) =>
+                        q.type === '階段' &&
+                        Number(q.meta?.length ?? -1) === clothLengthMm &&
+                        Math.round(Number(q.meta?.offsetMm ?? NaN)) === Math.round(centerMm)
+                    );
+                  })();
+                  // 階段編集時: 矢印の向きと反対側にある600mm布材のみ緑発光
+                  // 判定: 階段中心C、布材中点M、矢印ベクトルv に対して (M - C)・v < 0
+                  const highlightStairOpposite600 =
+                    currentMode === 'edit' &&
+                    editTargetType === '階段' &&
+                    part.type === '布材' &&
+                    clothLengthMm === 600 &&
+                    (() => {
+                      const stairs = group.parts.filter((p) => p.type === '階段');
+                      if (stairs.length === 0) return false;
+                      const mx = part.position.x + dirVec.x * (lengthPx / 2);
+                      const my = part.position.y + dirVec.y * (lengthPx / 2);
+                      return stairs.some((st) => {
+                        const vStair = degToUnitVector(Number(st.meta?.direction ?? 0));
+                        const cx = st.position.x;
+                        const cy = st.position.y;
+                        const d = (mx - cx) * vStair.x + (my - cy) * vStair.y;
+                        return d < 0; // 反対側（例: 左向き矢印なら右側）
+                      });
+                    })();
+
                   // 梁枠選択時: シーケンス規則に該当する布材を色分け発光
                   const frameColor = clothFrameHighlightMap.get(part.id);
                   const highlightFrameCloth =
@@ -529,12 +701,21 @@ export default function ScaffoldRenderer({
                       : frameColor === 'green'
                       ? '#34D399'
                       : '#FACC15';
+                  const stairStroke = '#FACC15';
+                  const stairOppStroke = '#34D399'; // 反対側600mm用の緑
                   // 共通: ライン黄色発光の表示可否
-                  const highlightClothLine = highlightCloth || highlightStairCloth || highlightFrameCloth;
+                  const highlightClothLine =
+                    highlightCloth || highlightStairLine || highlightFrameCloth || highlightStairOpposite600;
+                  // 発光色の選択（優先度: 梁枠色 > 階段反対側600(緑) > 階段通常(黄)）
+                  const highlightStroke = highlightFrameCloth
+                    ? frameStroke
+                    : highlightStairOpposite600
+                    ? stairOppStroke
+                    : stairStroke;
                   // 150mmの短スパンは中点発光を抑制
                   const showMidGlowCloth = highlightCloth && clothLengthMm !== 150;
-                  // 階段は 1800/900 のみ中点発光
-                  const showMidGlowStair = highlightStairCloth;
+                  // 階段は 1800/900 かつ階段有りスパン、かつ階段用の並行布材（stairParallel）にのみ中点発光
+                  const showMidGlowStair = highlightStairHasStair && Boolean((part.meta as any)?.stairParallel);
                   // 中点座標（各スパンの中心）
                   const midX = part.position.x + dirVec.x * (lengthPx / 2);
                   const midY = part.position.y + dirVec.y * (lengthPx / 2);
@@ -547,10 +728,10 @@ export default function ScaffoldRenderer({
                         return (
                           <Line
                             points={[part.position.x, part.position.y, x2, y2]}
-                            stroke={highlightFrameCloth ? frameStroke : '#FACC15'}
+                            stroke={highlightStroke}
                             strokeWidth={CLOTH_GLOW.glowWidth}
                             opacity={op}
-                            shadowColor={highlightFrameCloth ? frameStroke : '#FACC15'}
+                            shadowColor={highlightStroke}
                             shadowBlur={CLOTH_GLOW.shadowBlur}
                             shadowOpacity={0.95}
                             globalCompositeOperation="lighter"
@@ -563,10 +744,67 @@ export default function ScaffoldRenderer({
                         points={[part.position.x, part.position.y, x2, y2]}
                         stroke={stroke}
                         strokeWidth={2}
-                        shadowColor={highlightClothLine ? (highlightFrameCloth ? frameStroke : '#FACC15') : undefined}
+                        shadowColor={highlightClothLine ? highlightStroke : undefined}
                         shadowBlur={highlightClothLine ? CLOTH_GLOW.shadowBlur * 0.6 : 0}
                         shadowOpacity={highlightClothLine ? 0.7 : 0}
+                        onMouseEnter={(e) => {
+                          // 布材編集時 or 階段編集時の黄色発光領域はクリックしやすいように手のカーソルに
+                          if (currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段')) {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'pointer';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          const stage = e.target.getStage?.();
+                          if (stage) stage.container().style.cursor = 'default';
+                        }}
+                        onClick={(e) => {
+                          // 布材編集 or 階段編集
+                          if (!(currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段'))) return;
+                          e.cancelBubble = true;
+                          const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
+                          if (editTargetType === '布材') onClothClick?.(args);
+                          else onStairClick?.(args);
+                        }}
+                        onTap={(e) => {
+                          if (!(currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段'))) return;
+                          e.cancelBubble = true;
+                          const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
+                          if (editTargetType === '布材') onClothClick?.(args);
+                          else onStairClick?.(args);
+                        }}
                       />
+                      {/* 階段編集時のクリック領域（最前面に配置、黄色発光部分全域をカバー） */}
+                      {highlightStairLine && (
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          stroke="rgba(0,0,0,0)"
+                          strokeWidth={Math.max(CLOTH_GLOW.glowWidth + 8, 20 * invScale)}
+                          listening={true}
+                          onClick={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === '階段')) return;
+                            e.cancelBubble = true;
+                            const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
+                            onStairClick?.(args);
+                          }}
+                          onTap={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === '階段')) return;
+                            e.cancelBubble = true;
+                            const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
+                            onStairClick?.(args);
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentMode === 'edit' && editTargetType === '階段') {
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'pointer';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'default';
+                          }}
+                        />
+                      )}
                       {/* 中点の青色発光（加算合成の○） */}
                       {(showMidGlowCloth || showMidGlowStair) && (() => {
                         const anchor = { x: midX, y: midY };
@@ -611,6 +849,41 @@ export default function ScaffoldRenderer({
                               globalCompositeOperation="lighter"
                               listening={false}
                             />
+                            {/* 階段編集時のみ: 青色発光「中点」クリックで筋交数量カードを開く */}
+                            {currentMode === 'edit' && editTargetType === '階段' && (
+                              <Circle
+                                x={midX}
+                                y={midY}
+                                radius={Math.max(CLOTH_MID_GLOW.ringRadius * rScale + 8, 16 * invScale)}
+                                fill={'rgba(0,0,0,0)'}
+                                listening={true}
+                                onClick={(e) => {
+                                  e.cancelBubble = true;
+                                  onStairBraceClick?.({ anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id });
+                                }}
+                                onTap={(e) => {
+                                  e.cancelBubble = true;
+                                  onStairBraceClick?.({ anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id });
+                                }}
+                              />
+                            )}
+                            {/* ドラッグ開始ハンドル（布材編集時のみ） */}
+                            {currentMode === 'edit' && editTargetType === '布材' && (
+                              <Circle
+                                x={midX}
+                                y={midY}
+                                radius={Math.max(CLOTH_MID_GLOW.ringRadius * rScale + 8, 16 * invScale)}
+                                fill={'rgba(0,0,0,0)'}
+                                listening={true}
+                                onMouseDown={(e) => {
+                                  e.cancelBubble = true;
+                                  onClothSplitStart?.({ groupId: group.id, partId: part.id });
+                                }}
+                                onDragStart={(e) => {
+                                  e.cancelBubble = true;
+                                }}
+                              />
+                            )}
                           </>
                         );
                       })()}
@@ -804,7 +1077,272 @@ export default function ScaffoldRenderer({
                         shadowColor={highlightBracketLine ? '#FACC15' : undefined}
                         shadowBlur={highlightBracketLine ? BRACKET_GLOW.shadowBlur * 0.6 : 0}
                         shadowOpacity={highlightBracketLine ? 0.7 : 0}
+                        onMouseEnter={(e) => {
+                          if (currentMode === 'edit' && editTargetType === 'ブラケット') {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'pointer';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          const stage = e.target.getStage?.();
+                          if (stage) stage.container().style.cursor = 'default';
+                        }}
+                        onClick={(e) => {
+                          // ブラケット編集時のみカードを出す
+                          if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
+                          e.cancelBubble = true;
+                          const midX = (part.position.x + x2) / 2;
+                          const midY = (part.position.y + y2) / 2;
+                          onBracketClick?.({
+                            anchor: { x: midX, y: midY },
+                            groupId: group.id,
+                            partId: part.id,
+                          });
+                        }}
+                        onTap={(e) => {
+                          if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
+                          e.cancelBubble = true;
+                          const midX = (part.position.x + x2) / 2;
+                          const midY = (part.position.y + y2) / 2;
+                          onBracketClick?.({
+                            anchor: { x: midX, y: midY },
+                            groupId: group.id,
+                            partId: part.id,
+                          });
+                        }}
                       />
+                      {/* ブラケット編集時のクリック領域（最前面に配置、アンチと重なってもクリック可能） */}
+                      {highlightBracketLine && (
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          stroke="rgba(0,0,0,0)"
+                          strokeWidth={Math.max(BRACKET_GLOW.glowWidth + 8, 20 * invScale)}
+                          listening={true}
+                          onClick={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
+                            e.cancelBubble = true;
+                            const midX = (part.position.x + x2) / 2;
+                            const midY = (part.position.y + y2) / 2;
+                            onBracketClick?.({
+                              anchor: { x: midX, y: midY },
+                              groupId: group.id,
+                              partId: part.id,
+                            });
+                          }}
+                          onTap={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
+                            e.cancelBubble = true;
+                            const midX = (part.position.x + x2) / 2;
+                            const midY = (part.position.y + y2) / 2;
+                            onBracketClick?.({
+                              anchor: { x: midX, y: midY },
+                              groupId: group.id,
+                              partId: part.id,
+                            });
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentMode === 'edit' && editTargetType === 'ブラケット') {
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'pointer';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'default';
+                          }}
+                        />
+                      )}
+                    </Group>
+                  );
+                }
+
+                case '階段': {
+                  // 階段は meta.width を使用（既定: 400mm）。levels が指定されていればその段数で等分線を描く。
+                  // ※ 既存互換: lengthが 1800/900 の場合は従来の等分（8/4）をデフォルトに維持。
+                  const lengthMm = part.meta?.length ?? 1800;
+                  const widthMm = part.meta?.width ?? 400; // 既定はW相当
+                  const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+                  const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+                  const angle = part.meta?.direction ?? 0; // スパン方向と平行
+                  const stroke = colorToStroke(part.color);
+                  const v = degToUnitVector(angle);
+                  // 直交方向（矩形短辺方向）
+                  const n = { x: -v.y, y: v.x };
+                  // ステップ線の数（等分線の本数 = 分割数-1）
+                  // meta.levels があればそれを優先（例: 2 段 → 中央に1本）。無ければ既存の 1800→8, 900→4。
+                  const levels = typeof part.meta?.levels === 'number' ? Math.max(0, Math.floor(Number(part.meta?.levels))) : undefined;
+                  const div = levels && levels > 1 ? levels : lengthMm === 1800 ? 8 : lengthMm === 900 ? 4 : 0;
+                  const lines = [] as JSX.Element[];
+                  for (let i = 1; i < div; i++) {
+                    const t = (i / div) * lengthPx - lengthPx / 2; // 中央基準のオフセット（px）
+                    const cx = part.position.x + v.x * t;
+                    const cy = part.position.y + v.y * t;
+                    const x1 = cx - n.x * (widthPx / 2);
+                    const y1 = cy - n.y * (widthPx / 2);
+                    const x2 = cx + n.x * (widthPx / 2);
+                    const y2 = cy + n.y * (widthPx / 2);
+                    lines.push(
+                      <Line
+                        key={`${part.id}-step-${i}`}
+                        points={[x1, y1, x2, y2]}
+                        stroke={stroke}
+                        strokeWidth={1}
+                        opacity={0.9}
+                        listening={false}
+                      />
+                    );
+                  }
+                  // 矢印（矩形中心に向き表示）: 軸方向に短い矢印を描く
+                  const cx = part.position.x;
+                  const cy = part.position.y;
+                  const arrowLen = Math.min(lengthPx * 0.35, 60); // ほどよい長さ
+                  const headLen = Math.min(widthPx * 0.35, 18);
+                  const baseX = cx - v.x * (arrowLen / 2);
+                  const baseY = cy - v.y * (arrowLen / 2);
+                  const tipX = cx + v.x * (arrowLen / 2);
+                  const tipY = cy + v.y * (arrowLen / 2);
+                  // 矢印ヘッド（±30°）
+                  const rad = (30 * Math.PI) / 180;
+                  const hx1 = tipX - (v.x * Math.cos(rad) - v.y * Math.sin(rad)) * headLen;
+                  const hy1 = tipY - (v.y * Math.cos(rad) + v.x * Math.sin(rad)) * headLen;
+                  const hx2 = tipX - (v.x * Math.cos(-rad) - v.y * Math.sin(-rad)) * headLen;
+                  const hy2 = tipY - (v.y * Math.cos(-rad) + v.x * Math.sin(-rad)) * headLen;
+                  return (
+                    <Group key={part.id}>
+                      {/* 外枠 */}
+                      <Rect
+                        x={part.position.x}
+                        y={part.position.y}
+                        width={lengthPx}
+                        height={widthPx}
+                        offsetX={lengthPx / 2}
+                        offsetY={widthPx / 2}
+                        rotation={angle}
+                        stroke={stroke}
+                        strokeWidth={1.5}
+                        cornerRadius={2}
+                        fill={stroke + '22'}
+                        listening={false}
+                      />
+                      {/* 等分線 */}
+                      {lines}
+                      {/* 方向矢印（中央） */}
+                      <Line points={[baseX, baseY, tipX, tipY]} stroke={stroke} strokeWidth={1.5} listening={false} opacity={0.95} />
+                      <Line points={[tipX, tipY, hx1, hy1]} stroke={stroke} strokeWidth={1.5} listening={false} opacity={0.95} />
+                      <Line points={[tipX, tipY, hx2, hy2]} stroke={stroke} strokeWidth={1.5} listening={false} opacity={0.95} />
+                      {/* クリック領域（矢印上）: クリックで向き反転 / Shift+クリックでアンチに変換 */}
+                      <Line
+                        points={[baseX, baseY, tipX, tipY]}
+                        stroke={'rgba(0,0,0,0)'}
+                        strokeWidth={Math.max(10, 16 * invScale)}
+                        listening={true}
+                        onMouseEnter={(e) => {
+                          const stage = e.target.getStage?.();
+                          if (stage) stage.container().style.cursor = 'pointer';
+                          // 1800階段の矢印ホバー中にスペースキーで数量追加できるよう記録
+                          setHoveredStair({ groupId: group.id, partId: part.id });
+                        }}
+                        onMouseLeave={(e) => {
+                          const stage = e.target.getStage?.();
+                          if (stage) stage.container().style.cursor = 'default';
+                          setHoveredStair((h) => (h && h.partId === part.id ? null : h));
+                        }}
+                        onClick={(e) => {
+                          e.cancelBubble = true;
+                          const withShift = e.evt?.shiftKey;
+                          // Shift+クリック: アンチへ変換
+                          if (withShift) {
+                            const lineMeta = group.meta?.line;
+                            const spanLenMm = Number(group.meta?.spanLength ?? 0);
+                            const offsetCenterMm = Number(part.meta?.offsetMm ?? 0); // 中心の沿い方向オフセット（mm）
+                            const antiWidthMm = 400; // W
+                            if (lineMeta && spanLenMm > 0) {
+                              // スパン方向ベクトル（px）
+                              const spanAngleDeg = angle; // 階段の長手方向はスパン方向
+                              const vr = degToUnitVector(spanAngleDeg);
+                              // 左法線（reversed=false）をベクトルで算出（calculateDirection依存を避ける）
+                              const dxL = lineMeta.end.x - lineMeta.start.x;
+                              const dyL = lineMeta.end.y - lineMeta.start.y;
+                              const lenL = Math.sqrt(dxL * dxL + dyL * dyL) || 1;
+                              const nLeft = { x: -dyL / lenL, y: dxL / lenL };
+                              // ライン上の中心点（offsetCenterMm / spanLenMm）
+                              const r = Math.max(0, Math.min(1, offsetCenterMm / spanLenMm));
+                              const base = {
+                                x: lineMeta.start.x + (lineMeta.end.x - lineMeta.start.x) * r,
+                                y: lineMeta.start.y + (lineMeta.end.y - lineMeta.start.y) * r,
+                              };
+                              // 既存の階段矩形の中心そのままにアンチを配置（矩形は既に350mm側にある想定）
+                              const pos = { x: part.position.x, y: part.position.y };
+                              // offsetMm は区間の開始オフセット（中心から長手/2 引く）
+                              const offsetStartMm = offsetCenterMm - lengthMm / 2;
+                              const antiPart = {
+                                id: part.id,
+                                type: 'アンチ' as const,
+                                position: pos, // 正しい350mm中心位置
+                                color: part.color,
+                                meta: {
+                                  length: lengthMm,
+                                  width: antiWidthMm,
+                                  bracketSize: 'W',
+                                  direction: spanAngleDeg, // 長手はスパンと平行
+                                  offsetMm: offsetStartMm, // 始点からの開始オフセット
+                                },
+                              };
+                              // 追加: 元ライン中心に S 幅（240mm）のアンチを追加作図
+                              const sAntiPart = {
+                                id: uuidv4(),
+                                type: 'アンチ' as const,
+                                position: { x: base.x, y: base.y }, // ライン上の中心
+                                color: part.color,
+                                meta: {
+                                  length: lengthMm,
+                                  width: 240, // S 幅
+                                  bracketSize: 'S',
+                                  direction: spanAngleDeg,
+                                  offsetMm: offsetStartMm,
+                                },
+                              };
+                              const replaced = group.parts.map((p) =>
+                                p.id === part.id ? (antiPart as any) : p
+                              );
+                              updateScaffoldGroup(group.id, {
+                                parts: [...replaced, sAntiPart],
+                              });
+                              return;
+                            }
+                          }
+                          // 通常クリック: 矢印向きを反転（180°）
+                          const dir = Number(part.meta?.direction ?? 0);
+                          const flipped = (dir + 180) % 360;
+                          updateScaffoldGroup(group.id, {
+                            parts: group.parts.map((p) =>
+                              p.id === part.id
+                                ? ({
+                                    ...p,
+                                    meta: { ...(p.meta || {}), direction: flipped },
+                                  } as any)
+                                : p
+                            ),
+                          });
+                        }}
+                      />
+                      {/* 矢印近くに数量表示（×2 など）。quantity>1 のときのみ表示 */}
+                      {Number(part.meta?.quantity ?? 1) > 1 && (() => {
+                        // 矩形内側の端から少し内側に寄せた位置（回転に追従）
+                        const margin = Math.min(12, widthPx / 2 - 6);
+                        const labelX = cx + n.x * (widthPx / 2 - margin);
+                        const labelY = cy + n.y * (widthPx / 2 - margin);
+                        return (
+                          <Text
+                            x={labelX}
+                            y={labelY}
+                            text={`×${Number(part.meta?.quantity ?? 1)}`}
+                            fontSize={12}
+                            fill={stroke}
+                            listening={false}
+                          />
+                        );
+                      })()}
                     </Group>
                   );
                 }
@@ -820,7 +1358,7 @@ export default function ScaffoldRenderer({
                   const highlightAnti = currentMode === 'edit' && editTargetType === 'アンチ';
                   // Rectのpositionは左上なので、中心基準にするためoffsetを設定
                   return (
-                    <Group key={part.id} listening={false}>
+                    <Group key={part.id}>
                       {/* アンチの黄色発光（枠の外周・加算合成） */}
                       {highlightAnti && (() => {
                         const anchor = { x: part.position.x, y: part.position.y };
@@ -858,7 +1396,106 @@ export default function ScaffoldRenderer({
                         stroke={stroke}
                         strokeWidth={1}
                         cornerRadius={2}
+                        onMouseEnter={(e) => {
+                          if (currentMode === 'edit' && editTargetType === 'アンチ') {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'pointer';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          const stage = e.target.getStage?.();
+                          if (stage) stage.container().style.cursor = 'default';
+                        }}
+                        onClick={(e) => {
+                          // アンチ編集時のみカードを出す
+                          if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                          e.cancelBubble = true;
+                          onAntiClick?.({
+                            anchor: { x: part.position.x, y: part.position.y },
+                            groupId: group.id,
+                            partId: part.id,
+                          });
+                        }}
+                        onTap={(e) => {
+                          if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                          e.cancelBubble = true;
+                          onAntiClick?.({
+                            anchor: { x: part.position.x, y: part.position.y },
+                            groupId: group.id,
+                            partId: part.id,
+                          });
+                        }}
                       />
+                      {/* クリック領域（透明、矩形全体をカバー、ただし青色発光部分は除外） */}
+                      {highlightAnti && (
+                        <Rect
+                          x={part.position.x}
+                          y={part.position.y}
+                          width={lengthPx}
+                          height={widthPx}
+                          offsetX={lengthPx / 2}
+                          offsetY={widthPx / 2}
+                          rotation={angle}
+                          fill="rgba(0,0,0,0)"
+                          listening={true}
+                          onClick={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                            // クリック位置が青色発光部分の範囲内かチェック
+                            const stage = e.target.getStage();
+                            if (stage) {
+                              const stagePos = stage.getPointerPosition();
+                              if (stagePos) {
+                                const canvasPos = {
+                                  x: (stagePos.x - canvasPosition.x) / canvasScale,
+                                  y: (stagePos.y - canvasPosition.y) / canvasScale,
+                                };
+                                const dx = canvasPos.x - part.position.x;
+                                const dy = canvasPos.y - part.position.y;
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                const glowRadius = ANTI_MID_GLOW.gradRadius * getRadiusScale(part.id + '-anti-mid', { x: part.position.x, y: part.position.y });
+                                // 青色発光部分の範囲内の場合はクリックを無視
+                                if (distance <= glowRadius) {
+                                  return;
+                                }
+                              }
+                            }
+                            e.cancelBubble = true;
+                            onAntiClick?.({
+                              anchor: { x: part.position.x, y: part.position.y },
+                              groupId: group.id,
+                              partId: part.id,
+                            });
+                          }}
+                          onTap={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                            // タップ位置が青色発光部分の範囲内かチェック
+                            const stage = e.target.getStage();
+                            if (stage) {
+                              const stagePos = stage.getPointerPosition();
+                              if (stagePos) {
+                                const canvasPos = {
+                                  x: (stagePos.x - canvasPosition.x) / canvasScale,
+                                  y: (stagePos.y - canvasPosition.y) / canvasScale,
+                                };
+                                const dx = canvasPos.x - part.position.x;
+                                const dy = canvasPos.y - part.position.y;
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                const glowRadius = ANTI_MID_GLOW.gradRadius * getRadiusScale(part.id + '-anti-mid', { x: part.position.x, y: part.position.y });
+                                // 青色発光部分の範囲内の場合はクリックを無視
+                                if (distance <= glowRadius) {
+                                  return;
+                                }
+                              }
+                            }
+                            e.cancelBubble = true;
+                            onAntiClick?.({
+                              anchor: { x: part.position.x, y: part.position.y },
+                              groupId: group.id,
+                              partId: part.id,
+                            });
+                          }}
+                        />
+                      )}
                       {/* アンチの中点に青色発光○（中心はpart.position） */}
                       {highlightAnti && (() => {
                         const anchor = { x: part.position.x, y: part.position.y };
@@ -902,6 +1539,32 @@ export default function ScaffoldRenderer({
                               opacity={opCore}
                               globalCompositeOperation="lighter"
                               listening={false}
+                            />
+                            {/* 青色発光部分のクリック領域（最前面に配置） */}
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={ANTI_MID_GLOW.gradRadius * rScale}
+                              fill="rgba(0,0,0,0)"
+                              listening={true}
+                              onClick={(e) => {
+                                if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                                e.cancelBubble = true;
+                                onAntiLevelClick?.({
+                                  anchor: { x: part.position.x, y: part.position.y },
+                                  groupId: group.id,
+                                  partId: part.id,
+                                });
+                              }}
+                              onTap={(e) => {
+                                if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                                e.cancelBubble = true;
+                                onAntiLevelClick?.({
+                                  anchor: { x: part.position.x, y: part.position.y },
+                                  groupId: group.id,
+                                  partId: part.id,
+                                });
+                              }}
                             />
                           </>
                         );

@@ -398,6 +398,73 @@ function QuantityGrid() {
     return sums;
   })();
 
+  // 筋交の自動集計（寸法ごと）
+  // 仕様:
+  // - 基本は「作図モードで作図されたスパン（布材）の本数」を各寸法ごとにカウント（=1/スパン）
+  // - 将来、1500と600を1200+900や1800+300に変更した場合も、布材の現在寸法を採用するため自然に反映される
+  // - ただし、該当スパンに階段（同寸法・同オフセットの中心）が作図されている場合、そのスパンは0扱い
+  //   代わりに、そのスパンの p.meta.braceQty（カードで編集）が集計対象になる
+  const BRACE_LENGTHS = [1800, 1500, 1200, 900] as const;
+  const braceSums: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      BRACE_LENGTHS.map((l) => [l, 0])
+    );
+
+    // ヘルパー: 対象布材スパンに階段があるかどうか
+    const hasStairOnSpan = (g: any, cloth: any) => {
+      const len = Number(cloth.meta?.length ?? 0);
+      const off = Number(cloth.meta?.offsetMm ?? 0);
+      if (!Number.isFinite(len) || !Number.isFinite(off)) return false;
+      const centerMm = off + len / 2;
+      return g.parts.some(
+        (q: any) =>
+          q.type === '階段' &&
+          Number(q.meta?.length ?? -1) === len &&
+          Math.round(Number(q.meta?.offsetMm ?? NaN)) === Math.round(centerMm)
+      );
+    };
+
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== '布材') continue;
+        const len = Number(p.meta?.length ?? 0);
+        if (!Number.isFinite(len)) continue;
+        if (!(BRACE_LENGTHS as readonly number[]).includes(len)) continue;
+
+        if (hasStairOnSpan(g, p)) {
+          // 階段あり: 自動0、本数はカード編集値（braceQty）を採用
+          const qty = Number(p.meta?.braceQty ?? 0);
+          if (qty > 0) sums[len] += qty;
+        } else {
+          // 階段なし: 自動で1カウント
+          sums[len] += 1;
+        }
+      }
+    }
+    return sums;
+  })();
+
+  // 階段の自動集計（寸法ごと）: パーツ種別 '階段' の meta.length をカウント
+  // - 1800 / 900 / 600 をサポート（'梯子' 項目は手動入力のまま）
+  const STAIR_LENGTHS = [1800, 900, 600] as const;
+  const stairSums: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      STAIR_LENGTHS.map((l) => [l, 0])
+    );
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== '階段') continue;
+        const len = Number(p.meta?.length ?? 0);
+        const qty = Number(p.meta?.quantity ?? 1); // 未指定は1台
+        if (!Number.isFinite(len) || !Number.isFinite(qty)) continue;
+        if ((STAIR_LENGTHS as readonly number[]).includes(len) && qty > 0) {
+          sums[len] += qty;
+        }
+      }
+    }
+    return sums;
+  })();
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {sections.map((section) => (
@@ -432,6 +499,10 @@ function QuantityGrid() {
                 if (kind === 'W') autoQtyAnti = Number(antiSumsW[len] ?? 0);
                 else if (kind === 'S') autoQtyAnti = Number(antiSumsS[len] ?? 0);
               }
+              const isStair = section.name === '階段' && (STAIR_LENGTHS as readonly number[]).includes(Number(item.label));
+              const autoQtyStair = isStair ? Number(stairSums[Number(item.label)] ?? 0) : undefined;
+              const isBrace = section.name === '筋交' && (BRACE_LENGTHS as readonly number[]).includes(Number(item.label));
+              const autoQtyBrace = isBrace ? Number(braceSums[Number(item.label)] ?? 0) : undefined;
               return (
                 <div key={item.key} className="mb-1.5 rounded-lg bg-white/40 p-1 dark:bg-slate-800/40">
                   <div className="flex items-center gap-1">
@@ -453,11 +524,15 @@ function QuantityGrid() {
                               ? String(autoQtyBracket)
                               : isAnti
                                 ? String(autoQtyAnti ?? 0)
-                              : state.qty
+                                : isStair
+                                  ? String(autoQtyStair ?? 0)
+                                  : isBrace
+                                    ? String(autoQtyBrace ?? 0)
+                                  : state.qty
                       }
-                      onChange={(e) => !(isPillar || isCloth || isBracket || isAnti) && setQty(item.key, e.target.value)}
-                      readOnly={isPillar || isCloth || isBracket || isAnti}
-                      aria-readonly={isPillar || isCloth || isBracket || isAnti}
+                      onChange={(e) => !(isPillar || isCloth || isBracket || isAnti || isStair || isBrace) && setQty(item.key, e.target.value)}
+                      readOnly={isPillar || isCloth || isBracket || isAnti || isStair || isBrace}
+                      aria-readonly={isPillar || isCloth || isBracket || isAnti || isStair || isBrace}
                       aria-label={`${section.name} ${item.label} の数量`}
                     />
                   </div>
