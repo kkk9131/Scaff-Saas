@@ -6,7 +6,7 @@
 /**
  * 足場部材の種別
  */
-export type ScaffoldPartType = '柱' | '布材' | 'ブラケット' | 'アンチ' | '階段' | '梁枠';
+export type ScaffoldPartType = '柱' | '布材' | 'ブラケット' | 'アンチ' | '階段' | 'ハネ' | '梁枠';
 
 /**
  * マーカーの種類（柱用）

@@ -13,6 +13,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { GripVertical, Table, Minimize2, Maximize2 } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import { mmToPx, DEFAULT_SCALE } from '@/lib/utils/scale';
 import type { PillarType } from '@/types/scaffold';
 
 /**
@@ -465,6 +466,150 @@ function QuantityGrid() {
     return sums;
   })();
 
+  // ハネ（寸法）自動集計
+  // 仕様:
+  // - 対象は「柱・三角マーカー（marker==='triangle'）」のうち、梁枠確定由来でないもの（meta.markerFrom!=='beam-frame'）
+  // - 三角の「逆向き」のブラケットまたは布材の寸法を読む
+  //   - 逆向きの判定: 三角 direction の +180° とパーツ direction の角度差が 20° 以下
+  //   - ブラケットは meta.width、布材は meta.length を寸法として採用
+  // - 寸法が 900/600/355/300/150 のものを「ハネ」として該当寸法へ +1
+  const HANE_LENGTHS = [900, 600, 355, 300, 150] as const;
+  const angleDiff = (a: number, b: number) => {
+    const d = Math.abs(((a % 360) + 360) % 360 - (((b % 360) + 360) % 360));
+    return d > 180 ? 360 - d : d;
+  };
+  const degToUnitVector = (deg: number) => {
+    const rad = (deg * Math.PI) / 180;
+    return { x: Math.cos(rad), y: Math.sin(rad) };
+  };
+  const angleFromLine = (line: { start: { x: number; y: number }; end: { x: number; y: number } }) => {
+    const dx = line.end.x - line.start.x;
+    const dy = line.end.y - line.start.y;
+    const rad = Math.atan2(dy, dx);
+    return (rad * 180) / Math.PI;
+  };
+  const isNear = (ax: number, ay: number, bx: number, by: number, tol = 6) => Math.hypot(ax - bx, ay - by) <= tol;
+  const haneSums: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(HANE_LENGTHS.map((l) => [l, 0]));
+    for (const g of scaffoldGroups) {
+      // 事前に布材・ブラケットを抽出
+      const cloths = g.parts.filter((p) => p.type === '布材');
+      const brackets = g.parts.filter((p) => p.type === 'ブラケット');
+      const baseDir = g.meta?.line ? angleFromLine(g.meta.line) : 0;
+
+      for (const p of g.parts) {
+        if (p.type !== '柱') continue;
+        if ((p.marker ?? 'circle') !== 'triangle') continue; // 三角以外は無視
+        if (String(p.meta?.markerFrom || '') === 'beam-frame') continue; // 梁枠確定由来は除外
+        const rawDir = Number(p.meta?.markerDirection);
+        // 方向未設定の三角は「見た目=上向き（270°）」とみなす
+        const triDir = Number.isFinite(rawDir) ? rawDir : 270;
+        // 逆向きは単純に +180°（markerDirection は見た目の方向を表現している）
+        const opp = (triDir + 180) % 360;
+        let picked: number | undefined = undefined;
+        let pickedEnd: { x: number; y: number } | undefined = undefined;
+
+        // 1) ブラケット優先
+        for (const b of brackets) {
+          const bdir = Number(b.meta?.direction ?? baseDir);
+          const w = Number(b.meta?.width ?? 0);
+          if (!(HANE_LENGTHS as readonly number[]).includes(w) || w <= 0) continue;
+          const v = degToUnitVector(bdir);
+          const startPos = { x: b.position.x, y: b.position.y };
+          const endPos = { x: b.position.x + v.x * mmToPx(w, DEFAULT_SCALE), y: b.position.y + v.y * mmToPx(w, DEFAULT_SCALE) };
+          const triAtStart = isNear(startPos.x, startPos.y, p.position.x, p.position.y, 8);
+          const triAtEnd = isNear(endPos.x, endPos.y, p.position.x, p.position.y, 8);
+          if (triAtStart && angleDiff(bdir, opp) <= 20) {
+            picked = w;
+            pickedEnd = endPos;
+            break;
+          }
+          if (triAtEnd && angleDiff((bdir + 180) % 360, opp) <= 20) {
+            picked = w;
+            pickedEnd = startPos;
+            break;
+          }
+        }
+        // 2) 見つからなければ布材
+        if (picked == null) {
+          for (const c of cloths) {
+            const l = Number(c.meta?.length ?? 0);
+            if (!(HANE_LENGTHS as readonly number[]).includes(l) || l <= 0) continue;
+            const cdir0 = Number.isFinite(Number(c.meta?.direction)) ? Number(c.meta?.direction) : baseDir;
+            const candidates = [cdir0, (cdir0 + 180) % 360, (baseDir + 90) % 360, (baseDir + 270) % 360];
+            for (const cdir of candidates) {
+              const v = degToUnitVector(cdir);
+              const startPos = { x: c.position.x, y: c.position.y };
+              const endPos = { x: c.position.x + v.x * mmToPx(l, DEFAULT_SCALE), y: c.position.y + v.y * mmToPx(l, DEFAULT_SCALE) };
+              const triAtStart = isNear(startPos.x, startPos.y, p.position.x, p.position.y, 8);
+              const triAtEnd = isNear(endPos.x, endPos.y, p.position.x, p.position.y, 8);
+              if (triAtStart && angleDiff(cdir, opp) <= 20) {
+                picked = l;
+                pickedEnd = endPos;
+                break;
+              }
+              if (triAtEnd && angleDiff((cdir + 180) % 360, opp) <= 20) {
+                picked = l;
+                pickedEnd = startPos;
+                break;
+              }
+            }
+            if (picked != null) break;
+          }
+        }
+        // 3) その先に必ず柱があること（終端近傍に柱が存在）
+        if (picked != null && pickedEnd) {
+          const hasPillarAtEnd = g.parts.some((q) => q.type === '柱' && isNear(q.position.x, q.position.y, pickedEnd!.x, pickedEnd!.y, 8));
+          if (hasPillarAtEnd) sums[picked] += 1;
+        }
+      }
+    }
+    return sums;
+  })();
+
+  // ジャッキの自動集計
+  // 仕様:
+  // - 柱パーツのうち「丸マーカー（marker==='circle' もしくは未設定=既定の丸）」のみカウント対象
+  // - 色が red の丸マーカー → 「下屋ジャッキ」へ加算
+  // - 色が white/black/blue/green の丸マーカー → 「ジャッキ」へ加算
+  // - 三角や四角（triangle/square）は集計しない
+  const jackSums = (() => {
+    let jack = 0;
+    let shitaya = 0;
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== '柱') continue;
+        const marker = (p.marker ?? 'circle') as 'circle' | 'triangle' | 'square';
+        if (marker !== 'circle') continue; // 丸以外は集計しない
+        const color = String(p.color || '').toLowerCase();
+        if (color === 'red') shitaya += 1;
+        else if (color === 'white' || color === 'black' || color === 'blue' || color === 'green') jack += 1;
+      }
+    }
+    return { jack, shitaya };
+  })();
+
+  // 梁枠の自動集計（寸法ごと）: パーツ種別 '梁枠' の meta.length をカウント
+  // - 対象は 5400 / 3600 / 2700
+  const BEAM_FRAME_LENGTHS = [5400, 3600, 2700] as const;
+  const beamFrameSums: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      BEAM_FRAME_LENGTHS.map((l) => [l, 0])
+    );
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== '梁枠') continue;
+        const len = Number(p.meta?.length ?? 0);
+        const qty = Number(p.meta?.quantity ?? 1);
+        if (!Number.isFinite(len) || !Number.isFinite(qty)) continue;
+        if ((BEAM_FRAME_LENGTHS as readonly number[]).includes(len) && qty > 0) {
+          sums[len] += qty;
+        }
+      }
+    }
+    return sums;
+  })();
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {sections.map((section) => (
@@ -501,8 +646,19 @@ function QuantityGrid() {
               }
               const isStair = section.name === '階段' && (STAIR_LENGTHS as readonly number[]).includes(Number(item.label));
               const autoQtyStair = isStair ? Number(stairSums[Number(item.label)] ?? 0) : undefined;
+              const isBeamFrame = section.name === '梁枠' && (BEAM_FRAME_LENGTHS as readonly number[]).includes(Number(item.label));
+              const autoQtyBeam = isBeamFrame ? Number(beamFrameSums[Number(item.label)] ?? 0) : undefined;
+              const isJack = section.name === 'ジャッキ';
+              const isJackAutoItem = isJack && (item.label === 'ジャッキ' || item.label === '下屋ジャッキ');
+              const autoQtyJack = isJackAutoItem
+                ? item.label === 'ジャッキ'
+                  ? jackSums.jack
+                  : jackSums.shitaya
+                : undefined;
               const isBrace = section.name === '筋交' && (BRACE_LENGTHS as readonly number[]).includes(Number(item.label));
               const autoQtyBrace = isBrace ? Number(braceSums[Number(item.label)] ?? 0) : undefined;
+              const isHane = section.name === 'ハネ' && (HANE_LENGTHS as readonly number[]).includes(Number(item.label));
+              const autoQtyHane = isHane ? Number(haneSums[Number(item.label)] ?? 0) : undefined;
               return (
                 <div key={item.key} className="mb-1.5 rounded-lg bg-white/40 p-1 dark:bg-slate-800/40">
                   <div className="flex items-center gap-1">
@@ -528,11 +684,17 @@ function QuantityGrid() {
                                   ? String(autoQtyStair ?? 0)
                                   : isBrace
                                     ? String(autoQtyBrace ?? 0)
-                                  : state.qty
+                                    : isBeamFrame
+                                      ? String(autoQtyBeam ?? 0)
+                                      : isJackAutoItem
+                                        ? String(autoQtyJack ?? 0)
+                                        : isHane
+                                          ? String(autoQtyHane ?? 0)
+                                        : state.qty
                       }
-                      onChange={(e) => !(isPillar || isCloth || isBracket || isAnti || isStair || isBrace) && setQty(item.key, e.target.value)}
-                      readOnly={isPillar || isCloth || isBracket || isAnti || isStair || isBrace}
-                      aria-readonly={isPillar || isCloth || isBracket || isAnti || isStair || isBrace}
+                      onChange={(e) => !(isPillar || isCloth || isBracket || isAnti || isStair || isBrace || isBeamFrame || isJackAutoItem || isHane) && setQty(item.key, e.target.value)}
+                      readOnly={isPillar || isCloth || isBracket || isAnti || isStair || isBrace || isBeamFrame || isJackAutoItem || isHane}
+                      aria-readonly={isPillar || isCloth || isBracket || isAnti || isStair || isBrace || isBeamFrame || isJackAutoItem || isHane}
                       aria-label={`${section.name} ${item.label} の数量`}
                     />
                   </div>

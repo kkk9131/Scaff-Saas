@@ -839,7 +839,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-305] 編集モード・ポップアップUI
+### [TASK-305] 編集モード・ポップアップUI 🚀
 ```yaml
 依存: TASK-301
 並列可: TASK-306
@@ -958,7 +958,7 @@ frontend/hooks/useDrawingSave.ts
 
 ---
 
-### [TASK-310] ショートカットと方向ルールの単体テスト
+### [TASK-310] ショートカットと方向ルールの単体テスト 🚀
 ```yaml
 依存: TASK-302, TASK-303
 並列可: TASK-308
@@ -982,7 +982,7 @@ frontend/hooks/useDrawingSave.ts
 
 ---
 
-### [TASK-311] 集計・アンダーバー（数量/座標/寸法）
+### [TASK-311] 集計・アンダーバー（数量/座標/寸法） 🚀
 ```yaml
 依存: TASK-301, TASK-306
 並列可: なし

@@ -216,7 +216,7 @@ function LeftSidebar() {
                 <div className="my-2 h-px bg-white/20 dark:bg-slate-700/50" />
                 {/* セクション見出し（視覚的な説明） */}
                 <div className="mb-1 text-[10px] font-semibold tracking-wider text-slate-600 dark:text-slate-400 text-center">編集対象</div>
-                {/* 6種の部材タイプ選択（2列） */}
+                {/* 7種の部材タイプ選択（2列） */}
                 <div className="grid grid-cols-1 gap-2">
                   {/* 柱 / 布材 */}
                   <EditTargetButton type="柱" glyph="柱" />
@@ -224,7 +224,8 @@ function LeftSidebar() {
                   {/* ブラケット / アンチ */}
                   <EditTargetButton type="ブラケット" glyph="ブ" />
                   <EditTargetButton type="アンチ" glyph="ア" />
-                  {/* 階段 / 梁枠 */}
+                  {/* はね / 階段 / 梁枠 */}
+                  <EditTargetButton type="ハネ" glyph="羽" />
                   <EditTargetButton type="階段" glyph="階" />
                   <EditTargetButton type="梁枠" glyph="梁" />
                 </div>

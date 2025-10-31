@@ -146,14 +146,12 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
     onClose();
   };
 
-  
-
   return (
     <div
       style={style}
       className="glass-scope bracket-config-card fixed z-30 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
       aria-live="polite"
-      aria-label="ブラケットの方向と寸法選択カード"
+      aria-label="ブラケットの設定カード"
     >
       {/* ヘッダー */}
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-slate-700/50">

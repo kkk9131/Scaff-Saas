@@ -28,6 +28,7 @@ import BracketQuantityCard from './BracketQuantityCard';
 import AntiQuantityCard from './AntiQuantityCard';
 import AntiLevelCard from './AntiLevelCard';
 import BracketConfigCard from './BracketConfigCard';
+import HaneConfigCard from './HaneConfigCard';
 import BraceQuantityCard from './BraceQuantityCard';
 
 /**
@@ -474,6 +475,16 @@ export default function CanvasStage() {
     | null
   >(null);
 
+  // ハネの方向・寸法カード
+  const [haneCard, setHaneCard] = useState<
+    | {
+        anchor: { x: number; y: number };
+        groupId: string;
+        partId: string;
+      }
+    | null
+  >(null);
+
   /**
    * リサイズハンドラー
    * ウィンドウサイズ変更時にStageサイズを更新
@@ -766,8 +777,43 @@ export default function CanvasStage() {
           },
         });
 
-        // ストアに追加
-        addScaffoldGroup(scaffoldGroup);
+        // 既存との重複を除去（柱・ブラケット）してから追加
+        const allExistingParts = useDrawingStore.getState().scaffoldGroups.flatMap((g) => g.parts);
+        const near = (ax: number, ay: number, bx: number, by: number, tol = 2) => Math.hypot(ax - bx, ay - by) <= tol;
+        const roundCardinal = (deg: number) => {
+          const d = ((deg % 360) + 360) % 360;
+          const cand = [0, 90, 180, 270];
+          let best = 0, bestDiff = 1e9;
+          for (const c of cand) {
+            const diff = Math.min(Math.abs(d - c), 360 - Math.abs(d - c));
+            if (diff < bestDiff) { bestDiff = diff; best = c; }
+          }
+          return best;
+        };
+        const existsPillarAt = (x: number, y: number) =>
+          allExistingParts.some((p) => p.type === '柱' && near(p.position.x, p.position.y, x, y, 2));
+        const existsBracketAt = (x: number, y: number, width: number, dir: number) =>
+          allExistingParts.some(
+            (p) =>
+              p.type === 'ブラケット' &&
+              near(p.position.x, p.position.y, x, y, 2) &&
+              Number(p.meta?.width ?? -1) === width &&
+              roundCardinal(Number(p.meta?.direction ?? 0)) === roundCardinal(dir)
+          );
+
+        const filteredParts = scaffoldGroup.parts.filter((p) => {
+          if (p.type === '柱') {
+            return !existsPillarAt(p.position.x, p.position.y);
+          }
+          if (p.type === 'ブラケット') {
+            const width = Number(p.meta?.width ?? 0);
+            const dir = Number(p.meta?.direction ?? 0);
+            return !existsBracketAt(p.position.x, p.position.y, width, dir);
+          }
+          return true;
+        });
+        const dedupGroup = { ...scaffoldGroup, parts: filteredParts };
+        addScaffoldGroup(dedupGroup);
       }
 
       // スパン描画状態をリセット
@@ -1008,6 +1054,9 @@ export default function CanvasStage() {
             onBracketConfigClick={({ anchor, groupId, partId }) => {
               setBracketConfigCard({ anchor, groupId, partId });
             }}
+            onHaneConfigClick={({ anchor, groupId, partId }) => {
+              setHaneCard({ anchor, groupId, partId });
+            }}
           />
         </Layer>
 
@@ -1072,8 +1121,8 @@ export default function CanvasStage() {
         const leftSegs = moveAll150To(splitIntoAllowed(clothSplit.leftMm), 'end');
         const rightSegs = moveAll150To(splitIntoAllowed(clothSplit.rightMm), 'start');
         const text = `${leftSegs.join('+')} / ${rightSegs.join('+')}`;
-        return (
-          <div
+  return (
+    <div
           className="fixed z-30 rounded-md border px-2 py-1 text-[11px] font-semibold shadow-sm border-slate-300 bg-white text-black dark:border-slate-700 dark:bg-black dark:text-white"
           style={{
             left: clothSplit.anchorCanvas.x * canvasScale + canvasPosition.x + 8,
@@ -1187,6 +1236,19 @@ export default function CanvasStage() {
             top: bracketConfigCard.anchor.y * canvasScale + canvasPosition.y + 12,
           }}
           onClose={() => setBracketConfigCard(null)}
+        />
+      )}
+
+      {/* ハネの方向と寸法選択カード（オーバーレイ） */}
+      {haneCard && (
+        <HaneConfigCard
+          groupId={haneCard.groupId}
+          partId={haneCard.partId}
+          screenPosition={{
+            left: haneCard.anchor.x * canvasScale + canvasPosition.x + 12,
+            top: haneCard.anchor.y * canvasScale + canvasPosition.y + 12,
+          }}
+          onClose={() => setHaneCard(null)}
         />
       )}
     </div>

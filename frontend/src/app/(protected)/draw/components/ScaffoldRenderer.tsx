@@ -95,6 +95,7 @@ export default function ScaffoldRenderer({
   onAntiClick,
   onAntiLevelClick,
   onBracketConfigClick,
+  onHaneConfigClick,
   onClothSplitStart,
 }: {
   stageWidth: number;
@@ -141,6 +142,14 @@ export default function ScaffoldRenderer({
     partId: string;
   }) => void;
   /**
+   * ハネ編集時、柱クリックで方向・寸法カードを出す
+   */
+  onHaneConfigClick?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    partId: string;
+  }) => void;
+  /**
    * アンチ編集時の黄色発光矩形クリックで呼び出すコールバック
    */
   onAntiClick?: (args: {
@@ -170,6 +179,187 @@ export default function ScaffoldRenderer({
   const { scaffoldGroups, updateScaffoldGroup, editTargetType, canvasScale, canvasPosition } = useDrawingStore();
   const { currentMode } = useDrawingModeStore();
   const { isDark } = useTheme();
+
+  /**
+   * 梁枠パターンの選択・ホバー状態
+   * - frameSelection: グループID|startMm-endMm -> 選択インデックス
+   * - hoveredFrameKey: ホバー中の領域キー（手カーソルと視覚強調）
+   */
+  const [frameSelection, setFrameSelection] = React.useState<Record<string, number>>({});
+  const [hoveredFrameKey, setHoveredFrameKey] = React.useState<string | null>(null);
+  // 確定済み梁枠のホバー（数量×2のUI表示・Spaceで加算）
+  const [hoveredBeamFrame, setHoveredBeamFrame] = React.useState<{ groupId: string; partId: string } | null>(null);
+
+  /**
+   * Cmd/Ctrl + Enter で梁枠を確定
+   * - 選択中のパターンについて、間柱を三角化し、該当布材を点線化
+   * - 布材はデータへ反映（meta.lineStyle='dashed'）し、以後の描画で常に点線表示
+   */
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!((e.metaKey || e.ctrlKey) && (e.key === 'Enter' || e.code === 'Enter'))) return;
+      // 梁枠編集時のみ有効
+      const { editTargetType, scaffoldGroups, updateScaffoldGroup } = useDrawingStore.getState();
+      if (editTargetType !== '梁枠') return;
+
+      // すべてのグループに対して、frameSelection の対象を確定反映
+      for (const group of scaffoldGroups) {
+        // グループ内の布材をオフセット順に
+        const cloths = group.parts
+          .filter((p) => p.type === '布材' && p.meta?.lineStyle !== 'dashed')
+          .sort((a, b) => (a.meta?.offsetMm ?? 0) - (b.meta?.offsetMm ?? 0));
+
+        // パターン検出（描画部と同等）
+        type FrameMatch = { start: number; length: number; name: 'P2_1800_1800' | 'P3_1800_1800_1800' | 'P2_1800_900' | 'P2_900_1800' };
+        const matches: FrameMatch[] = [];
+        for (let i = 0; i < cloths.length; i++) {
+          const l0 = cloths[i]?.meta?.length ?? 0;
+          const l1 = cloths[i + 1]?.meta?.length ?? 0;
+          const l2 = cloths[i + 2]?.meta?.length ?? 0;
+          if (i + 1 < cloths.length && l0 === 1800 && l1 === 1800) matches.push({ start: i, length: 2, name: 'P2_1800_1800' });
+          if (i + 2 < cloths.length && l0 === 1800 && l1 === 1800 && l2 === 1800) matches.push({ start: i, length: 3, name: 'P3_1800_1800_1800' });
+          if (i + 1 < cloths.length && l0 === 1800 && l1 === 900) matches.push({ start: i, length: 2, name: 'P2_1800_900' });
+          if (i + 1 < cloths.length && l0 === 900 && l1 === 1800) matches.push({ start: i, length: 2, name: 'P2_900_1800' });
+        }
+
+        // グルーピング（安定キー: 先頭布材ID-末尾布材ID）
+        type FrameGroup = { key: string; startId: string; endId: string; matches: FrameMatch[] };
+        const toInterval = (m: FrameMatch) => {
+          const first = cloths[m.start];
+          const last = cloths[m.start + m.length - 1];
+          const s = Number(first?.meta?.offsetMm ?? 0);
+          const e = Number(last?.meta?.offsetMm ?? 0) + Number(last?.meta?.length ?? 0);
+          return { s, e, m };
+        };
+        const ivs = matches.map(toInterval).sort((a, b) => (a.s === b.s ? a.e - b.e : a.s - b.s));
+        const fgs: FrameGroup[] = [];
+        let cur: typeof ivs = [];
+        const flush = () => {
+          if (!cur.length) return;
+          const s = Math.min(...cur.map((c) => c.s));
+          const e = Math.max(...cur.map((c) => c.e));
+          const first = cur[0];
+          const last = cur.reduce((p, c) => (c.e >= p.e ? c : p), cur[0]);
+          const firstId = cloths[first.m.start]?.id ?? `s${s}`;
+          const lastId = cloths[last.m.start + last.m.length - 1]?.id ?? `e${e}`;
+          const key = `${group.id}|${firstId}-${lastId}`;
+          fgs.push({ key, startId: firstId, endId: lastId, matches: cur.map((c) => c.m) });
+          cur = [];
+        };
+        for (const iv of ivs) {
+          if (!cur.length) cur.push(iv);
+          else {
+            const lastEnd = Math.max(...cur.map((c) => c.e));
+            if (iv.s <= lastEnd) cur.push(iv);
+            else {
+              flush();
+              cur.push(iv);
+            }
+          }
+        }
+        flush();
+
+        // 対象キー: hoveredFrameKey があればそれを最優先。なければ frameSelection に存在するキー。
+        let changed = false;
+        let parts = group.parts.map((p) => ({ ...p }));
+
+        const keysToConfirm = new Set<string>();
+        if (hoveredFrameKey) keysToConfirm.add(hoveredFrameKey);
+        for (const k of Object.keys(frameSelection)) keysToConfirm.add(k);
+
+        // スパン方向ベクトル（px）
+        const t = group.meta?.line
+          ? normalize(
+              group.meta.line.end.x - group.meta.line.start.x,
+              group.meta.line.end.y - group.meta.line.start.y
+            )
+          : { x: 1, y: 0 };
+
+        for (const fg of fgs) {
+          if (!keysToConfirm.has(fg.key)) continue;
+          const sel = frameSelection[fg.key] ?? 0;
+          const idx = Math.max(0, Math.min(sel, fg.matches.length - 1));
+          const active = fg.matches[idx];
+          // 1) 布材を点線化（対象 cloths[active.start..start+length-1]）
+          const clothIds = new Set(
+            Array.from({ length: active.length }, (_, i) => cloths[active.start + i]?.id).filter(Boolean) as string[]
+          );
+          parts = parts.map((p) =>
+            p.type === '布材' && clothIds.has(p.id)
+              ? ({ ...p, meta: { ...(p.meta || {}), lineStyle: 'dashed' } } as any)
+              : p
+          );
+          // 2) 間柱を三角化（境界オフセットで柱を検索）
+          const first = cloths[active.start];
+          let offMm = Number(first?.meta?.offsetMm ?? 0);
+          for (let i = 1; i <= active.length - 1; i++) {
+            const prev = cloths[active.start + i - 1];
+            const len = Number(prev?.meta?.length ?? 0);
+            const boundary = offMm + len;
+            offMm = boundary;
+            parts = parts.map((p) => {
+              if (
+                p.type === '柱' &&
+                Math.abs(Number(p.meta?.offsetMm ?? 1e9) - boundary) <= 1
+              ) {
+                return { ...p, marker: 'triangle' as const, meta: { ...(p.meta || {}), markerFrom: 'beam-frame' } };
+              }
+              return p;
+            });
+          }
+          // 3) 梁枠パーツを追加（数量表の自動集計対象）
+          // 長さ（mm）: 対象 cloth の合計
+          const combinedLen = Array.from({ length: active.length }, (_, i) => Number(cloths[active.start + i]?.meta?.length ?? 0)).reduce((a, b) => a + b, 0);
+          // アンカー（px）: 先頭布材の始点と末尾布材の終点の中点
+          const firstCloth = cloths[active.start];
+          const lastCloth = cloths[active.start + active.length - 1];
+          const lastDir = typeof lastCloth?.meta?.direction === 'number' ? degToUnitVector(Number(lastCloth?.meta?.direction)) : t;
+          const lastLenPx = mmToPx(Number(lastCloth?.meta?.length ?? 0), DEFAULT_SCALE);
+          const startPos = { x: firstCloth.position.x, y: firstCloth.position.y };
+          const endPos = { x: lastCloth.position.x + lastDir.x * lastLenPx, y: lastCloth.position.y + lastDir.y * lastLenPx };
+          const anchor = { x: (startPos.x + endPos.x) / 2, y: (startPos.y + endPos.y) / 2 };
+          parts.push({
+            id: uuidv4(),
+            type: '梁枠',
+            position: anchor,
+            color: 'green',
+            meta: { length: combinedLen, quantity: 1, startOffsetMm: Number(first?.meta?.offsetMm ?? 0), endOffsetMm: offMm },
+          } as any);
+          changed = true;
+        }
+
+        if (changed) updateScaffoldGroup(group.id, { parts });
+      }
+
+      // 反映後は選択状態をクリア
+      if (Object.keys(frameSelection).length > 0) {
+        e.preventDefault();
+        setHoveredFrameKey(null);
+        setFrameSelection({});
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [frameSelection, hoveredFrameKey]);
+
+  // スペースキーで確定済み梁枠の数量を+1（ホバー中のみ、梁枠モード時）
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      const { editTargetType, scaffoldGroups, updateScaffoldGroup } = useDrawingStore.getState();
+      if (!(editTargetType === '梁枠' && hoveredBeamFrame)) return;
+      e.preventDefault();
+      const { groupId, partId } = hoveredBeamFrame;
+      const group = scaffoldGroups.find((g) => g.id === groupId);
+      if (!group) return;
+      const parts = group.parts.map((p) =>
+        p.id === partId ? ({ ...p, meta: { ...(p.meta || {}), quantity: Number(p.meta?.quantity ?? 1) + 1 } } as any) : p
+      );
+      updateScaffoldGroup(groupId, { parts });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [hoveredBeamFrame]);
 
   // ホバー中の柱（マーカー変更対象）
   const [hoveredPillar, setHoveredPillar] = React.useState<
@@ -375,7 +565,7 @@ export default function ScaffoldRenderer({
         const clothFrameHighlightMap: Map<string, 'yellow' | 'blue' | 'green'> = new Map();
         if (currentMode === 'edit' && editTargetType === '梁枠') {
           const clothPartsOrdered = group.parts
-            .filter((p) => p.type === '布材')
+            .filter((p) => p.type === '布材' && p.meta?.lineStyle !== 'dashed')
             .sort(
               (a, b) => (a.meta?.offsetMm ?? 0) - (b.meta?.offsetMm ?? 0)
             );
@@ -420,11 +610,14 @@ export default function ScaffoldRenderer({
           }
         }
 
+        // ドラッグ完全無効化（作図済みグループは動かせない）
+        const canDrag = false;
         return (
           <Group
             key={group.id}
-            draggable
+            draggable={canDrag}
             onDragEnd={(e) => {
+              if (!canDrag) return;
               // Groupのドラッグ量（Konvaは相対ではなく絶対座標になるため差分を計算）
               // ここでは簡易的にドラッグ終了時のドラッグ量を取得するためにevt.targetのドラッグ変位を利用
               const node = e.target;
@@ -440,11 +633,46 @@ export default function ScaffoldRenderer({
               const stroke = colorToStroke(part.color);
               // 柱ハイライト
               const highlightPillarYellow =
-                currentMode === 'edit' && editTargetType === '柱' && part.type === '柱';
+                currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ハネ') && part.type === '柱';
               const highlightPillarBlue =
                 currentMode === 'edit' && editTargetType === 'ブラケット' && part.type === '柱';
               const isPillarHighlighted = highlightPillarYellow || highlightPillarBlue;
               switch (part.type) {
+                case '梁枠': {
+                  // 確定済みの梁枠（数量表の自動集計対象）
+                  const qty = Number(part.meta?.quantity ?? 1);
+                  const showLabel = currentMode === 'edit' && editTargetType === '梁枠' && qty > 1;
+                  return (
+                    <Group
+                      key={part.id}
+                      onMouseEnter={(e) => {
+                        if (currentMode === 'edit' && editTargetType === '梁枠') {
+                          const stage = e.target.getStage?.();
+                          if (stage) stage.container().style.cursor = 'pointer';
+                          setHoveredBeamFrame({ groupId: group.id, partId: part.id });
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        const stage = e.target.getStage?.();
+                        if (stage) stage.container().style.cursor = 'default';
+                        setHoveredBeamFrame((cur) => (cur && cur.partId === part.id ? null : cur));
+                      }}
+                    >
+                      {/* 数量表示（×2 など）。qty>1 のときのみ表示 */}
+                      {showLabel && (
+                        <Text
+                          x={part.position.x}
+                          y={part.position.y}
+                          text={`×${qty}`}
+                          fontSize={12}
+                          fill={isDark ? '#FFFFFF' : '#000000'}
+                        />
+                      )}
+                      {/* クリック領域（透明） */}
+                      <Circle x={part.position.x} y={part.position.y} radius={18 * invScale} fill={'rgba(0,0,0,0)'} listening={true} />
+                    </Group>
+                  );
+                }
                 case '柱':
                   return (
                     <Group
@@ -467,6 +695,16 @@ export default function ScaffoldRenderer({
                               partId: relatedBracket.id,
                             });
                           }
+                          return;
+                        }
+                        // ハネ編集時: 柱クリックで方向・寸法カードを表示
+                        if (currentMode === 'edit' && editTargetType === 'ハネ') {
+                          e.cancelBubble = true;
+                          onHaneConfigClick?.({
+                            anchor: { x: part.position.x, y: part.position.y },
+                            groupId: group.id,
+                            partId: part.id,
+                          });
                           return;
                         }
                         // 編集モードで柱が対象のときのみクリックを処理
@@ -739,11 +977,12 @@ export default function ScaffoldRenderer({
                           />
                         );
                       })()}
-                      {/* 本体ライン */}
+                      {/* 本体ライン（確定済みは点線描画） */}
                       <Line
                         points={[part.position.x, part.position.y, x2, y2]}
                         stroke={stroke}
                         strokeWidth={2}
+                        dash={part.meta?.lineStyle === 'dashed' ? [6 * invScale, 6 * invScale] : undefined}
                         shadowColor={highlightClothLine ? highlightStroke : undefined}
                         shadowBlur={highlightClothLine ? CLOTH_GLOW.shadowBlur * 0.6 : 0}
                         shadowOpacity={highlightClothLine ? 0.7 : 0}
@@ -776,6 +1015,37 @@ export default function ScaffoldRenderer({
                       />
                       {/* 階段編集時のクリック領域（最前面に配置、黄色発光部分全域をカバー） */}
                       {highlightStairLine && (
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          stroke="rgba(0,0,0,0)"
+                          strokeWidth={Math.max(CLOTH_GLOW.glowWidth + 8, 20 * invScale)}
+                          listening={true}
+                          onClick={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === '階段')) return;
+                            e.cancelBubble = true;
+                            const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
+                            onStairClick?.(args);
+                          }}
+                          onTap={(e) => {
+                            if (!(currentMode === 'edit' && editTargetType === '階段')) return;
+                            e.cancelBubble = true;
+                            const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
+                            onStairClick?.(args);
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentMode === 'edit' && editTargetType === '階段') {
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'pointer';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'default';
+                          }}
+                        />
+                      )}
+                      {/* 階段編集時の緑色発光部分のクリック領域（最前面に配置、緑色発光部分全域をカバー） */}
+                      {highlightStairOpposite600 && (
                         <Line
                           points={[part.position.x, part.position.y, x2, y2]}
                           stroke="rgba(0,0,0,0)"
@@ -1592,6 +1862,168 @@ export default function ScaffoldRenderer({
                   return null;
               }
             })}
+
+            {/* 梁枠編集: パターン領域のクリックオーバーレイ＋選択表示（点線・三角） */}
+            {(() => {
+              if (!(currentMode === 'edit' && editTargetType === '梁枠')) return null;
+              // 1) パターン検出（1800,1800 / 1800,1800,1800 / 1800,900 or 900,1800）
+              type FrameMatch = { start: number; length: number; name: 'P2_1800_1800' | 'P3_1800_1800_1800' | 'P2_1800_900' | 'P2_900_1800' };
+              const frameCloths = group.parts
+                .filter((p) => p.type === '布材' && p.meta?.lineStyle !== 'dashed')
+                .sort((a, b) => (a.meta?.offsetMm ?? 0) - (b.meta?.offsetMm ?? 0));
+              const matches: FrameMatch[] = [];
+              for (let i = 0; i < frameCloths.length; i++) {
+                const l0 = frameCloths[i]?.meta?.length ?? 0;
+                const l1 = frameCloths[i + 1]?.meta?.length ?? 0;
+                const l2 = frameCloths[i + 2]?.meta?.length ?? 0;
+                if (i + 1 < frameCloths.length && l0 === 1800 && l1 === 1800) matches.push({ start: i, length: 2, name: 'P2_1800_1800' });
+                if (i + 2 < frameCloths.length && l0 === 1800 && l1 === 1800 && l2 === 1800) matches.push({ start: i, length: 3, name: 'P3_1800_1800_1800' });
+                if (i + 1 < frameCloths.length && l0 === 1800 && l1 === 900) matches.push({ start: i, length: 2, name: 'P2_1800_900' });
+                if (i + 1 < frameCloths.length && l0 === 900 && l1 === 1800) matches.push({ start: i, length: 2, name: 'P2_900_1800' });
+              }
+              if (matches.length === 0) return null;
+
+              // 2) 重複マッチを一つの領域にグルーピング
+              type FrameGroup = {
+                key: string;
+                rangeStartMm: number;
+                rangeEndMm: number;
+                startPos: { x: number; y: number };
+                endPos: { x: number; y: number };
+                matches: FrameMatch[];
+              };
+              const toInterval = (m: FrameMatch) => {
+                const first = frameCloths[m.start];
+                const last = frameCloths[m.start + m.length - 1];
+                const startMm = Number(first?.meta?.offsetMm ?? 0);
+                const endMm = Number(last?.meta?.offsetMm ?? 0) + Number(last?.meta?.length ?? 0);
+                const dirVec = typeof last?.meta?.direction === 'number' ? degToUnitVector(Number(last?.meta?.direction)) : t;
+                const lenPx = mmToPx(Number(last?.meta?.length ?? 0), DEFAULT_SCALE);
+                const startPos = { x: first.position.x, y: first.position.y };
+                const endPos = { x: last.position.x + dirVec.x * lenPx, y: last.position.y + dirVec.y * lenPx };
+                return { startMm, endMm, startPos, endPos, m };
+              };
+              const ivs = matches.map(toInterval).sort((a, b) => (a.startMm === b.startMm ? a.endMm - b.endMm : a.startMm - b.startMm));
+              const groups: FrameGroup[] = [];
+              let cur: typeof ivs = [];
+              const flush = () => {
+                if (!cur.length) return;
+                const startMm = Math.min(...cur.map((c) => c.startMm));
+                const endMm = Math.max(...cur.map((c) => c.endMm));
+                const first = cur[0];
+                const last = cur.reduce((p, c) => (c.endMm >= p.endMm ? c : p), cur[0]);
+                // 安定キー: 先頭布材ID-末尾布材ID
+                const firstId = frameCloths[first.m.start]?.id ?? `s${startMm}`;
+                const lastId = frameCloths[last.m.start + last.m.length - 1]?.id ?? `e${endMm}`;
+                const key = `${group.id}|${firstId}-${lastId}`;
+                groups.push({ key, rangeStartMm: startMm, rangeEndMm: endMm, startPos: first.startPos, endPos: last.endPos, matches: cur.map((c) => c.m) });
+                cur = [];
+              };
+              for (const iv of ivs) {
+                if (!cur.length) cur.push(iv);
+                else {
+                  const lastEnd = Math.max(...cur.map((c) => c.endMm));
+                  if (iv.startMm <= lastEnd) cur.push(iv);
+                  else {
+                    flush();
+                    cur.push(iv);
+                  }
+                }
+              }
+              flush();
+
+              // 3) レンダリング（クリック切替＋視覚強調）
+              const dashLen = 8 * invScale;
+              return (
+                <>
+                  {groups.map((fg) => {
+                    const k = fg.key;
+                    const sel = Math.max(0, Math.min(frameSelection[k] ?? 0, fg.matches.length - 1));
+                    const active = fg.matches[sel];
+                    const showHover = hoveredFrameKey === k;
+                    // 間柱（三角）の描画用ユーティリティ（±1mm でマッチ）
+                    const triangles: React.ReactNode[] = [];
+                    const first = frameCloths[active.start];
+                    let offMm = Number(first?.meta?.offsetMm ?? 0);
+                    for (let i = 1; i <= active.length - 1; i++) {
+                      const prev = frameCloths[active.start + i - 1];
+                      const len = Number(prev?.meta?.length ?? 0);
+                      const boundaryMm = offMm + len;
+                      offMm = boundaryMm;
+                      const pillar = group.parts.find(
+                        (p) => p.type === '柱' && Math.abs((Number(p.meta?.offsetMm ?? 1e9)) - boundaryMm) <= 1
+                      );
+                      if (pillar) {
+                        triangles.push(
+                          <RegularPolygon
+                            key={`tri-${k}-${boundaryMm}`}
+                            x={pillar.position.x}
+                            y={pillar.position.y}
+                            sides={3}
+                            radius={6.5 * invScale}
+                            fill="#EF4444"
+                            stroke="#B91C1C"
+                            strokeWidth={1}
+                            listening={false}
+                          />
+                        );
+                      }
+                    }
+                    // 選択中パターンの開始/終了座標（点線用）
+                    const mFirst = frameCloths[active.start];
+                    const mLast = frameCloths[active.start + active.length - 1];
+                    const mDir = typeof mLast?.meta?.direction === 'number' ? degToUnitVector(Number(mLast?.meta?.direction)) : t;
+                    const mLenPx = mmToPx(Number(mLast?.meta?.length ?? 0), DEFAULT_SCALE);
+                    const mStartPos = { x: mFirst.position.x, y: mFirst.position.y };
+                    const mEndPos = { x: mLast.position.x + mDir.x * mLenPx, y: mLast.position.y + mDir.y * mLenPx };
+                    return (
+                      <Group key={`frame-${k}`}>
+                        {/* 点線の強調ライン（布材は非破壊、上から重ねる）*/}
+                        <Line
+                          points={[mStartPos.x, mStartPos.y, mEndPos.x, mEndPos.y]}
+                          stroke="#3B82F6"
+                          strokeWidth={3}
+                          dash={[dashLen, dashLen]}
+                          opacity={0.9}
+                          listening={false}
+                        />
+                        {/* 間柱の三角マーカー（UI上のみ上書き表示） */}
+                        {triangles}
+                        {/* クリック当たり判定（広めの透明ライン、ホバーで確認しやすく） */}
+                        <Line
+                          points={[fg.startPos.x, fg.startPos.y, fg.endPos.x, fg.endPos.y]}
+                          stroke={showHover ? 'rgba(250,204,21,0.25)' : 'rgba(0,0,0,0)'}
+                          strokeWidth={Math.max(10 * invScale + 12, 22 * invScale)}
+                          shadowColor={showHover ? '#FACC15' : undefined}
+                          shadowBlur={showHover ? 16 * invScale : 0}
+                          shadowOpacity={showHover ? 0.9 : 0}
+                          listening={true}
+                          hitStrokeWidth={24}
+                          onMouseEnter={(e) => {
+                            const st = e.target.getStage?.();
+                            if (st) st.container().style.cursor = 'pointer';
+                            setHoveredFrameKey(k);
+                          }}
+                          onMouseLeave={(e) => {
+                            const st = e.target.getStage?.();
+                            if (st) st.container().style.cursor = 'default';
+                            setHoveredFrameKey((cur) => (cur === k ? null : cur));
+                          }}
+                          onClick={(e) => {
+                            e.cancelBubble = true;
+                            setFrameSelection((prev) => ({ ...prev, [k]: ((prev[k] ?? 0) + 1) % fg.matches.length }));
+                          }}
+                          onTap={(e) => {
+                            e.cancelBubble = true;
+                            setFrameSelection((prev) => ({ ...prev, [k]: ((prev[k] ?? 0) + 1) % fg.matches.length }));
+                          }}
+                        />
+                      </Group>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </Group>
         );
       })}

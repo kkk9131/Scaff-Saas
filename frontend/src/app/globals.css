@@ -417,6 +417,20 @@
   html:not(.dark) .brace-quantity-card input {
     background-color: rgba(255, 255, 255, 0.8) !important;
   }
+  /* ハネ設定カード（ライトモード時の白背景強制） */
+  html:not(.dark) .hane-config-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .hane-config-card button {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  /* ブラケット設定カード（ライトモード時の白背景強制） */
+  html:not(.dark) .bracket-config-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .bracket-config-card button {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
   /* コンポーネント属性で強制透過（安全ネット） */
   :root :is(aside[data-sidebar-root], aside[data-chat-root]) {
     background-color: transparent !important;
