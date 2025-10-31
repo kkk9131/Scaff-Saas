@@ -361,7 +361,62 @@
     color: #fff !important;
   }
 
-  /* glass-scopeクラス: 削除（コンポーネント側のTailwindクラスのみ使用） */
+  /* DraggablePanel: ライトモード時に背景を少し明るく（他のカードと統一） */
+  html:not(.dark) .draggable-panel {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+  }
+  html:not(.dark) .draggable-panel .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .draggable-panel .rounded-lg {
+    background-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  html:not(.dark) .draggable-panel input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  /* PillarQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
+  html:not(.dark) .pillar-quantity-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .pillar-quantity-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  /* ClothQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
+  html:not(.dark) .cloth-quantity-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .cloth-quantity-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  /* BracketQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
+  html:not(.dark) .bracket-quantity-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .bracket-quantity-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  /* AntiQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
+  html:not(.dark) .anti-quantity-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .anti-quantity-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+
+  /* アンチ段数カード（ライトモード時の白背景強制） */
+  html:not(.dark) .anti-level-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .anti-level-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  /* 筋交数量カード（ライトモード時の白背景強制） */
+  html:not(.dark) .brace-quantity-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .brace-quantity-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
   /* コンポーネント属性で強制透過（安全ネット） */
   :root :is(aside[data-sidebar-root], aside[data-chat-root]) {
     background-color: transparent !important;

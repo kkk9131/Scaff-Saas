@@ -70,6 +70,12 @@ export interface ScaffoldPart {
     quantity?: number;
 
     /**
+     * ツボ数量（将来拡張用）
+     * - 布材などで使用予定のカスタムカウント
+     */
+    tsubo?: number;
+
+    /**
      * 柱の複数種別カウント（新）
      * - 例: { A: 2, C: 3 }
      * - 0や未指定のキーは保存時に省略

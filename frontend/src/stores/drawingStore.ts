@@ -163,7 +163,7 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
 
   // UI状態の初期状態
   leftSidebarOpen: true, // デフォルトで左サイドバー表示
-  rightSidebarOpen: true, // デフォルトで右サイドバー表示
+  rightSidebarOpen: false, // デフォルトではAIチャット（右サイドバー）を閉じておく
   underbarVisible: true, // デフォルトでアンダーバー表示
   modeTabsVisible: true, // デフォルトでモードタブ表示
 
