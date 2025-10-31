@@ -374,6 +374,27 @@
   html:not(.dark) .draggable-panel input {
     background-color: rgba(255, 255, 255, 0.8) !important;
   }
+  /* 編集カード全体のライトモード時の白背景強制 */
+  html:not(.dark) .pillar-quantity-card,
+  html:not(.dark) .cloth-quantity-card,
+  html:not(.dark) .bracket-quantity-card,
+  html:not(.dark) .anti-quantity-card,
+  html:not(.dark) .anti-level-card,
+  html:not(.dark) .brace-quantity-card,
+  html:not(.dark) .hane-config-card,
+  html:not(.dark) .bracket-config-card {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  html:not(.dark) .pillar-quantity-card::before,
+  html:not(.dark) .cloth-quantity-card::before,
+  html:not(.dark) .bracket-quantity-card::before,
+  html:not(.dark) .anti-quantity-card::before,
+  html:not(.dark) .anti-level-card::before,
+  html:not(.dark) .brace-quantity-card::before,
+  html:not(.dark) .hane-config-card::before,
+  html:not(.dark) .bracket-config-card::before {
+    display: none !important;
+  }
   /* PillarQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
   html:not(.dark) .pillar-quantity-card .rounded-xl {
     background-color: rgba(255, 255, 255, 0.6) !important;
