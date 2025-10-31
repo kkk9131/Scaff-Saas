@@ -318,6 +318,86 @@ function QuantityGrid() {
     return sums;
   })();
 
+  // 布材の自動集計（寸法ごと）: 各布材パーツの meta.length をキーに meta.quantity を合算
+  const CLOTH_LENGTHS = [1800, 1500, 1200, 900, 600, 300, 150] as const;
+  const clothSums: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      CLOTH_LENGTHS.map((l) => [l, 0])
+    );
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== '布材') continue;
+        const len = Number(p.meta?.length ?? 0);
+        const qty = Number(p.meta?.quantity ?? 0);
+        if (!Number.isFinite(len) || !Number.isFinite(qty)) continue;
+        if ((CLOTH_LENGTHS as readonly number[]).includes(len) && qty > 0) {
+          sums[len] += qty;
+        }
+      }
+    }
+    return sums;
+  })();
+
+  // ブラケットの自動集計（幅ごと）
+  // - BracketQuantityCard で設定された meta.quantity を幅（meta.width: 600/355 等）単位で合算
+  const BRACKET_WIDTHS = [600, 355, 750, 900] as const;
+  const bracketSums: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      BRACKET_WIDTHS.map((w) => [w, 0])
+    );
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== 'ブラケット') continue;
+        const width = Number(p.meta?.width ?? 0);
+        const qty = Number(p.meta?.quantity ?? 0);
+        if (!Number.isFinite(width) || !Number.isFinite(qty)) continue;
+        if ((BRACKET_WIDTHS as readonly number[]).includes(width) && qty > 0) {
+          sums[width] += qty;
+        }
+      }
+    }
+    return sums;
+  })();
+
+  // アンチの自動集計（W/S × 寸法ごと）
+  // - AntiQuantityCard で設定した meta.antiW / meta.antiS を寸法（meta.length）単位で合算
+  const ANTI_W_LENGTHS = [1800, 1500, 1200, 900, 600, 150] as const;
+  const ANTI_S_LENGTHS = [1800, 1500, 1200, 900, 600, 355, 150] as const;
+  const antiSumsW: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      ANTI_W_LENGTHS.map((l) => [l, 0])
+    );
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== 'アンチ') continue;
+        const len = Number(p.meta?.length ?? 0);
+        const w = Number(p.meta?.antiW ?? 0);
+        if (!Number.isFinite(len) || !Number.isFinite(w)) continue;
+        if ((ANTI_W_LENGTHS as readonly number[]).includes(len) && w > 0) {
+          sums[len] += w;
+        }
+      }
+    }
+    return sums;
+  })();
+  const antiSumsS: Record<number, number> = (() => {
+    const sums: Record<number, number> = Object.fromEntries(
+      ANTI_S_LENGTHS.map((l) => [l, 0])
+    );
+    for (const g of scaffoldGroups) {
+      for (const p of g.parts) {
+        if (p.type !== 'アンチ') continue;
+        const len = Number(p.meta?.length ?? 0);
+        const s = Number(p.meta?.antiS ?? 0);
+        if (!Number.isFinite(len) || !Number.isFinite(s)) continue;
+        if ((ANTI_S_LENGTHS as readonly number[]).includes(len) && s > 0) {
+          sums[len] += s;
+        }
+      }
+    }
+    return sums;
+  })();
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {sections.map((section) => (
@@ -333,10 +413,25 @@ function QuantityGrid() {
           <div className="max-h-48 overflow-y-auto pr-0.5">
             {section.items.map((item) => {
               const state = values[item.key] || { qty: '', memo: '' };
-              // 柱セクションはストアから自動集計した値を表示（編集不可）
+              // 自動集計対象セクション
               const isPillar = section.name === '柱';
+              const isCloth = section.name === '布材';
+              const isBracket = section.name === 'ブラケット';
+              const isAnti = section.name === 'アンチ';
               const pillarKey = item.label as PillarType;
-              const autoQty = isPillar ? Number(pillarSums[pillarKey] ?? 0) : undefined;
+              const autoQtyPillar = isPillar ? Number(pillarSums[pillarKey] ?? 0) : undefined;
+              const autoQtyCloth = isCloth ? Number(clothSums[Number(item.label)] ?? 0) : undefined;
+              const autoQtyBracket = isBracket ? Number(bracketSums[Number(item.label)] ?? 0) : undefined;
+              // アンチはキーから W/S と寸法を判別（例: key="アンチ:W1800" / "アンチ:S355"）
+              let autoQtyAnti: number | undefined = undefined;
+              if (isAnti) {
+                const key = item.key; // 形式: アンチ:W1800 or アンチ:S900 など
+                const kind = key.includes('アンチ:W') ? 'W' : key.includes('アンチ:S') ? 'S' : undefined;
+                const lenStr = key.replace('アンチ:W', '').replace('アンチ:S', '');
+                const len = Number(lenStr);
+                if (kind === 'W') autoQtyAnti = Number(antiSumsW[len] ?? 0);
+                else if (kind === 'S') autoQtyAnti = Number(antiSumsS[len] ?? 0);
+              }
               return (
                 <div key={item.key} className="mb-1.5 rounded-lg bg-white/40 p-1 dark:bg-slate-800/40">
                   <div className="flex items-center gap-1">
@@ -349,10 +444,20 @@ function QuantityGrid() {
                       min={0}
                       className="w-14 rounded-md border border-slate-300 bg-white/80 px-1 py-0.5 text-right text-[11px] outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 dark:border-slate-600 dark:bg-slate-700"
                       placeholder="0"
-                      value={isPillar ? String(autoQty) : state.qty}
-                      onChange={(e) => !isPillar && setQty(item.key, e.target.value)}
-                      readOnly={isPillar}
-                      aria-readonly={isPillar}
+                      value={
+                        isPillar
+                          ? String(autoQtyPillar)
+                          : isCloth
+                            ? String(autoQtyCloth)
+                            : isBracket
+                              ? String(autoQtyBracket)
+                              : isAnti
+                                ? String(autoQtyAnti ?? 0)
+                              : state.qty
+                      }
+                      onChange={(e) => !(isPillar || isCloth || isBracket || isAnti) && setQty(item.key, e.target.value)}
+                      readOnly={isPillar || isCloth || isBracket || isAnti}
+                      aria-readonly={isPillar || isCloth || isBracket || isAnti}
                       aria-label={`${section.name} ${item.label} の数量`}
                     />
                   </div>
