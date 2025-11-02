@@ -218,7 +218,7 @@ export default function DraggablePanel() {
 
       {/* コンテンツエリア */}
       {!isMinimized && (
-        <div className="relative p-3 h-[calc(100%-60px)] overflow-y-auto">
+        <div className="relative p-3 h-[calc(100%-60px)] overflow-y-auto overflow-x-hidden">
           {/*
            * 数量表（UIのみ・ローカルステート）
            * - 3列グリッド
@@ -622,7 +622,7 @@ function QuantityGrid() {
             {section.name}
           </div>
           {/* アイテム一覧（スクロール可） */}
-          <div className="max-h-48 overflow-y-auto pr-0.5">
+          <div className="max-h-48 overflow-y-auto overflow-x-hidden pr-0.5">
             {section.items.map((item) => {
               const state = values[item.key] || { qty: '', memo: '' };
               // 自動集計対象セクション

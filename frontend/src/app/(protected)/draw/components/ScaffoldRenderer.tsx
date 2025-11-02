@@ -97,6 +97,7 @@ export default function ScaffoldRenderer({
   onBracketConfigClick,
   onHaneConfigClick,
   onClothSplitStart,
+  onViewPartHover,
 }: {
   stageWidth: number;
   stageHeight: number;
@@ -175,8 +176,25 @@ export default function ScaffoldRenderer({
   }) => void;
   /** 布材のスパン分割（ドラッグ開始） */
   onClothSplitStart?: (args: { groupId: string; partId: string }) => void;
+  /**
+   * ビューモード時の部材ホバー情報を渡すコールバック
+   */
+  onViewPartHover?: (args: {
+    groupId: string;
+    partId: string;
+    screenPosition: { x: number; y: number };
+  } | null) => void;
 }) {
-  const { scaffoldGroups, updateScaffoldGroup, editTargetType, canvasScale, canvasPosition } = useDrawingStore();
+  const {
+    scaffoldGroups,
+    updateScaffoldGroup,
+    editTargetType,
+    canvasScale,
+    canvasPosition,
+    editSelectionMode,
+    selectedScaffoldPartKeys,
+    toggleSelectScaffoldPart,
+  } = useDrawingStore();
   const { currentMode } = useDrawingModeStore();
   const { isDark } = useTheme();
 
@@ -371,6 +389,13 @@ export default function ScaffoldRenderer({
     | { groupId: string; partId: string }
     | null
   >(null);
+  
+  // ビューモード時のホバー中の部材（情報カード表示用）
+  const [hoveredViewPart, setHoveredViewPart] = React.useState<{
+    groupId: string;
+    partId: string;
+    screenPosition: { x: number; y: number };
+  } | null>(null);
 
   // ダーク/ライトでの白色変換対応
   const colorToStroke = (color: string) =>
@@ -401,10 +426,42 @@ export default function ScaffoldRenderer({
     return (h % 1000) / 1000;
   };
 
+  /**
+   * 数量が確定しているかの判定
+   * - 汎用フラグ meta.quantityConfirmed を最優先
+   * - 互換: 値が入っている場合（pillarCounts/quantity/antiW/antiS/braceQty）も確定扱い
+   */
+  const isQuantityConfirmed = (p: ScaffoldPart): boolean => {
+    const m: any = p.meta || {};
+    if (m.quantityConfirmed === true) return true;
+    switch (p.type) {
+      case '柱': {
+        const counts = m.pillarCounts as Record<string, number> | undefined;
+        if (counts) {
+          for (const k of Object.keys(counts)) {
+            if (Number(counts[k] || 0) > 0) return true;
+          }
+        }
+        return false;
+      }
+      case '布材':
+        return (
+          Number(m.quantity || 0) > 0 ||
+          Number(m.braceQty || 0) > 0
+        );
+      case 'ブラケット':
+        return Number(m.quantity || 0) > 0;
+      case 'アンチ':
+        return Number(m.antiW || 0) > 0 || Number(m.antiS || 0) > 0;
+      default:
+        return false;
+    }
+  };
+
   // パルスアニメーション（編集モード中のみ駆動、約30fps）
   const [pulseTime, setPulseTime] = React.useState(0);
   React.useEffect(() => {
-    if (currentMode !== 'edit') return; // 編集時のみ
+    if (currentMode !== 'edit' && currentMode !== 'view') return; // 編集時とビューモード時のみ
     let raf = 0;
     let last = 0;
     const loop = (t: number) => {
@@ -636,7 +693,8 @@ export default function ScaffoldRenderer({
                 currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ハネ') && part.type === '柱';
               const highlightPillarBlue =
                 currentMode === 'edit' && editTargetType === 'ブラケット' && part.type === '柱';
-              const isPillarHighlighted = highlightPillarYellow || highlightPillarBlue;
+              const isSelected = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
+              const isPillarHighlighted = highlightPillarYellow || highlightPillarBlue || isSelected;
               switch (part.type) {
                 case '梁枠': {
                   // 確定済みの梁枠（数量表の自動集計対象）
@@ -678,9 +736,20 @@ export default function ScaffoldRenderer({
                     <Group
                       key={part.id}
                       onClick={(e) => {
-                        // ブラケット編集時は設定カードを表示
+                        // ビューモードでは編集を無効化
+                        if (currentMode === 'view') {
+                          e.cancelBubble = true;
+                          return;
+                        }
+                        // ブラケット編集時
                         if (currentMode === 'edit' && editTargetType === 'ブラケット') {
                           e.cancelBubble = true;
+                          // 選択系モード（select/lasso/bulk）では、青色発光中の柱を複数選択できるようトグルにする
+                          // → Enterで方向・寸法カード（複数用）を開く挙動に繋げる
+                          if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
                           // この柱に関連するブラケットを探す
                           const relatedBracket = group.parts.find(
                             (p) =>
@@ -710,6 +779,12 @@ export default function ScaffoldRenderer({
                         // 編集モードで柱が対象のときのみクリックを処理
                         if (!(currentMode === 'edit' && editTargetType === '柱')) return;
                         e.cancelBubble = true; // 親のドラッグ等へバブルさせない
+                        // 選択/投げ縄/一括モードでは選択トグル
+                        if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                          toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                          return;
+                        }
+                        // 既存: 単体編集ポップ
                         onPillarClick?.({
                           anchor: { x: part.position.x, y: part.position.y },
                           groupId: group.id,
@@ -717,9 +792,19 @@ export default function ScaffoldRenderer({
                         });
                       }}
                       onTap={(e) => {
-                        // ブラケット編集時は設定カードを表示
+                        // ビューモードでは編集を無効化
+                        if (currentMode === 'view') {
+                          e.cancelBubble = true;
+                          return;
+                        }
+                        // ブラケット編集時
                         if (currentMode === 'edit' && editTargetType === 'ブラケット') {
                           e.cancelBubble = true;
+                          // 選択系モード（select/lasso/bulk）では、青色発光中の柱を複数選択できるようトグルにする
+                          if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
                           // この柱に関連するブラケットを探す
                           const relatedBracket = group.parts.find(
                             (p) =>
@@ -738,6 +823,10 @@ export default function ScaffoldRenderer({
                         }
                         if (!(currentMode === 'edit' && editTargetType === '柱')) return;
                         e.cancelBubble = true;
+                        if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                          toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                          return;
+                        }
                         onPillarClick?.({
                           anchor: { x: part.position.x, y: part.position.y },
                           groupId: group.id,
@@ -745,7 +834,27 @@ export default function ScaffoldRenderer({
                         });
                       }}
                       onMouseEnter={(e) => {
-                        if (currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ブラケット')) {
+                        if (currentMode === 'view') {
+                          // ビューモード: 情報カードを表示
+                          const stage = e.target.getStage();
+                          if (stage) {
+                            const container = stage.container();
+                            const rect = container.getBoundingClientRect();
+                            const screenX = (part.position.x * canvasScale + canvasPosition.x) + rect.left;
+                            const screenY = (part.position.y * canvasScale + canvasPosition.y) + rect.top;
+                            setHoveredViewPart({
+                              groupId: group.id,
+                              partId: part.id,
+                              screenPosition: { x: screenX, y: screenY },
+                            });
+                            onViewPartHover?.({
+                              groupId: group.id,
+                              partId: part.id,
+                              screenPosition: { x: screenX, y: screenY },
+                            });
+                            container.style.cursor = 'default';
+                          }
+                        } else if (currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ブラケット')) {
                           e.target.getStage()?.container().style &&
                             (e.target.getStage()!.container().style.cursor = 'pointer');
                           if (editTargetType === '柱') {
@@ -757,14 +866,63 @@ export default function ScaffoldRenderer({
                         e.target.getStage()?.container().style &&
                           (e.target.getStage()!.container().style.cursor = 'default');
                         setHoveredPillar((h) => (h && h.partId === part.id ? null : h));
+                        if (currentMode === 'view') {
+                          setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
+                          onViewPartHover?.(null);
+                        }
                       }}
                     >
-                      {/* 発光レイヤー（控えめ・ズーム追従） */}
-                      {isPillarHighlighted && (() => {
+                      {/* ビューモード時の数量未確定発光（赤色） */}
+                      {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
                         const anchor = { x: part.position.x, y: part.position.y };
                         const rScale = getRadiusScale(part.id, anchor);
                         const opGrad = getPulseOpacity(0.9, part.id, anchor);
                         const opRing = getPulseOpacity(0.95, part.id, anchor);
+                        return (
+                          <>
+                            {/* 赤色の放射グロー */}
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={GLOW.gradRadius * rScale}
+                              listening={false}
+                              fillRadialGradientStartPoint={{ x: 0, y: 0 }}
+                              fillRadialGradientStartRadius={0}
+                              fillRadialGradientEndPoint={{ x: 0, y: 0 }}
+                              fillRadialGradientEndRadius={GLOW.gradRadius * rScale}
+                              fillRadialGradientColorStops={[
+                                0,
+                                'rgba(239,68,68,0.95)',
+                                1,
+                                'rgba(239,68,68,0)',
+                              ]}
+                              opacity={opGrad}
+                              globalCompositeOperation="lighter"
+                            />
+                            {/* 赤色の外周リング */}
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={GLOW.ringRadius * rScale}
+                              stroke="#EF4444"
+                              strokeWidth={GLOW.ringStroke}
+                              opacity={opRing}
+                              shadowColor="#EF4444"
+                              shadowBlur={GLOW.shadowBlur}
+                              shadowOpacity={0.9}
+                              globalCompositeOperation="lighter"
+                              listening={false}
+                            />
+                          </>
+                        );
+                      })()}
+                      {/* 発光レイヤー（控えめ・ズーム追従） */}
+                      {isPillarHighlighted && (() => {
+                        const anchor = { x: part.position.x, y: part.position.y };
+                        const confirmed = isQuantityConfirmed(part);
+                        const rScale = confirmed ? 1 : getRadiusScale(part.id, anchor);
+                        const opGrad = confirmed ? 0.9 : getPulseOpacity(0.9, part.id, anchor);
+                        const opRing = confirmed ? 0.95 : getPulseOpacity(0.95, part.id, anchor);
                         return (
                         <>
                           {/* 放射グロー（加算合成） */}
@@ -804,6 +962,19 @@ export default function ScaffoldRenderer({
                             globalCompositeOperation="lighter"
                             listening={false}
                           />
+                          {/* 選択時の強調リング（シアン） */}
+                          {isSelected && (
+                            <Circle
+                              x={part.position.x}
+                              y={part.position.y}
+                              radius={GLOW.ringRadius * 1.2 * rScale}
+                              stroke={'#06B6D4'}
+                              strokeWidth={Math.max(1, GLOW.ringStroke * 0.8)}
+                              opacity={0.95}
+                              listening={false}
+                              globalCompositeOperation="lighter"
+                            />
+                          )}
                         </>
                         );
                       })()}
@@ -957,12 +1128,31 @@ export default function ScaffoldRenderer({
                   // 中点座標（各スパンの中心）
                   const midX = part.position.x + dirVec.x * (lengthPx / 2);
                   const midY = part.position.y + dirVec.y * (lengthPx / 2);
+                  const isSelectedCloth = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
                   return (
                     <Group key={part.id}>
+                      {/* ビューモード時の数量未確定発光（赤色） */}
+                      {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
+                        const anchor = { x: midX, y: midY };
+                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        return (
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke="#EF4444"
+                            strokeWidth={CLOTH_GLOW.glowWidth}
+                            opacity={op}
+                            shadowColor="#EF4444"
+                            shadowBlur={CLOTH_GLOW.shadowBlur}
+                            shadowOpacity={0.95}
+                            globalCompositeOperation="lighter"
+                            listening={false}
+                          />
+                        );
+                      })()}
                       {/* 発光下地（太めのイエロー、加算合成） */}
                       {highlightClothLine && (() => {
                         const anchor = { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 };
-                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        const op = isQuantityConfirmed(part) ? 0.9 : getPulseOpacity(0.9, part.id, anchor);
                         return (
                           <Line
                             points={[part.position.x, part.position.y, x2, y2]}
@@ -987,8 +1177,28 @@ export default function ScaffoldRenderer({
                         shadowBlur={highlightClothLine ? CLOTH_GLOW.shadowBlur * 0.6 : 0}
                         shadowOpacity={highlightClothLine ? 0.7 : 0}
                         onMouseEnter={(e) => {
-                          // 布材編集時 or 階段編集時の黄色発光領域はクリックしやすいように手のカーソルに
-                          if (currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段')) {
+                          if (currentMode === 'view') {
+                            // ビューモード: 情報カードを表示
+                            const stage = e.target.getStage();
+                            if (stage) {
+                              const container = stage.container();
+                              const rect = container.getBoundingClientRect();
+                              const screenX = (midX * canvasScale + canvasPosition.x) + rect.left;
+                              const screenY = (midY * canvasScale + canvasPosition.y) + rect.top;
+                              setHoveredViewPart({
+                                groupId: group.id,
+                                partId: part.id,
+                                screenPosition: { x: screenX, y: screenY },
+                              });
+                              onViewPartHover?.({
+                                groupId: group.id,
+                                partId: part.id,
+                                screenPosition: { x: screenX, y: screenY },
+                              });
+                              container.style.cursor = 'default';
+                            }
+                          } else if (currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段')) {
+                            // 布材編集時 or 階段編集時の黄色発光領域はクリックしやすいように手のカーソルに
                             const stage = e.target.getStage?.();
                             if (stage) stage.container().style.cursor = 'pointer';
                           }
@@ -996,23 +1206,77 @@ export default function ScaffoldRenderer({
                         onMouseLeave={(e) => {
                           const stage = e.target.getStage?.();
                           if (stage) stage.container().style.cursor = 'default';
+                          if (currentMode === 'view') {
+                            setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
+                            onViewPartHover?.(null);
+                          }
                         }}
                         onClick={(e) => {
+                          // ビューモードでは編集を無効化
+                          if (currentMode === 'view') {
+                            e.cancelBubble = true;
+                            return;
+                          }
                           // 布材編集 or 階段編集
                           if (!(currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段'))) return;
                           e.cancelBubble = true;
+                          // 選択モード時（select/lasso/bulk）かつ黄色発光対象なら選択トグル（布材編集時のみ）
+                          if (editTargetType === '布材' && (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') && highlightClothLine) {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
                           const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
-                          if (editTargetType === '布材') onClothClick?.(args);
-                          else onStairClick?.(args);
+                          if (editTargetType === '布材') onClothClick?.(args); else onStairClick?.(args);
                         }}
                         onTap={(e) => {
+                          // ビューモードでは編集を無効化
+                          if (currentMode === 'view') {
+                            e.cancelBubble = true;
+                            return;
+                          }
                           if (!(currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段'))) return;
                           e.cancelBubble = true;
+                          if (editTargetType === '布材' && (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') && highlightClothLine) {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
                           const args = { anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id } as const;
-                          if (editTargetType === '布材') onClothClick?.(args);
-                          else onStairClick?.(args);
+                          if (editTargetType === '布材') onClothClick?.(args); else onStairClick?.(args);
                         }}
                       />
+                      {/* 選択時の強調ライン（シアン） */}
+                      {currentMode === 'edit' && editTargetType === '布材' && isSelectedCloth && (
+                        <>
+                          {/* 選択ハイライトのシアン発光（太めの下地） */}
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(CLOTH_GLOW.glowWidth * 0.75, 10 * invScale)}
+                            opacity={0.55}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={CLOTH_GLOW.shadowBlur}
+                            shadowOpacity={0.9}
+                            lineCap="round"
+                            lineJoin="round"
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                          />
+                          {/* 選択ハイライトのシアン実線（細めの芯） */}
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(3.5, 4 * invScale)}
+                            opacity={0.98}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={CLOTH_GLOW.shadowBlur * 0.6}
+                            shadowOpacity={0.95}
+                            lineCap="round"
+                            lineJoin="round"
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                          />
+                        </>
+                      )}
                       {/* 階段編集時のクリック領域（最前面に配置、黄色発光部分全域をカバー） */}
                       {highlightStairLine && (
                         <Line
@@ -1078,10 +1342,11 @@ export default function ScaffoldRenderer({
                       {/* 中点の青色発光（加算合成の○） */}
                       {(showMidGlowCloth || showMidGlowStair) && (() => {
                         const anchor = { x: midX, y: midY };
-                        const rScale = getRadiusScale(part.id + '-mid', anchor);
-                        const opGrad = getPulseOpacity(0.95, part.id + '-mid', anchor);
-                        const opRing = getPulseOpacity(0.95, part.id + '-mid', anchor);
-                        const opCore = getPulseOpacity(0.9, part.id + '-mid', anchor);
+                        const confirmed = isQuantityConfirmed(part);
+                        const rScale = confirmed ? 1 : getRadiusScale(part.id + '-mid', anchor);
+                        const opGrad = confirmed ? 0.95 : getPulseOpacity(0.95, part.id + '-mid', anchor);
+                        const opRing = confirmed ? 0.95 : getPulseOpacity(0.95, part.id + '-mid', anchor);
+                        const opCore = confirmed ? 0.9 : getPulseOpacity(0.9, part.id + '-mid', anchor);
                         return (
                           <>
                             <Circle
@@ -1171,12 +1436,32 @@ export default function ScaffoldRenderer({
                   const y2 = part.position.y + v.y * widthPx;
                   const highlightBracketTip = currentMode === 'edit' && editTargetType === '柱';
                   const highlightBracketLine = currentMode === 'edit' && editTargetType === 'ブラケット';
+                  const isSelectedBracket = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
                   return (
                     <Group key={part.id}>
+                      {/* ビューモード時の数量未確定発光（赤色） */}
+                      {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
+                        const anchor = { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 };
+                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        return (
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke="#EF4444"
+                            strokeWidth={BRACKET_GLOW.glowWidth}
+                            opacity={op}
+                            shadowColor="#EF4444"
+                            shadowBlur={BRACKET_GLOW.shadowBlur}
+                            shadowOpacity={0.95}
+                            globalCompositeOperation="lighter"
+                            listening={false}
+                          />
+                        );
+                      })()}
                       {/* ブラケットラインの黄色発光（編集対象がブラケットのとき） */}
                       {highlightBracketLine && (() => {
                         const anchor = { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 };
-                        const op = getPulseOpacity(0.9, part.id, anchor);
+                        const confirmed = isQuantityConfirmed(part);
+                        const op = confirmed ? 0.9 : getPulseOpacity(0.9, part.id, anchor);
                         return (
                           <Line
                             points={[part.position.x, part.position.y, x2, y2]}
@@ -1194,10 +1479,11 @@ export default function ScaffoldRenderer({
                       {/* 先端の青色発光（柱編集時） */}
                       {highlightBracketTip && (() => {
                         const anchor = { x: x2, y: y2 };
-                        const rScale = getRadiusScale(part.id + '-tip', anchor);
-                        const opGrad = getPulseOpacity(0.95, part.id + '-tip', anchor);
-                        const opRing = getPulseOpacity(0.95, part.id + '-tip', anchor);
-                        const opCore = getPulseOpacity(0.9, part.id + '-tip', anchor);
+                        const confirmed = isQuantityConfirmed(part);
+                        const rScale = confirmed ? 1 : getRadiusScale(part.id + '-tip', anchor);
+                        const opGrad = confirmed ? 0.95 : getPulseOpacity(0.95, part.id + '-tip', anchor);
+                        const opRing = confirmed ? 0.95 : getPulseOpacity(0.95, part.id + '-tip', anchor);
+                        const opCore = confirmed ? 0.9 : getPulseOpacity(0.9, part.id + '-tip', anchor);
                         return (
                         <>
                           {/* 放射グロー（青） */}
@@ -1348,7 +1634,29 @@ export default function ScaffoldRenderer({
                         shadowBlur={highlightBracketLine ? BRACKET_GLOW.shadowBlur * 0.6 : 0}
                         shadowOpacity={highlightBracketLine ? 0.7 : 0}
                         onMouseEnter={(e) => {
-                          if (currentMode === 'edit' && editTargetType === 'ブラケット') {
+                          if (currentMode === 'view') {
+                            // ビューモード: 情報カードを表示
+                            const stage = e.target.getStage();
+                            if (stage) {
+                              const container = stage.container();
+                              const rect = container.getBoundingClientRect();
+                              const midX = (part.position.x + x2) / 2;
+                              const midY = (part.position.y + y2) / 2;
+                              const screenX = (midX * canvasScale + canvasPosition.x) + rect.left;
+                              const screenY = (midY * canvasScale + canvasPosition.y) + rect.top;
+                              setHoveredViewPart({
+                                groupId: group.id,
+                                partId: part.id,
+                                screenPosition: { x: screenX, y: screenY },
+                              });
+                              onViewPartHover?.({
+                                groupId: group.id,
+                                partId: part.id,
+                                screenPosition: { x: screenX, y: screenY },
+                              });
+                              container.style.cursor = 'default';
+                            }
+                          } else if (currentMode === 'edit' && editTargetType === 'ブラケット') {
                             const stage = e.target.getStage?.();
                             if (stage) stage.container().style.cursor = 'pointer';
                           }
@@ -1356,11 +1664,25 @@ export default function ScaffoldRenderer({
                         onMouseLeave={(e) => {
                           const stage = e.target.getStage?.();
                           if (stage) stage.container().style.cursor = 'default';
+                          if (currentMode === 'view') {
+                            setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
+                            onViewPartHover?.(null);
+                          }
                         }}
                         onClick={(e) => {
+                          // ビューモードでは編集を無効化
+                          if (currentMode === 'view') {
+                            e.cancelBubble = true;
+                            return;
+                          }
                           // ブラケット編集時のみカードを出す
                           if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
                           e.cancelBubble = true;
+                          // 選択モード時は黄色発光中（highlightBracketLine）のみ選択トグル
+                          if ((editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') && highlightBracketLine) {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
                           const midX = (part.position.x + x2) / 2;
                           const midY = (part.position.y + y2) / 2;
                           onBracketClick?.({
@@ -1370,8 +1692,17 @@ export default function ScaffoldRenderer({
                           });
                         }}
                         onTap={(e) => {
+                          // ビューモードでは編集を無効化
+                          if (currentMode === 'view') {
+                            e.cancelBubble = true;
+                            return;
+                          }
                           if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
                           e.cancelBubble = true;
+                          if ((editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') && highlightBracketLine) {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
                           const midX = (part.position.x + x2) / 2;
                           const midY = (part.position.y + y2) / 2;
                           onBracketClick?.({
@@ -1381,6 +1712,64 @@ export default function ScaffoldRenderer({
                           });
                         }}
                       />
+                      {/* ブラケット: 黄色発光上の選択専用ヒット領域（透明・太線） */}
+                      {currentMode === 'edit' && editTargetType === 'ブラケット' && highlightBracketLine && (
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          stroke="rgba(0,0,0,0)"
+                          strokeWidth={Math.max(BRACKET_GLOW.glowWidth + 8, 20 * invScale)}
+                          listening={true}
+                          lineCap="round"
+                          lineJoin="round"
+                          onMouseEnter={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'pointer';
+                          }}
+                          onMouseLeave={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'default';
+                          }}
+                          onClick={(e) => {
+                            e.cancelBubble = true;
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                          }}
+                          onTap={(e) => {
+                            e.cancelBubble = true;
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                          }}
+                        />
+                      )}
+                      {/* 選択時の強調シアンライン */}
+                      {currentMode === 'edit' && editTargetType === 'ブラケット' && isSelectedBracket && (
+                        <>
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(BRACKET_GLOW.glowWidth * 0.75, 10 * invScale)}
+                            opacity={0.55}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={BRACKET_GLOW.shadowBlur}
+                            shadowOpacity={0.9}
+                            lineCap="round"
+                            lineJoin="round"
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                          />
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(3.5, 4 * invScale)}
+                            opacity={0.98}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={BRACKET_GLOW.shadowBlur * 0.6}
+                            shadowOpacity={0.95}
+                            lineCap="round"
+                            lineJoin="round"
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                          />
+                        </>
+                      )}
                       {/* ブラケット編集時のクリック領域（最前面に配置、アンチと重なってもクリック可能） */}
                       {highlightBracketLine && (
                         <Line
@@ -1390,31 +1779,128 @@ export default function ScaffoldRenderer({
                           listening={true}
                           onClick={(e) => {
                             if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
+                            // クリック位置（ステージ座標）を取得
+                            const stage = e.target.getStage?.();
+                            const ptr = stage?.getPointerPosition();
+                            const nearBase = (() => {
+                              if (!ptr) return false;
+                              const dx = ptr.x - part.position.x;
+                              const dy = ptr.y - part.position.y;
+                              const dist = Math.hypot(dx, dy);
+                              return dist <= Math.max(16 * invScale, 12);
+                            })();
                             e.cancelBubble = true;
+                            if (nearBase) {
+                              // 柱の近傍クリックは柱の選択/単体カード表示を優先
+                              const pillarAtBase = group.parts.find(
+                                (pp) =>
+                                  pp.type === '柱' &&
+                                  Math.abs(pp.position.x - part.position.x) < 1 &&
+                                  Math.abs(pp.position.y - part.position.y) < 1
+                              );
+                              if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                                if (pillarAtBase) toggleSelectScaffoldPart(`${group.id}:${pillarAtBase.id}`);
+                                return;
+                              }
+                              // 選択モード解除時は方向・寸法カード（単体）を表示
+                              onBracketConfigClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
+                              return;
+                            }
+                            // 近傍でない → 従来通り（選択モード: ブラケット選択 / 非選択モード: 数量カード）
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                              return;
+                            }
                             const midX = (part.position.x + x2) / 2;
                             const midY = (part.position.y + y2) / 2;
-                            onBracketClick?.({
-                              anchor: { x: midX, y: midY },
-                              groupId: group.id,
-                              partId: part.id,
-                            });
+                            onBracketClick?.({ anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id });
                           }}
                           onTap={(e) => {
                             if (!(currentMode === 'edit' && editTargetType === 'ブラケット')) return;
+                            const stage = e.target.getStage?.();
+                            const ptr = stage?.getPointerPosition();
+                            const nearBase = (() => {
+                              if (!ptr) return false;
+                              const dx = ptr.x - part.position.x;
+                              const dy = ptr.y - part.position.y;
+                              const dist = Math.hypot(dx, dy);
+                              return dist <= Math.max(16 * invScale, 12);
+                            })();
                             e.cancelBubble = true;
+                            if (nearBase) {
+                              const pillarAtBase = group.parts.find(
+                                (pp) =>
+                                  pp.type === '柱' &&
+                                  Math.abs(pp.position.x - part.position.x) < 1 &&
+                                  Math.abs(pp.position.y - part.position.y) < 1
+                              );
+                              if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                                if (pillarAtBase) toggleSelectScaffoldPart(`${group.id}:${pillarAtBase.id}`);
+                                return;
+                              }
+                              onBracketConfigClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
+                              return;
+                            }
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                              return;
+                            }
                             const midX = (part.position.x + x2) / 2;
                             const midY = (part.position.y + y2) / 2;
-                            onBracketClick?.({
-                              anchor: { x: midX, y: midY },
-                              groupId: group.id,
-                              partId: part.id,
-                            });
+                            onBracketClick?.({ anchor: { x: midX, y: midY }, groupId: group.id, partId: part.id });
                           }}
                           onMouseEnter={(e) => {
                             if (currentMode === 'edit' && editTargetType === 'ブラケット') {
                               const stage = e.target.getStage?.();
                               if (stage) stage.container().style.cursor = 'pointer';
                             }
+                          }}
+                          onMouseLeave={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'default';
+                          }}
+                        />
+                      )}
+
+                      {/* 基部クリック専用オーバーレイ: ブラケット編集時は柱優先のクリック領域を最前面に追加 */}
+                      {currentMode === 'edit' && editTargetType === 'ブラケット' && (
+                        <Circle
+                          x={part.position.x}
+                          y={part.position.y}
+                          radius={Math.max(16 * invScale, 12)}
+                          fill={'rgba(0,0,0,0)'}
+                          listening={true}
+                          onClick={(e) => {
+                            e.cancelBubble = true;
+                            const pillarAtBase = group.parts.find(
+                              (pp) =>
+                                pp.type === '柱' &&
+                                Math.abs(pp.position.x - part.position.x) < 1 &&
+                                Math.abs(pp.position.y - part.position.y) < 1
+                            );
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              if (pillarAtBase) toggleSelectScaffoldPart(`${group.id}:${pillarAtBase.id}`);
+                              return;
+                            }
+                            onBracketConfigClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
+                          }}
+                          onTap={(e) => {
+                            e.cancelBubble = true;
+                            const pillarAtBase = group.parts.find(
+                              (pp) =>
+                                pp.type === '柱' &&
+                                Math.abs(pp.position.x - part.position.x) < 1 &&
+                                Math.abs(pp.position.y - part.position.y) < 1
+                            );
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              if (pillarAtBase) toggleSelectScaffoldPart(`${group.id}:${pillarAtBase.id}`);
+                              return;
+                            }
+                            onBracketConfigClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
+                          }}
+                          onMouseEnter={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'pointer';
                           }}
                           onMouseLeave={(e) => {
                             const stage = e.target.getStage?.();
@@ -1629,6 +2115,31 @@ export default function ScaffoldRenderer({
                   // Rectのpositionは左上なので、中心基準にするためoffsetを設定
                   return (
                     <Group key={part.id}>
+                      {/* ビューモード時の数量未確定発光（赤色） */}
+                      {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
+                        const anchor = { x: part.position.x, y: part.position.y };
+                        const op = getPulseOpacity(0.95, part.id, anchor);
+                        return (
+                          <Rect
+                            x={part.position.x}
+                            y={part.position.y}
+                            width={lengthPx}
+                            height={widthPx}
+                            offsetX={lengthPx / 2}
+                            offsetY={widthPx / 2}
+                            rotation={angle}
+                            stroke={'#EF4444'}
+                            strokeWidth={ANTI_GLOW.ringStroke}
+                            opacity={op}
+                            shadowColor={'#EF4444'}
+                            shadowBlur={ANTI_GLOW.shadowBlur}
+                            shadowOpacity={0.95}
+                            globalCompositeOperation="lighter"
+                            listening={false}
+                            cornerRadius={2}
+                          />
+                        );
+                      })()}
                       {/* アンチの黄色発光（枠の外周・加算合成） */}
                       {highlightAnti && (() => {
                         const anchor = { x: part.position.x, y: part.position.y };
@@ -1666,8 +2177,31 @@ export default function ScaffoldRenderer({
                         stroke={stroke}
                         strokeWidth={1}
                         cornerRadius={2}
+                        // アンチの基礎矩形は、ビューモードとアンチ編集時のみポインターイベントを受け付ける
+                        // ブラケット編集時など他編集モードでは underlying（ブラケット）のクリックを通すために無効化
+                        listening={currentMode === 'view' || (currentMode === 'edit' && editTargetType === 'アンチ')}
                         onMouseEnter={(e) => {
-                          if (currentMode === 'edit' && editTargetType === 'アンチ') {
+                          if (currentMode === 'view') {
+                            // ビューモード: 情報カードを表示
+                            const stage = e.target.getStage();
+                            if (stage) {
+                              const container = stage.container();
+                              const rect = container.getBoundingClientRect();
+                              const screenX = (part.position.x * canvasScale + canvasPosition.x) + rect.left;
+                              const screenY = (part.position.y * canvasScale + canvasPosition.y) + rect.top;
+                              setHoveredViewPart({
+                                groupId: group.id,
+                                partId: part.id,
+                                screenPosition: { x: screenX, y: screenY },
+                              });
+                              onViewPartHover?.({
+                                groupId: group.id,
+                                partId: part.id,
+                                screenPosition: { x: screenX, y: screenY },
+                              });
+                              container.style.cursor = 'default';
+                            }
+                          } else if (currentMode === 'edit' && editTargetType === 'アンチ') {
                             const stage = e.target.getStage?.();
                             if (stage) stage.container().style.cursor = 'pointer';
                           }
@@ -1675,8 +2209,17 @@ export default function ScaffoldRenderer({
                         onMouseLeave={(e) => {
                           const stage = e.target.getStage?.();
                           if (stage) stage.container().style.cursor = 'default';
+                          if (currentMode === 'view') {
+                            setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
+                            onViewPartHover?.(null);
+                          }
                         }}
                         onClick={(e) => {
+                          // ビューモードでは編集を無効化
+                          if (currentMode === 'view') {
+                            e.cancelBubble = true;
+                            return;
+                          }
                           // アンチ編集時のみカードを出す
                           if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                           e.cancelBubble = true;
@@ -1687,6 +2230,11 @@ export default function ScaffoldRenderer({
                           });
                         }}
                         onTap={(e) => {
+                          // ビューモードでは編集を無効化
+                          if (currentMode === 'view') {
+                            e.cancelBubble = true;
+                            return;
+                          }
                           if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                           e.cancelBubble = true;
                           onAntiClick?.({
@@ -1709,6 +2257,11 @@ export default function ScaffoldRenderer({
                           fill="rgba(0,0,0,0)"
                           listening={true}
                           onClick={(e) => {
+                            // ビューモードでは編集を無効化
+                            if (currentMode === 'view') {
+                              e.cancelBubble = true;
+                              return;
+                            }
                             if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                             // クリック位置が青色発光部分の範囲内かチェック
                             const stage = e.target.getStage();
@@ -1737,6 +2290,11 @@ export default function ScaffoldRenderer({
                             });
                           }}
                           onTap={(e) => {
+                            // ビューモードでは編集を無効化
+                            if (currentMode === 'view') {
+                              e.cancelBubble = true;
+                              return;
+                            }
                             if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                             // タップ位置が青色発光部分の範囲内かチェック
                             const stage = e.target.getStage();
@@ -1769,10 +2327,11 @@ export default function ScaffoldRenderer({
                       {/* アンチの中点に青色発光○（中心はpart.position） */}
                       {highlightAnti && (() => {
                         const anchor = { x: part.position.x, y: part.position.y };
-                        const rScale = getRadiusScale(part.id + '-anti-mid', anchor);
-                        const opGrad = getPulseOpacity(0.95, part.id + '-anti-mid', anchor);
-                        const opRing = getPulseOpacity(0.95, part.id + '-anti-mid', anchor);
-                        const opCore = getPulseOpacity(0.9, part.id + '-anti-mid', anchor);
+                        const confirmed = isQuantityConfirmed(part);
+                        const rScale = confirmed ? 1 : getRadiusScale(part.id + '-anti-mid', anchor);
+                        const opGrad = confirmed ? 0.95 : getPulseOpacity(0.95, part.id + '-anti-mid', anchor);
+                        const opRing = confirmed ? 0.95 : getPulseOpacity(0.95, part.id + '-anti-mid', anchor);
+                        const opCore = confirmed ? 0.9 : getPulseOpacity(0.9, part.id + '-anti-mid', anchor);
                         return (
                           <>
                             <Circle

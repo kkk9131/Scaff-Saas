@@ -382,7 +382,11 @@
   html:not(.dark) .anti-level-card,
   html:not(.dark) .brace-quantity-card,
   html:not(.dark) .hane-config-card,
-  html:not(.dark) .bracket-config-card {
+  html:not(.dark) .bracket-config-card,
+  html:not(.dark) .bulk-pillar-quantity-card,
+  html:not(.dark) .memo-card,
+  html:not(.dark) .save-modal-card,
+  html:not(.dark) .reset-modal-card {
     background-color: rgba(255, 255, 255, 0.95) !important;
   }
   html:not(.dark) .pillar-quantity-card::before,
@@ -392,8 +396,104 @@
   html:not(.dark) .anti-level-card::before,
   html:not(.dark) .brace-quantity-card::before,
   html:not(.dark) .hane-config-card::before,
-  html:not(.dark) .bracket-config-card::before {
+  html:not(.dark) .bracket-config-card::before,
+  html:not(.dark) .bulk-pillar-quantity-card::before,
+  html:not(.dark) .memo-card::before,
+  html:not(.dark) .save-modal-card::before,
+  html:not(.dark) .reset-modal-card::before {
     display: none !important;
+  }
+  /* 保存フォーマットカードのライトモード時の白背景強制 */
+  html:not(.dark) .save-format-card {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  html:not(.dark) .save-format-card * {
+    color: #000 !important;
+  }
+  html:not(.dark) .save-format-card h3,
+  html:not(.dark) .save-format-card p {
+    color: #000 !important;
+  }
+  html:not(.dark) .save-format-card .text-muted-foreground {
+    color: #000 !important;
+  }
+  /* モーダル内のテキスト全般をライトモード時に黒文字に */
+  html:not(.dark) .reset-modal-card,
+  html:not(.dark) .save-modal-card {
+    color: #000 !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* モーダル本体のbg-cardクラスをライトモード時に白に */
+  html:not(.dark) .save-modal-card.bg-card,
+  html:not(.dark) .reset-modal-card.bg-card,
+  html:not(.dark) .save-modal-card .bg-card,
+  html:not(.dark) .reset-modal-card .bg-card,
+  html:not(.dark) .save-modal-card [class*="bg-card"],
+  html:not(.dark) .reset-modal-card [class*="bg-card"],
+  html:not(.dark) .save-modal-card div.bg-card,
+  html:not(.dark) .reset-modal-card div.bg-card {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* モーダル本体の直接の子要素を白に */
+  html:not(.dark) .save-modal-card > div,
+  html:not(.dark) .reset-modal-card > div {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* モーダル内のすべてのdiv要素を白に（ヘッダー、コンテンツ、フッターを除く） */
+  html:not(.dark) .save-modal-card div[class*="rounded-2xl"],
+  html:not(.dark) .reset-modal-card div[class*="rounded-2xl"] {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* リセットモーダル内のすべての要素も白背景に */
+  html:not(.dark) .reset-modal-card div,
+  html:not(.dark) .reset-modal-card section,
+  html:not(.dark) .reset-modal-card article {
+    background-color: inherit !important;
+  }
+  html:not(.dark) .reset-modal-card > div > div[class*="rounded-2xl"] {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* モーダル内のキャンセルボタンのライトモード時の黒文字強制 */
+  html:not(.dark) .reset-modal-card footer button,
+  html:not(.dark) .save-modal-card footer button,
+  html:not(.dark) .reset-modal-card footer button *,
+  html:not(.dark) .save-modal-card footer button *,
+  html:not(.dark) .reset-modal-card footer button[class*="outline"],
+  html:not(.dark) .save-modal-card footer button[class*="outline"],
+  html:not(.dark) .reset-modal-card footer button[class*="outline"] *,
+  html:not(.dark) .save-modal-card footer button[class*="outline"] *,
+  html:not(.dark) .reset-modal-card footer button.bg-white,
+  html:not(.dark) .save-modal-card footer button.bg-white,
+  html:not(.dark) .reset-modal-card footer button.bg-white *,
+  html:not(.dark) .save-modal-card footer button.bg-white *,
+  html:not(.dark) .reset-modal-card footer button span,
+  html:not(.dark) .save-modal-card footer button span {
+    color: #1e293b !important;
+  }
+  /* モーダル内のタイトルと説明文も黒文字に */
+  html:not(.dark) .reset-modal-card h2,
+  html:not(.dark) .save-modal-card h2,
+  html:not(.dark) .reset-modal-card h2 *,
+  html:not(.dark) .save-modal-card h2 *,
+  html:not(.dark) .reset-modal-card p,
+  html:not(.dark) .save-modal-card p,
+  html:not(.dark) .reset-modal-card p *,
+  html:not(.dark) .save-modal-card p * {
+    color: #000 !important;
+  }
+  /* モーダル内のtext-muted-foregroundクラスも黒文字に */
+  html:not(.dark) .reset-modal-card .text-muted-foreground,
+  html:not(.dark) .save-modal-card .text-muted-foreground,
+  html:not(.dark) .reset-modal-card button .text-muted-foreground,
+  html:not(.dark) .save-modal-card button .text-muted-foreground {
+    color: #1e293b !important;
+  }
+  /* モーダル内のtext-gray-*クラスも黒文字に */
+  html:not(.dark) .reset-modal-card .text-gray-900,
+  html:not(.dark) .save-modal-card .text-gray-900,
+  html:not(.dark) .reset-modal-card button .text-gray-900,
+  html:not(.dark) .save-modal-card button .text-gray-900 {
+    color: #1e293b !important;
   }
   /* PillarQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
   html:not(.dark) .pillar-quantity-card .rounded-xl {
@@ -450,6 +550,26 @@
     background-color: rgba(255, 255, 255, 0.6) !important;
   }
   html:not(.dark) .bracket-config-card button {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  /* 一括設定カード（ライトモード時の白背景強制） */
+  html:not(.dark) .bulk-pillar-quantity-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .bulk-pillar-quantity-card input {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  html:not(.dark) .bulk-pillar-quantity-card button {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  /* メモカード（ライトモード時の白背景強制） */
+  html:not(.dark) .memo-card .rounded-xl {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  html:not(.dark) .memo-card textarea {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  html:not(.dark) .memo-card button {
     background-color: rgba(255, 255, 255, 0.6) !important;
   }
   /* コンポーネント属性で強制透過（安全ネット） */

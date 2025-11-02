@@ -3,7 +3,7 @@
  * 作図画面下部のステータスバーコンポーネント
  *
  * 機能:
- * - モディファイアキー（Shift / Alt / Space）の押下状態表示
+ * - モディファイアキー（Shift / Alt / Space / Command）の押下状態表示
  * - 各キーのホバー時に説明ツールチップ表示
  * - 拡大率の表示
  * - 非表示ボタン
@@ -31,6 +31,7 @@ export default function Underbar() {
   const [shiftDown, setShiftDown] = useState(false);
   const [altDown, setAltDown] = useState(false);
   const [spaceDown, setSpaceDown] = useState(false);
+  const [commandDown, setCommandDown] = useState(false);
 
   // サイドバーのツールチップスタイルと統一
   const { theme } = useTheme();
@@ -44,17 +45,24 @@ export default function Underbar() {
    * - Shift: ブラケットW/S切替（トグル操作の目印として押下状態を視覚化）
    * - Alt: 方向反転（押下中のみ有効のため視覚化）
    * - Space: パンモード（押下中のみ有効のため視覚化）
+   * - Command/Ctrl: ショートカットキー（押下中のみ有効のため視覚化）
    */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setShiftDown(true);
       if (e.key === 'Alt') setAltDown(true);
       if (e.code === 'Space') setSpaceDown(true);
+      if (e.key === 'Meta' || e.code === 'MetaLeft' || e.code === 'MetaRight' || e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+        setCommandDown(true);
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setShiftDown(false);
       if (e.key === 'Alt') setAltDown(false);
       if (e.code === 'Space') setSpaceDown(false);
+      if (e.key === 'Meta' || e.code === 'MetaLeft' || e.code === 'MetaRight' || e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+        setCommandDown(false);
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -104,6 +112,17 @@ export default function Underbar() {
                 <span>Space</span>
               </div>
               <div className={tooltipCls}>パンモード（押下中のみ有効）</div>
+            </div>
+
+            {/* Command/Ctrl */}
+            <div className={`group relative rounded-md border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+              commandDown ? 'border-cyan-400 text-cyan-400' : 'border-white/30 text-slate-600 dark:text-slate-400'
+            }`}>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px]">⌘</span>
+                <span className="text-[10px]">Cmd</span>
+              </div>
+              <div className={tooltipCls}>ショートカットキー（押下中のみ有効）</div>
             </div>
           </div>
         </div>

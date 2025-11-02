@@ -230,10 +230,11 @@ const Modal: React.FC<ModalProps> = ({
       <div
         ref={modalRef}
         className={cn(
-          'relative w-full overflow-hidden rounded-xl',
-          'bg-white dark:bg-slate-900',
-          'border border-gray-200 dark:border-slate-700',
-          'shadow-2xl',
+          'relative w-full overflow-hidden rounded-2xl',
+          'bg-card text-card-foreground',
+          'border dark:border-white/10',
+          'shadow-lg shadow-sky-500/10 dark:shadow-slate-900/50',
+          'backdrop-blur-xl',
           'animate-scale-in',
           sizeClasses[size],
           className
@@ -243,7 +244,7 @@ const Modal: React.FC<ModalProps> = ({
         {(title || description || showCloseButton) && (
           <div
             className={cn(
-              'flex items-start justify-between border-b border-gray-200 dark:border-slate-700 p-6',
+              'flex items-start justify-between border-b border-white/30 dark:border-slate-700/50 p-4',
               headerClassName
             )}
           >
@@ -251,7 +252,7 @@ const Modal: React.FC<ModalProps> = ({
               {title && (
                 <h2
                   id="modal-title"
-                  className="text-2xl font-bold leading-tight tracking-tight text-card-foreground"
+                  className="text-xl font-bold leading-tight tracking-tight text-card-foreground"
                 >
                   {title}
                 </h2>
@@ -259,7 +260,7 @@ const Modal: React.FC<ModalProps> = ({
               {description && (
                 <p
                   id="modal-description"
-                  className="mt-2 text-sm text-muted-foreground"
+                  className="mt-1.5 text-sm text-muted-foreground"
                 >
                   {description}
                 </p>
@@ -301,7 +302,7 @@ const Modal: React.FC<ModalProps> = ({
         {/* コンテンツ */}
         <div
           className={cn(
-            'max-h-[calc(100vh-16rem)] overflow-y-auto p-6 scrollbar-thin',
+            'max-h-[calc(100vh-16rem)] overflow-y-auto p-4 scrollbar-thin',
             contentClassName
           )}
         >
@@ -312,7 +313,7 @@ const Modal: React.FC<ModalProps> = ({
         {footer && (
           <div
             className={cn(
-              'flex items-center justify-end gap-3 border-t border-gray-200 dark:border-slate-700 p-6',
+              'flex items-center justify-end gap-3 border-t border-white/30 dark:border-slate-700/50 p-4',
               footerClassName
             )}
           >
@@ -351,6 +352,7 @@ export interface ConfirmModalProps {
   cancelText?: string;
   variant?: 'default' | 'destructive' | 'warning';
   isLoading?: boolean;
+  className?: string;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -363,6 +365,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   cancelText = 'キャンセル',
   variant = 'default',
   isLoading = false,
+  className,
 }) => {
   return (
     <Modal
@@ -371,9 +374,15 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       title={title}
       description={description}
       size="sm"
+      className={className}
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isLoading}
+            className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
+          >
             {cancelText}
           </Button>
           <Button

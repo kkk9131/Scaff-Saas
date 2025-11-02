@@ -13,7 +13,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer } from 'react-konva';
+import { Stage, Layer, Group, Rect, Transformer } from 'react-konva';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import { generateScaffoldSpan } from '@/lib/sax/spanGenerator';
@@ -22,14 +22,19 @@ import { calculateDirection } from '@/lib/sax/directionRules';
 import GridOverlay from './GridOverlay';
 import SaxTool from './SaxTool';
 import ScaffoldRenderer from './ScaffoldRenderer';
-import PillarQuantityCard from './PillarQuantityCard';
-import ClothQuantityCard from './ClothQuantityCard';
-import BracketQuantityCard from './BracketQuantityCard';
+import PillarQuantityCardUnified from './PillarQuantityCardUnified';
+import ClothQuantityCardUnified from './ClothQuantityCardUnified';
+import BracketQuantityCardUnified from './BracketQuantityCardUnified';
+import BracketConfigCardBulk from './BracketConfigCardBulk';
 import AntiQuantityCard from './AntiQuantityCard';
 import AntiLevelCard from './AntiLevelCard';
 import BracketConfigCard from './BracketConfigCard';
 import HaneConfigCard from './HaneConfigCard';
 import BraceQuantityCard from './BraceQuantityCard';
+import MemoRenderer from './MemoRenderer';
+import MemoCard from './MemoCard';
+import ViewModeInfoCard from './ViewModeInfoCard';
+// 旧: BulkPillarQuantityCard は統合版へ移行
 
 /**
  * CanvasStageコンポーネント
@@ -61,6 +66,24 @@ export default function CanvasStage() {
     setBracketSize,
     setDirectionReversed,
     updateScaffoldGroup,
+    // 追加: 一括編集/選択
+    selectedScaffoldPartKeys,
+    editSelectionMode,
+    editTargetType,
+    setEditSelectionMode,
+    setBulkPillarScope,
+    scaffoldGroups,
+    bulkPillarScope,
+    bulkClothScope,
+    setBulkClothScope,
+    bulkBracketScope,
+    setBulkBracketScope,
+    // メモ関連
+    memos,
+    addMemo,
+    updateMemo,
+    selectedMemoId,
+    setSelectedMemoId,
   } = useDrawingStore();
 
   const { currentMode } = useDrawingModeStore();
@@ -105,6 +128,115 @@ export default function CanvasStage() {
     x: number;
     y: number;
   } | null>(null);
+
+  // メモ作成用の状態
+  const [isDrawingMemo, setIsDrawingMemo] = useState(false);
+  const [memoStart, setMemoStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [memoCurrent, setMemoCurrent] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // メモ編集カードの状態
+  const [memoCard, setMemoCard] = useState<{
+    anchor: { x: number; y: number };
+    memoId: string;
+  } | null>(null);
+
+  // ビューモード時のホバー情報
+  const [hoveredViewPart, setHoveredViewPart] = useState<{
+    groupId: string;
+    partId: string;
+    screenPosition: { x: number; y: number };
+  } | null>(null);
+
+  // Transformerの参照（メモのリサイズ用）
+  const transformerRef = useRef<any>(null);
+  const transformerTargetRef = useRef<any>(null);
+
+  // Transformerのターゲットを設定する関数
+  const setTransformerTarget = (target: any) => {
+    transformerTargetRef.current = target;
+    if (transformerRef.current && target) {
+      transformerRef.current.nodes([target]);
+      transformerRef.current.getLayer()?.batchDraw();
+    }
+  };
+
+  // 選択中のメモが変更されたらTransformerを更新
+  useEffect(() => {
+    if (!transformerRef.current) return;
+
+    if (selectedMemoId && currentMode === 'memo') {
+      // transformerTargetRefから直接取得
+      if (transformerTargetRef.current) {
+        transformerRef.current.nodes([transformerTargetRef.current]);
+        transformerRef.current.getLayer()?.batchDraw();
+        return;
+      }
+      
+      // フォールバック: Stageから検索
+      const stage = stageRef.current;
+      if (stage) {
+        const memoLayer = stage.findOne('.memo-layer');
+        if (memoLayer) {
+          const selectedGroup = memoLayer.findOne(`#memo-group-${selectedMemoId}`);
+          if (selectedGroup) {
+            transformerRef.current.nodes([selectedGroup]);
+            transformerRef.current.getLayer()?.batchDraw();
+            return;
+          }
+        }
+      }
+    }
+    
+    // 選択解除またはメモモード以外の場合
+    transformerRef.current.nodes([]);
+    transformerTargetRef.current = null;
+  }, [selectedMemoId, currentMode]);
+
+  // Transformerのリサイズ変更を監視
+  useEffect(() => {
+    if (!transformerRef.current || !selectedMemoId) return;
+
+    const transformer = transformerRef.current;
+    const handleTransformEnd = () => {
+      const node = transformer.nodes()[0];
+      if (!node) return;
+
+      const memo = memos.find((m) => m.id === selectedMemoId);
+      if (!memo) return;
+
+      // Groupのスケールとサイズから新しいサイズを計算
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      const newWidth = Math.max(100, memo.size.width * scaleX);
+      const newHeight = Math.max(60, memo.size.height * scaleY);
+
+      // 位置を更新（Groupのx, yから）
+      const newPosition = {
+        x: node.x(),
+        y: node.y(),
+      };
+
+      updateMemo(selectedMemoId, {
+        position: newPosition,
+        size: { width: newWidth, height: newHeight },
+      });
+
+      // スケールをリセット
+      node.scaleX(1);
+      node.scaleY(1);
+    };
+
+    transformer.on('transformend', handleTransformEnd);
+
+    return () => {
+      transformer.off('transformend', handleTransformEnd);
+    };
+  }, [selectedMemoId, memos, updateMemo]);
 
   // 分割適用処理
   const applyClothSplit = (
@@ -542,6 +674,38 @@ export default function CanvasStage() {
   }, [isPanning]);
 
   /**
+   * Enterキー: 柱・選択モードで一括編集カードを開く
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.code !== 'Enter') return;
+      if (currentMode !== 'edit') return;
+      // 複数選択時に Enter で一括カードを開く（柱/布材）
+      if (!(selectedScaffoldPartKeys.length > 1)) return;
+      if (editTargetType === '柱') {
+        e.preventDefault();
+        setBulkPillarScope('selected');
+        setEditSelectionMode('bulk');
+        return;
+      }
+      if (editTargetType === '布材') {
+        e.preventDefault();
+        setBulkClothScope('selected');
+        setEditSelectionMode('bulk');
+        return;
+      }
+      if (editTargetType === 'ブラケット') {
+        e.preventDefault();
+        setBulkBracketScope('selected');
+        setEditSelectionMode('bulk');
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentMode, editTargetType, selectedScaffoldPartKeys.length, setEditSelectionMode, setBulkPillarScope, setBulkClothScope, setBulkBracketScope]);
+
+  /**
    * Shift/Altキーでサックスモード設定を切替
    * Shiftキー: ブラケットサイズW/S切替
    * Altキー: 方向反転フラグの切替
@@ -628,6 +792,42 @@ export default function CanvasStage() {
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
+    // ビューモードでは編集を無効化
+    if (currentMode === 'view') {
+      return;
+    }
+
+    // メモモード時: クリック位置が既存のメモ領域内かチェック
+    if (currentMode === 'memo' && !isPanning) {
+      const canvasX = (pos.x - canvasPosition.x) / canvasScale;
+      const canvasY = (pos.y - canvasPosition.y) / canvasScale;
+
+      // 既存のメモ領域内かチェック（テキストの高さも考慮）
+      const clickedMemo = memos.find((memo) => {
+        const { position, size, text } = memo;
+        // テキストの行数から高さを計算（MemoRendererと同じ計算）
+        const lines = text.split('\n').filter((line) => line.trim().length > 0 || text.includes('\n'));
+        const fontSize = Math.max(12, 14 / canvasScale);
+        const lineHeight = fontSize * 1.4;
+        const padding = 8 / canvasScale;
+        const textHeight = lines.length > 0 ? lines.length * lineHeight : lineHeight;
+        const rectHeight = Math.max(size.height, textHeight + padding * 2);
+
+        return (
+          canvasX >= position.x &&
+          canvasX <= position.x + size.width &&
+          canvasY >= position.y &&
+          canvasY <= position.y + rectHeight
+        );
+      });
+
+      // 既存のメモ領域内をクリックした場合は新規作成をスキップ
+      if (clickedMemo) {
+        // メモ編集カードを表示（MemoRendererのonClickで既に処理される場合もあるが、念のため）
+        return;
+      }
+    }
+
     // サックスモードでのスパン描画開始（モードがdrawであれば描画可能）
     if (currentMode === 'draw' && !isPanning) {
       // キャンバス座標系に変換（スケールとポジションを考慮）
@@ -648,6 +848,29 @@ export default function CanvasStage() {
       setIsDrawingSpan(true);
       setSpanStart({ x: canvasX, y: canvasY });
       setSpanCurrent({ x: canvasX, y: canvasY });
+      return;
+    }
+
+    // メモモードでのメモ領域作成開始
+    if (currentMode === 'memo' && !isPanning) {
+      // キャンバス座標系に変換（スケールとポジションを考慮）
+      let canvasX = (pos.x - canvasPosition.x) / canvasScale;
+      let canvasY = (pos.y - canvasPosition.y) / canvasScale;
+
+      // グリッドスナップが有効な場合、座標をスナップ
+      if (snapToGrid) {
+        const snapped = snapPositionToGrid(
+          { x: canvasX, y: canvasY },
+          gridSize,
+          DEFAULT_SCALE
+        );
+        canvasX = snapped.x;
+        canvasY = snapped.y;
+      }
+
+      setIsDrawingMemo(true);
+      setMemoStart({ x: canvasX, y: canvasY });
+      setMemoCurrent({ x: canvasX, y: canvasY });
       return;
     }
 
@@ -721,6 +944,12 @@ export default function CanvasStage() {
     // スパン描画中のプレビュー更新
     if (isDrawingSpan) {
       setSpanCurrent({ x: canvasX, y: canvasY });
+      return;
+    }
+
+    // メモ作成中のプレビュー更新
+    if (isDrawingMemo) {
+      setMemoCurrent({ x: canvasX, y: canvasY });
       return;
     }
 
@@ -820,6 +1049,30 @@ export default function CanvasStage() {
       setIsDrawingSpan(false);
       setSpanStart(null);
       setSpanCurrent(null);
+      return;
+    }
+
+    // メモ作成完了時の処理
+    if (isDrawingMemo && memoStart && memoCurrent) {
+      // 始点と終点から矩形の位置とサイズを計算
+      const startX = Math.min(memoStart.x, memoCurrent.x);
+      const startY = Math.min(memoStart.y, memoCurrent.y);
+      const endX = Math.max(memoStart.x, memoCurrent.x);
+      const endY = Math.max(memoStart.y, memoCurrent.y);
+      const width = Math.max(100, endX - startX); // 最小幅100px
+      const height = Math.max(60, endY - startY); // 最小高さ60px
+
+      // メモを追加
+      addMemo({
+        position: { x: startX, y: startY },
+        size: { width, height },
+        text: '',
+      });
+
+      // メモ作成状態をリセット
+      setIsDrawingMemo(false);
+      setMemoStart(null);
+      setMemoCurrent(null);
       return;
     }
 
@@ -1057,18 +1310,73 @@ export default function CanvasStage() {
             onHaneConfigClick={({ anchor, groupId, partId }) => {
               setHaneCard({ anchor, groupId, partId });
             }}
+            onViewPartHover={(info) => {
+              setHoveredViewPart(info);
+            }}
           />
         </Layer>
 
         {/* 注記レイヤー（メモやテキスト） */}
         <Layer name="memo-layer">
-          {/* ここに注記・メモが描画される（将来実装） */}
+          {/* メモ描画プレビュー */}
+          {isDrawingMemo && memoStart && memoCurrent && (
+            <Group>
+              <Rect
+                x={Math.min(memoStart.x, memoCurrent.x)}
+                y={Math.min(memoStart.y, memoCurrent.y)}
+                width={Math.abs(memoCurrent.x - memoStart.x)}
+                height={Math.abs(memoCurrent.y - memoStart.y)}
+                fill="rgba(255, 255, 200, 0.3)"
+                stroke="#FCD34D"
+                strokeWidth={2 / canvasScale}
+                dash={[5 / canvasScale, 5 / canvasScale]}
+              />
+            </Group>
+          )}
+          {/* メモを描画 */}
+          {memos.map((memo) => (
+            <MemoRenderer
+              key={memo.id}
+              memo={memo}
+              scale={canvasScale}
+              isSelected={selectedMemoId === memo.id}
+              onClick={(memoId, anchor) => {
+                setMemoCard({ anchor, memoId });
+                setSelectedMemoId(memoId);
+              }}
+              onDragEnd={(memoId, position) => {
+                updateMemo(memoId, { position });
+              }}
+              setTransformerTarget={setTransformerTarget}
+            />
+          ))}
+          {/* Transformer（リサイズ用） */}
+          {selectedMemoId && currentMode === 'memo' && (
+            <Transformer
+              ref={transformerRef}
+              boundBoxFunc={(oldBox, newBox) => {
+                // 最小サイズを制限
+                if (Math.abs(newBox.width) < 100 || Math.abs(newBox.height) < 60) {
+                  return oldBox;
+                }
+                return newBox;
+              }}
+              rotateEnabled={false}
+              borderEnabled={true}
+              borderStroke="#F59E0B"
+              borderStrokeWidth={2 / canvasScale}
+              anchorFill="#F59E0B"
+              anchorStroke="#FFFFFF"
+              anchorSize={8 / canvasScale}
+            />
+          )}
         </Layer>
       </Stage>
 
-      {/* 柱の数量調整カード（オーバーレイ） */}
+      {/* 柱の数量調整カード（オーバーレイ：単体/統合版） */}
       {pillarCard && (
-        <PillarQuantityCard
+        <PillarQuantityCardUnified
+          kind="single"
           groupId={pillarCard.groupId}
           partId={pillarCard.partId}
           screenPosition={{
@@ -1080,9 +1388,34 @@ export default function CanvasStage() {
         />
       )}
 
-      {/* 布材の数量調整カード（オーバーレイ） */}
+      {/* 柱の一括数量調整カード（統合版）。選択対象 or 全柱 */}
+      {currentMode === 'edit' && editTargetType === '柱' && editSelectionMode === 'bulk' && (selectedScaffoldPartKeys.length > 0 || bulkPillarScope === 'all') && (() => {
+        // アンカー（1件目の柱座標を採用、なければキャンバス中央）
+        let anchorCanvas = { x: stageSize.width / 2 / canvasScale, y: stageSize.height / 2 / canvasScale };
+        const firstKey = selectedScaffoldPartKeys[0];
+        const [gid, pid] = firstKey?.split(':') ?? [];
+        const g = scaffoldGroups.find((gg) => gg.id === gid);
+        const p = g?.parts.find((pp) => pp.id === pid);
+        if (g && p && p.type === '柱') {
+          anchorCanvas = { x: p.position.x, y: p.position.y };
+        }
+        return (
+          <PillarQuantityCardUnified
+            kind="bulk"
+            scope={bulkPillarScope === 'all' ? 'all' : 'selected'}
+            screenPosition={{
+              left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+              top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+            }}
+            onClose={() => setEditSelectionMode('select')}
+          />
+        );
+      })()}
+
+      {/* 布材の数量調整カード（オーバーレイ：単体/統合版） */}
       {clothCard && (
-        <ClothQuantityCard
+        <ClothQuantityCardUnified
+          kind="single"
           groupId={clothCard.groupId}
           partId={clothCard.partId}
           screenPosition={{
@@ -1134,6 +1467,78 @@ export default function CanvasStage() {
         );
       })()}
 
+      {/* 布材の一括数量調整カード（統合版）。選択対象 or 全布材 */}
+      {currentMode === 'edit' && editTargetType === '布材' && editSelectionMode === 'bulk' && (selectedScaffoldPartKeys.length > 0 || bulkClothScope === 'all') && (() => {
+        // アンカー（1件目の布材座標、なければキャンバス中央）
+        let anchorCanvas = { x: stageSize.width / 2 / canvasScale, y: stageSize.height / 2 / canvasScale };
+        const firstKey = selectedScaffoldPartKeys[0];
+        const [gid, pid] = firstKey?.split(':') ?? [];
+        const g = scaffoldGroups.find((gg) => gg.id === gid);
+        const p = g?.parts.find((pp) => pp.id === pid);
+        if (g && p && p.type === '布材') {
+          anchorCanvas = { x: p.position.x, y: p.position.y };
+        }
+        return (
+          <ClothQuantityCardUnified
+            kind="bulk"
+            scope={bulkClothScope === 'all' ? 'all' : 'selected'}
+            screenPosition={{
+              left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+              top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+            }}
+            onClose={() => setEditSelectionMode('select')}
+          />
+        );
+      })()}
+
+      {/* ブラケット一括操作: 選択が柱（青色発光）を含む場合は方向・寸法カード、
+          そうでなければ数量カード（既存）を表示 */}
+      {currentMode === 'edit' && editTargetType === 'ブラケット' && editSelectionMode === 'bulk' && (selectedScaffoldPartKeys.length > 0 || bulkBracketScope === 'all') && (() => {
+        // 選択に柱が含まれるか判定
+        let hasPillar = false;
+        let anchorCanvas = { x: stageSize.width / 2 / canvasScale, y: stageSize.height / 2 / canvasScale };
+        for (const key of selectedScaffoldPartKeys) {
+          const [gid, pid] = key.split(':');
+          const g = scaffoldGroups.find((gg) => gg.id === gid);
+          const p = g?.parts.find((pp) => pp.id === pid);
+          if (g && p && p.type === '柱') {
+            hasPillar = true;
+            anchorCanvas = { x: p.position.x, y: p.position.y };
+            break;
+          }
+        }
+        if (hasPillar) {
+          return (
+            <BracketConfigCardBulk
+              screenPosition={{
+                left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+                top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+              }}
+              onClose={() => setEditSelectionMode('select')}
+            />
+          );
+        }
+        // 柱が含まれない（＝ブラケット選択等）の場合は既存の数量カードを表示
+        const firstKey = selectedScaffoldPartKeys[0];
+        const [gid, pid] = firstKey?.split(':') ?? [];
+        const g = scaffoldGroups.find((gg) => gg.id === gid);
+        const p = g?.parts.find((pp) => pp.id === pid);
+        if (g && p && p.type === 'ブラケット') {
+          anchorCanvas = { x: p.position.x, y: p.position.y };
+        }
+        return (
+          <BracketQuantityCardUnified
+            kind="bulk"
+            scope={bulkBracketScope === 'all' ? 'all' : 'selected'}
+            screenPosition={{
+              left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+              top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+            }}
+            onClose={() => setEditSelectionMode('select')}
+          />
+        );
+      })()}
+
       {/* 分割方式選択カード */}
       {splitConfirm && (
         <div
@@ -1174,9 +1579,10 @@ export default function CanvasStage() {
         </div>
       )}
 
-      {/* ブラケットの数量調整カード（オーバーレイ） */}
-      {bracketCard && (
-        <BracketQuantityCard
+      {/* ブラケットの数量調整カード（オーバーレイ：単体/統合版） - 選択モード時は表示しない */}
+      {bracketCard && editSelectionMode === null && (
+        <BracketQuantityCardUnified
+          kind="single"
           groupId={bracketCard.groupId}
           partId={bracketCard.partId}
           screenPosition={{
@@ -1251,6 +1657,35 @@ export default function CanvasStage() {
           onClose={() => setHaneCard(null)}
         />
       )}
+
+      {/* メモ編集カード（オーバーレイ） */}
+      {memoCard && (
+        <MemoCard
+          memoId={memoCard.memoId}
+          screenPosition={{
+            left: memoCard.anchor.x * canvasScale + canvasPosition.x + 12,
+            top: memoCard.anchor.y * canvasScale + canvasPosition.y + 12,
+          }}
+          onClose={() => {
+            setMemoCard(null);
+            setSelectedMemoId(null);
+          }}
+        />
+      )}
+
+      {/* ビューモード時の情報カード（オーバーレイ） */}
+      {currentMode === 'view' && hoveredViewPart && (() => {
+        const group = scaffoldGroups.find((g) => g.id === hoveredViewPart.groupId);
+        const part = group?.parts.find((p) => p.id === hoveredViewPart.partId);
+        if (!group || !part) return null;
+        return (
+          <ViewModeInfoCard
+            screenPosition={hoveredViewPart.screenPosition}
+            part={part}
+            groupId={group.id}
+          />
+        );
+      })()}
     </div>
   );
 }

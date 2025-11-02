@@ -60,9 +60,9 @@ function LeftSidebar() {
   const Swatch = ({ color, label }: { color: 'white'|'red'|'blue'|'green'; label: string }) => (
     <button
       onClick={() => setCurrentColor(color)}
-      className={`group relative h-7 w-7 rounded-full border transition-all ${
+      className={`group relative h-5 w-5 rounded-full border transition-all ${
         currentColor === color
-          ? 'ring-2 ring-cyan-400 border-transparent'
+          ? 'ring-1 ring-cyan-400 border-transparent'
           : 'border-white/40 dark:border-slate-700/60'
       }`}
       style={{ backgroundColor: color === 'white' ? '#ffffff' : color === 'red' ? '#EF4444' : color === 'blue' ? '#3B82F6' : '#10B981' }}
@@ -111,7 +111,7 @@ function LeftSidebar() {
         leftSidebarOpen ? 'w-16' : 'w-12'
       }`}
     >
-      <div className="relative flex h-full flex-col gap-2 p-3 overflow-y-auto overscroll-contain">
+      <div className="relative flex h-full flex-col gap-2 p-3 overflow-y-auto overflow-x-hidden overscroll-contain">
         <button
           onClick={toggleLeftSidebar}
           className="flex h-8 w-full items-center justify-center rounded-lg text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all mb-2"
@@ -202,7 +202,7 @@ function LeftSidebar() {
             <div className="my-2 h-px bg-white/20 dark:bg-slate-700/50" />
 
             {/* 色パレット（white/red/blue/green） */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <Swatch color="white" label="White" />
               <Swatch color="red" label="Red" />
               <Swatch color="blue" label="Blue" />
