@@ -298,14 +298,9 @@ export default function ModeTabs() {
                 {/* 区切り線 */}
                 <div className="my-1 h-px bg-white/20 dark:bg-slate-700/50" />
 
-                {/* 追加（全青色発光部=全柱 対象のブラケット一括追加カードを表示） */}
+                {/* 追加（全黄色/青色発光部 対象の一括カードを表示） */}
                 <button
                   onClick={() => {
-                    // ブラケット編集に切り替え（必要なら）
-                    if (editTargetType !== 'ブラケット') {
-                      setEditTargetType('ブラケット');
-                    }
-                    // 全青色発光部 = ブラケット編集時に青色発光する柱 → 全柱を対象に選択状態へ
                     const keys: string[] = [];
                     for (const g of scaffoldGroups) {
                       for (const p of g.parts) {
@@ -313,8 +308,16 @@ export default function ModeTabs() {
                       }
                     }
                     selectScaffoldParts(keys);
-                    setBulkBracketScope('selected');
-                    setEditSelectionMode('bulk');
+                    if (editTargetType === 'ブラケット') {
+                      setBulkBracketScope('selected');
+                      setEditSelectionMode('bulk');
+                    } else if (editTargetType === 'ハネ') {
+                      setEditSelectionMode('bulk');
+                    } else {
+                      // 他ターゲットのときはハネに切替して実行（明示意図が必要なら分岐を外す）
+                      setEditTargetType('ハネ');
+                      setEditSelectionMode('bulk');
+                    }
                     setBulkMenuOpen(false);
                   }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800`}

@@ -700,6 +700,11 @@ export default function CanvasStage() {
         setEditSelectionMode('bulk');
         return;
       }
+      if (editTargetType === 'ハネ') {
+        e.preventDefault();
+        setEditSelectionMode('bulk');
+        return;
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -1657,6 +1662,29 @@ export default function CanvasStage() {
           onClose={() => setHaneCard(null)}
         />
       )}
+
+      {/* ハネの一括設定カード（選択対象 or 全柱（黄色発光）） */}
+      {currentMode === 'edit' && editTargetType === 'ハネ' && editSelectionMode === 'bulk' && selectedScaffoldPartKeys.length > 0 && (() => {
+        // アンカー（1件目の柱座標、なければ中央）
+        let anchorCanvas = { x: stageSize.width / 2 / canvasScale, y: stageSize.height / 2 / canvasScale };
+        const firstKey = selectedScaffoldPartKeys[0];
+        const [gid, pid] = firstKey?.split(':') ?? [];
+        const g = scaffoldGroups.find((gg) => gg.id === gid);
+        const p = g?.parts.find((pp) => pp.id === pid);
+        if (g && p && p.type === '柱') {
+          anchorCanvas = { x: p.position.x, y: p.position.y };
+        }
+        return (
+          <HaneConfigCard
+            kind="bulk"
+            screenPosition={{
+              left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+              top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+            }}
+            onClose={() => setEditSelectionMode('select')}
+          />
+        );
+      })()}
 
       {/* メモ編集カード（オーバーレイ） */}
       {memoCard && (

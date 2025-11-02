@@ -766,9 +766,15 @@ export default function ScaffoldRenderer({
                           }
                           return;
                         }
-                        // ハネ編集時: 柱クリックで方向・寸法カードを表示
+                        // ハネ編集時
                         if (currentMode === 'edit' && editTargetType === 'ハネ') {
                           e.cancelBubble = true;
+                          // 選択/投げ縄/一括モードでは選択トグル
+                          if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
+                          // 非選択モード時は単体カードを表示
                           onHaneConfigClick?.({
                             anchor: { x: part.position.x, y: part.position.y },
                             groupId: group.id,
@@ -795,6 +801,20 @@ export default function ScaffoldRenderer({
                         // ビューモードでは編集を無効化
                         if (currentMode === 'view') {
                           e.cancelBubble = true;
+                          return;
+                        }
+                        // ハネ編集時
+                        if (currentMode === 'edit' && editTargetType === 'ハネ') {
+                          e.cancelBubble = true;
+                          if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            return;
+                          }
+                          onHaneConfigClick?.({
+                            anchor: { x: part.position.x, y: part.position.y },
+                            groupId: group.id,
+                            partId: part.id,
+                          });
                           return;
                         }
                         // ブラケット編集時

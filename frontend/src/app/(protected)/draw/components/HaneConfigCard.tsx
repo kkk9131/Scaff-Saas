@@ -16,12 +16,21 @@ import { Wind, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { mmToPx, DEFAULT_SCALE } from '@/lib/utils/scale';
 
-export interface HaneConfigCardProps {
-  screenPosition: { left: number; top: number };
-  groupId: string;
-  partId: string;
-  onClose: () => void;
-}
+export type HaneConfigCardProps =
+  | {
+      /** 単体編集 */
+      kind?: 'single';
+      screenPosition: { left: number; top: number };
+      groupId: string;
+      partId: string;
+      onClose: () => void;
+    }
+  | {
+      /** 一括編集（選択された柱を対象） */
+      kind: 'bulk';
+      screenPosition: { left: number; top: number };
+      onClose: () => void;
+    };
 
 const DIRECTIONS = [
   { value: 0, label: '右', icon: '→' },
@@ -32,53 +41,91 @@ const DIRECTIONS = [
 
 const SIZES = [900, 600, 355, 300, 150] as const;
 
-export default function HaneConfigCard({ screenPosition, groupId, partId, onClose }: HaneConfigCardProps) {
+export default function HaneConfigCard(props: HaneConfigCardProps) {
   const [direction, setDirection] = React.useState<number>(270); // 初期は上向き
   const [size, setSize] = React.useState<number>(600);
 
-  const { scaffoldGroups, updateScaffoldGroup } = useDrawingStore();
-  const group = React.useMemo(() => scaffoldGroups.find((g) => g.id === groupId), [scaffoldGroups, groupId]);
-  const pillar = React.useMemo(() => group?.parts.find((p) => p.id === partId), [group, partId]);
+  const { scaffoldGroups, updateScaffoldGroup, selectedScaffoldPartKeys, clearScaffoldSelection } = useDrawingStore();
+  const kind: 'single' | 'bulk' = props.kind ?? 'single';
+  const group = kind === 'single' ? React.useMemo(() => scaffoldGroups.find((g) => g.id === (props as any).groupId), [scaffoldGroups, (props as any).groupId]) : undefined;
+  const pillar = kind === 'single' ? React.useMemo(() => group?.parts.find((p) => p.id === (props as any).partId), [group, (props as any).partId]) : undefined;
 
   const style: React.CSSProperties = {
     position: 'absolute',
-    left: `${screenPosition.left}px`,
-    top: `${screenPosition.top}px`,
+    left: `${props.screenPosition.left}px`,
+    top: `${props.screenPosition.top}px`,
     zIndex: 40,
     width: 360,
   };
 
   const handleDraw = () => {
-    if (!group || !pillar) return;
-    // 始点=柱位置、選択方向・寸法でライン（布材）と終端の三角柱を追加
-    const start = { x: pillar.position.x, y: pillar.position.y };
+    if (kind === 'single') {
+      const { groupId, onClose } = props as any;
+      if (!group || !pillar) return;
+      const start = { x: pillar.position.x, y: pillar.position.y };
+      const rad = (direction * Math.PI) / 180;
+      const v = { x: Math.cos(rad), y: Math.sin(rad) };
+      const lenPx = mmToPx(size, DEFAULT_SCALE);
+      const end = { x: start.x + v.x * lenPx, y: start.y + v.y * lenPx };
+      const addParts: any[] = [];
+      addParts.push({ id: crypto.randomUUID(), type: '布材', position: { ...start }, color: pillar.color, meta: { length: size, direction } });
+      addParts.push({ id: crypto.randomUUID(), type: '柱', position: { ...end }, color: pillar.color, marker: 'triangle', meta: { markerDirection: direction } });
+      updateScaffoldGroup(groupId, { parts: [...group.parts, ...addParts] });
+      (props as any).onClose();
+      return;
+    }
+    // bulk: 選択中の柱すべてに対して作図
+    const pillars = selectedScaffoldPartKeys
+      .map((key) => {
+        const [gid, pid] = key.split(':');
+        const g = scaffoldGroups.find((gg) => gg.id === gid);
+        const p = g?.parts.find((pp) => pp.id === pid);
+        return g && p && p.type === '柱' ? { group: g, pillar: p } : null;
+      })
+      .filter((x): x is { group: any; pillar: any } => Boolean(x));
+    if (pillars.length === 0) return;
     const rad = (direction * Math.PI) / 180;
     const v = { x: Math.cos(rad), y: Math.sin(rad) };
     const lenPx = mmToPx(size, DEFAULT_SCALE);
-    const end = { x: start.x + v.x * lenPx, y: start.y + v.y * lenPx };
-
-    const addParts: any[] = [];
-    // ライン部分は布材で表現（寸法=選択サイズ、方向=選択方向）
-    addParts.push({
-      id: crypto.randomUUID(),
-      type: '布材',
-      position: { ...start },
-      color: pillar.color,
-      meta: { length: size, direction }
-    });
-    // 終端に三角マーカー（柱）
-    addParts.push({
-      id: crypto.randomUUID(),
-      type: '柱',
-      position: { ...end },
-      color: pillar.color,
-      marker: 'triangle',
-      meta: { markerDirection: direction }
-    });
-
-    updateScaffoldGroup(group.id, { parts: [...group.parts, ...addParts] });
-    onClose();
+    // グループごとにまとめて更新
+    const grouped: Record<string, { group: any; items: any[] }> = {};
+    for (const it of pillars) {
+      const gid = it.group.id as string;
+      if (!grouped[gid]) grouped[gid] = { group: it.group, items: [] };
+      grouped[gid].items.push(it);
+    }
+    for (const gid of Object.keys(grouped)) {
+      const { group, items } = grouped[gid];
+      let parts = [...group.parts];
+      for (const it of items) {
+        const start = { x: it.pillar.position.x, y: it.pillar.position.y };
+        const end = { x: start.x + v.x * lenPx, y: start.y + v.y * lenPx };
+        parts = [
+          ...parts,
+          { id: crypto.randomUUID(), type: '布材', position: { ...start }, color: it.pillar.color, meta: { length: size, direction } },
+          { id: crypto.randomUUID(), type: '柱', position: { ...end }, color: it.pillar.color, marker: 'triangle', meta: { markerDirection: direction } },
+        ];
+      }
+      updateScaffoldGroup(gid, { parts });
+    }
+    clearScaffoldSelection();
+    props.onClose();
   };
+
+  // Enterで作図、Escで閉じる
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.code === 'Enter') {
+        e.preventDefault();
+        handleDraw();
+      } else if (e.key === 'Escape' || e.code === 'Escape') {
+        e.preventDefault();
+        props.onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleDraw, props]);
 
   return (
     <div
@@ -91,11 +138,11 @@ export default function HaneConfigCard({ screenPosition, groupId, partId, onClos
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-slate-700/50">
         <div className="flex items-center gap-2">
           <Wind size={18} className="text-emerald-400" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ハネの設定</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{kind === 'bulk' ? 'ハネの一括設定' : 'ハネの設定'}</h3>
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={onClose}
+            onClick={props.onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
             aria-label="閉じる"
           >
@@ -157,7 +204,7 @@ export default function HaneConfigCard({ screenPosition, groupId, partId, onClos
           <Button
             variant="outline"
             size="sm"
-            onClick={onClose}
+            onClick={props.onClose}
             className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
           >
             キャンセル
