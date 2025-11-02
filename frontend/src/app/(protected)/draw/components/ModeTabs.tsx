@@ -268,32 +268,64 @@ export default function ModeTabs() {
                 onMouseEnter={() => setBulkMenuOpen(true)}
                 onMouseLeave={() => setBulkMenuOpen(false)}
               >
-                {/* 数量（全体） */}
-                <button
-                  onClick={() => {
-                    if (editTargetType === '柱') {
-                      setBulkPillarScope('all');
-                      setEditSelectionMode('bulk');
-                    } else if (editTargetType === '布材') {
-                      setBulkClothScope('all');
-                      setEditSelectionMode('bulk');
-                    } else if (editTargetType === 'ブラケット') {
-                      setBulkBracketScope('all');
-                      setEditSelectionMode('bulk');
-                    }
-                    setBulkMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors ${
-                    (editTargetType === '柱' || editTargetType === '布材' || editTargetType === 'ブラケット')
-                      ? 'text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800'
-                      : 'text-slate-400 cursor-not-allowed dark:text-slate-600'
-                  }`}
-                  aria-label="数量（全体）"
-                  disabled={!(editTargetType === '柱' || editTargetType === '布材' || editTargetType === 'ブラケット')}
-                >
-                  <Table size={14} />
-                  <span>数量</span>
-                </button>
+                {/* 数量（全体） / アンチ編集時は『枚数/段数』の選択肢を表示 */}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      if (editTargetType === '柱') {
+                        setBulkPillarScope('all');
+                        setEditSelectionMode('bulk');
+                      } else if (editTargetType === '布材') {
+                        setBulkClothScope('all');
+                        setEditSelectionMode('bulk');
+                      } else if (editTargetType === 'ブラケット') {
+                        setBulkBracketScope('all');
+                        setEditSelectionMode('bulk');
+                      } else if (editTargetType === 'アンチ') {
+                        // アンチはホバーでサブ選択肢を出すため、ここでは何もしない
+                      }
+                      if (editTargetType !== 'アンチ') setBulkMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors ${
+                      (editTargetType === '柱' || editTargetType === '布材' || editTargetType === 'ブラケット' || editTargetType === 'アンチ')
+                        ? 'text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800'
+                        : 'text-slate-400 cursor-not-allowed dark:text-slate-600'
+                    }`}
+                    aria-label="数量（全体）"
+                    disabled={!(editTargetType === '柱' || editTargetType === '布材' || editTargetType === 'ブラケット' || editTargetType === 'アンチ')}
+                  >
+                    <Table size={14} />
+                    <span>数量</span>
+                  </button>
+                  {editTargetType === 'アンチ' && (
+                    <div className="absolute left-full top-0 ml-2 min-w-[120px] rounded-lg border shadow-lg py-1 z-[101] dark:border-slate-700 dark:bg-black border-slate-300 bg-white">
+                      <button
+                        className="w-full px-3 py-2 text-left text-[11px] hover:bg-white/10 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          const s = useDrawingStore.getState();
+                          s.setBulkAntiAction('quantity');
+                          s.setBulkAntiScope('all');
+                          setEditSelectionMode('bulk');
+                          setBulkMenuOpen(false);
+                        }}
+                      >
+                        枚数
+                      </button>
+                      <button
+                        className="w-full px-3 py-2 text-left text-[11px] hover:bg-white/10 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          const s = useDrawingStore.getState();
+                          s.setBulkAntiAction('level');
+                          s.setBulkAntiScope('all');
+                          setEditSelectionMode('bulk');
+                          setBulkMenuOpen(false);
+                        }}
+                      >
+                        段数
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* 区切り線 */}
                 <div className="my-1 h-px bg-white/20 dark:bg-slate-700/50" />

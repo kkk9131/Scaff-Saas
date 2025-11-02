@@ -748,6 +748,7 @@ export default function ScaffoldRenderer({
                           // → Enterで方向・寸法カード（複数用）を開く挙動に繋げる
                           if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
                             toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            useDrawingStore.getState().setBulkAntiAction?.('quantity');
                             return;
                           }
                           // この柱に関連するブラケットを探す
@@ -2132,39 +2133,55 @@ export default function ScaffoldRenderer({
                   const textColor = isDark ? '#FFFFFF' : '#000000';
                   const fontSize = Math.max(10, Math.min(12, widthPx - 6));
                   const highlightAnti = currentMode === 'edit' && editTargetType === 'アンチ';
+                  const isSelectedAnti = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
                   // Rectのpositionは左上なので、中心基準にするためoffsetを設定
                   return (
                     <Group key={part.id}>
                       {/* ビューモード時の数量未確定発光（赤色） */}
-                      {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
-                        const anchor = { x: part.position.x, y: part.position.y };
-                        const op = getPulseOpacity(0.95, part.id, anchor);
-                        return (
-                          <Rect
-                            x={part.position.x}
-                            y={part.position.y}
-                            width={lengthPx}
-                            height={widthPx}
-                            offsetX={lengthPx / 2}
-                            offsetY={widthPx / 2}
-                            rotation={angle}
-                            stroke={'#EF4444'}
-                            strokeWidth={ANTI_GLOW.ringStroke}
-                            opacity={op}
-                            shadowColor={'#EF4444'}
-                            shadowBlur={ANTI_GLOW.shadowBlur}
-                            shadowOpacity={0.95}
-                            globalCompositeOperation="lighter"
-                            listening={false}
-                            cornerRadius={2}
-                          />
-                        );
-                      })()}
+                      {currentMode === 'view' && !isQuantityConfirmed(part) && (
+                        <Rect
+                          x={part.position.x}
+                          y={part.position.y}
+                          width={lengthPx}
+                          height={widthPx}
+                          offsetX={lengthPx / 2}
+                          offsetY={widthPx / 2}
+                          rotation={angle}
+                          stroke={'#EF4444'}
+                          strokeWidth={ANTI_GLOW.ringStroke}
+                          opacity={getPulseOpacity(0.95, part.id, { x: part.position.x, y: part.position.y })}
+                          shadowColor={'#EF4444'}
+                          shadowBlur={ANTI_GLOW.shadowBlur}
+                          shadowOpacity={0.95}
+                          globalCompositeOperation="lighter"
+                          listening={false}
+                          cornerRadius={2}
+                        />
+                      )}
                       {/* アンチの黄色発光（枠の外周・加算合成） */}
-                      {highlightAnti && (() => {
-                        const anchor = { x: part.position.x, y: part.position.y };
-                        const op = getPulseOpacity(0.95, part.id, anchor);
-                        return (
+                      {highlightAnti ? (
+                        <Rect
+                          x={part.position.x}
+                          y={part.position.y}
+                          width={lengthPx}
+                          height={widthPx}
+                          offsetX={lengthPx / 2}
+                          offsetY={widthPx / 2}
+                          rotation={angle}
+                          stroke={'#FACC15'}
+                          strokeWidth={ANTI_GLOW.ringStroke}
+                          opacity={getPulseOpacity(0.95, part.id, { x: part.position.x, y: part.position.y })}
+                          shadowColor={'#FACC15'}
+                          shadowBlur={ANTI_GLOW.shadowBlur}
+                          shadowOpacity={0.95}
+                          globalCompositeOperation="lighter"
+                          listening={false}
+                          cornerRadius={2}
+                        />
+                      ) : null}
+                      {/* 選択時の強調シアン（下地＋芯の2段） */}
+                      {currentMode === 'edit' && editTargetType === 'アンチ' && isSelectedAnti && (useDrawingStore.getState().bulkAntiAction !== 'level') && (
+                        <>
                           <Rect
                             x={part.position.x}
                             y={part.position.y}
@@ -2173,18 +2190,36 @@ export default function ScaffoldRenderer({
                             offsetX={lengthPx / 2}
                             offsetY={widthPx / 2}
                             rotation={angle}
-                            stroke={'#FACC15'}
-                            strokeWidth={ANTI_GLOW.ringStroke}
-                            opacity={op}
-                            shadowColor={'#FACC15'}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(ANTI_GLOW.ringStroke * 0.75, 10 * invScale)}
+                            opacity={0.55}
+                            shadowColor={'#06B6D4'}
                             shadowBlur={ANTI_GLOW.shadowBlur}
-                            shadowOpacity={0.95}
-                            globalCompositeOperation="lighter"
+                            shadowOpacity={0.9}
                             listening={false}
+                            globalCompositeOperation="lighter"
                             cornerRadius={2}
                           />
-                        );
-                      })()}
+                          <Rect
+                            x={part.position.x}
+                            y={part.position.y}
+                            width={lengthPx}
+                            height={widthPx}
+                            offsetX={lengthPx / 2}
+                            offsetY={widthPx / 2}
+                            rotation={angle}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(3.5, 4 * invScale)}
+                            opacity={0.98}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={ANTI_GLOW.shadowBlur * 0.6}
+                            shadowOpacity={0.95}
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                            cornerRadius={2}
+                          />
+                        </>
+                      )}
                       <Rect
                         x={part.position.x}
                         y={part.position.y}
@@ -2243,11 +2278,25 @@ export default function ScaffoldRenderer({
                           // アンチ編集時のみカードを出す
                           if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                           e.cancelBubble = true;
-                          onAntiClick?.({
-                            anchor: { x: part.position.x, y: part.position.y },
-                            groupId: group.id,
-                            partId: part.id,
-                          });
+                          // 青色発光（中心）近傍は黄色選択を抑止
+                          try {
+                            const stage = e.target.getStage?.();
+                            const ptr = stage?.getPointerPosition();
+                            if (ptr) {
+                              const canvasPos = { x: (ptr.x - canvasPosition.x) / canvasScale, y: (ptr.y - canvasPosition.y) / canvasScale };
+                              const dx = canvasPos.x - part.position.x;
+                              const dy = canvasPos.y - part.position.y;
+                              const dist = Math.sqrt(dx * dx + dy * dy);
+                              const glowR = ANTI_MID_GLOW.gradRadius * getRadiusScale(part.id + '-anti-mid', { x: part.position.x, y: part.position.y });
+                              if (dist <= glowR) return; // 中心はスルー（青用）
+                            }
+                          } catch {}
+                          if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            useDrawingStore.getState().setBulkAntiAction?.('quantity');
+                            return;
+                          }
+                          onAntiClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
                         }}
                         onTap={(e) => {
                           // ビューモードでは編集を無効化
@@ -2257,15 +2306,29 @@ export default function ScaffoldRenderer({
                           }
                           if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                           e.cancelBubble = true;
-                          onAntiClick?.({
-                            anchor: { x: part.position.x, y: part.position.y },
-                            groupId: group.id,
-                            partId: part.id,
-                          });
+                          if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                            // 青色発光（中心）近傍は黄色選択を抑止
+                            try {
+                              const stage = e.target.getStage?.();
+                              const ptr = stage?.getPointerPosition();
+                              if (ptr) {
+                                const canvasPos = { x: (ptr.x - canvasPosition.x) / canvasScale, y: (ptr.y - canvasPosition.y) / canvasScale };
+                                const dx = canvasPos.x - part.position.x;
+                                const dy = canvasPos.y - part.position.y;
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                const glowR = ANTI_MID_GLOW.gradRadius * getRadiusScale(part.id + '-anti-mid', { x: part.position.x, y: part.position.y });
+                                if (dist <= glowR) return; // 中心はスルー（青用）
+                              }
+                            } catch {}
+                            toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                            useDrawingStore.getState().setBulkAntiAction?.('quantity');
+                            return;
+                          }
+                          onAntiClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
                         }}
                       />
                       {/* クリック領域（透明、矩形全体をカバー、ただし青色発光部分は除外） */}
-                      {highlightAnti && (
+                      {highlightAnti ? (
                         <Rect
                           x={part.position.x}
                           y={part.position.y}
@@ -2283,6 +2346,13 @@ export default function ScaffoldRenderer({
                               return;
                             }
                             if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                            // 選択系モードではトグル選択に切替
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              e.cancelBubble = true;
+                              toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                              useDrawingStore.getState().setBulkAntiAction?.('quantity');
+                              return;
+                            }
                             // クリック位置が青色発光部分の範囲内かチェック
                             const stage = e.target.getStage();
                             if (stage) {
@@ -2316,6 +2386,12 @@ export default function ScaffoldRenderer({
                               return;
                             }
                             if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              e.cancelBubble = true;
+                              toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                              useDrawingStore.getState().setBulkAntiAction?.('quantity');
+                              return;
+                            }
                             // タップ位置が青色発光部分の範囲内かチェック
                             const stage = e.target.getStage();
                             if (stage) {
@@ -2342,8 +2418,8 @@ export default function ScaffoldRenderer({
                               partId: part.id,
                             });
                           }}
-                        />
-                      )}
+                          />
+                      ) : null}
                       {/* アンチの中点に青色発光○（中心はpart.position） */}
                       {highlightAnti && (() => {
                         const anchor = { x: part.position.x, y: part.position.y };
@@ -2380,6 +2456,37 @@ export default function ScaffoldRenderer({
                               globalCompositeOperation="lighter"
                               listening={false}
                             />
+                            {/* 選択時のシアンリング（青色発光の上に重ねて見せる） */}
+                            {currentMode === 'edit' && editTargetType === 'アンチ' && isSelectedAnti && (useDrawingStore.getState().bulkAntiAction === 'level') && (
+                              <>
+                                <Circle
+                                  x={part.position.x}
+                                  y={part.position.y}
+                                  radius={ANTI_MID_GLOW.ringRadius * 1.25 * rScale}
+                                  stroke={'#06B6D4'}
+                                  strokeWidth={Math.max(2, ANTI_MID_GLOW.ringStroke * 0.9)}
+                                  opacity={0.95}
+                                  shadowColor={'#06B6D4'}
+                                  shadowBlur={ANTI_MID_GLOW.shadowBlur}
+                                  shadowOpacity={0.9}
+                                  globalCompositeOperation="lighter"
+                                  listening={false}
+                                />
+                                <Circle
+                                  x={part.position.x}
+                                  y={part.position.y}
+                                  radius={Math.max(ANTI_MID_GLOW.coreRadius * 1.2 * rScale, 4)}
+                                  stroke={'#06B6D4'}
+                                  strokeWidth={2}
+                                  opacity={0.98}
+                                  shadowColor={'#06B6D4'}
+                                  shadowBlur={ANTI_MID_GLOW.shadowBlur * 0.6}
+                                  shadowOpacity={0.95}
+                                  globalCompositeOperation="lighter"
+                                  listening={false}
+                                />
+                              </>
+                            )}
                             <Circle
                               x={part.position.x}
                               y={part.position.y}
@@ -2399,6 +2506,12 @@ export default function ScaffoldRenderer({
                               onClick={(e) => {
                                 if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                                 e.cancelBubble = true;
+                                // 選択モード中は段数用の選択トグル（青色発光選択）
+                                if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                                  useDrawingStore.getState().setBulkAntiAction?.('level');
+                                  toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                                  return;
+                                }
                                 onAntiLevelClick?.({
                                   anchor: { x: part.position.x, y: part.position.y },
                                   groupId: group.id,
@@ -2408,6 +2521,11 @@ export default function ScaffoldRenderer({
                               onTap={(e) => {
                                 if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                                 e.cancelBubble = true;
+                                if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                                  useDrawingStore.getState().setBulkAntiAction?.('level');
+                                  toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                                  return;
+                                }
                                 onAntiLevelClick?.({
                                   anchor: { x: part.position.x, y: part.position.y },
                                   groupId: group.id,

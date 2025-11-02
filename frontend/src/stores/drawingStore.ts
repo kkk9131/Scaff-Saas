@@ -119,6 +119,16 @@ interface DrawingState {
    * - 'all': キャンバス内のすべてのブラケット
    */
   bulkBracketScope: 'selected' | 'all';
+  /** アンチ一括の動作種別（数量 or 段数） */
+  bulkAntiAction: 'quantity' | 'level';
+  /** 一括編集時の対象スコープ（アンチ） */
+  bulkAntiScope: 'selected' | 'all';
+  /**
+   * 一括編集時の対象スコープ（アンチ）
+   * - 'selected': ユーザーが選択したアンチのみ
+   * - 'all': キャンバス内のすべてのアンチ
+   */
+  bulkAntiScope: 'selected' | 'all';
 
   // 足場グループ
   scaffoldGroups: ScaffoldGroup[];
@@ -191,6 +201,12 @@ interface DrawingState {
   setBulkClothScope: (scope: 'selected' | 'all') => void;
   /** 一括編集スコープ（ブラケット）の設定 */
   setBulkBracketScope: (scope: 'selected' | 'all') => void;
+  /** 一括編集モード（アンチ）の動作を設定（数量/段数） */
+  setBulkAntiAction: (action: 'quantity' | 'level') => void;
+  /** 一括編集スコープ（アンチ）の設定 */
+  setBulkAntiScope: (scope: 'selected' | 'all') => void;
+  /** 一括編集スコープ（アンチ）の設定 */
+  setBulkAntiScope: (scope: 'selected' | 'all') => void;
 
   // 編集モード用: 足場パーツ選択操作
   /** 選択をすべて解除 */
@@ -280,6 +296,9 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   bulkPillarScope: 'selected', // デフォルトは選択対象のみ
   bulkClothScope: 'selected', // デフォルトは選択対象のみ
   bulkBracketScope: 'selected', // デフォルトは選択対象のみ
+  bulkAntiAction: 'quantity',
+  bulkAntiScope: 'selected',
+  bulkAntiScope: 'selected', // デフォルトは選択対象のみ
 
   // UI状態の初期状態
   leftSidebarOpen: true, // デフォルトで左サイドバー表示
@@ -519,6 +538,10 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   setBulkClothScope: (scope) => set({ bulkClothScope: scope }),
   // 一括編集スコープ（ブラケット）を設定
   setBulkBracketScope: (scope) => set({ bulkBracketScope: scope }),
+  setBulkAntiAction: (action) => set({ bulkAntiAction: action }),
+  setBulkAntiScope: (scope) => set({ bulkAntiScope: scope }),
+  // 一括編集スコープ（アンチ）を設定
+  setBulkAntiScope: (scope) => set({ bulkAntiScope: scope }),
 
   // 足場グループを追加
   addScaffoldGroup: (group) =>

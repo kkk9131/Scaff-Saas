@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Wind, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { mmToPx, DEFAULT_SCALE } from '@/lib/utils/scale';
+import { Layers } from 'lucide-react';
 
 export type HaneConfigCardProps =
   | {
@@ -137,8 +138,21 @@ export default function HaneConfigCard(props: HaneConfigCardProps) {
       {/* ヘッダー */}
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-slate-700/50">
         <div className="flex items-center gap-2">
-          <Wind size={18} className="text-emerald-400" />
+          {kind === 'bulk' ? <Layers size={18} className="text-emerald-400" /> : <Wind size={18} className="text-emerald-400" />}
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{kind === 'bulk' ? 'ハネの一括設定' : 'ハネの設定'}</h3>
+          {kind === 'bulk' && (() => {
+            const count = selectedScaffoldPartKeys.filter((k) => {
+              const [gid, pid] = k.split(':');
+              const g = scaffoldGroups.find((gg) => gg.id === gid);
+              const p = g?.parts.find((pp) => pp.id === pid);
+              return p?.type === '柱';
+            }).length;
+            return (
+              <span className="ml-1 inline-flex items-center rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300">
+                {`対象 ${count} 箇所`}
+              </span>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-1">
           <button

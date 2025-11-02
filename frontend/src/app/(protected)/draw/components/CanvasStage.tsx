@@ -26,8 +26,9 @@ import PillarQuantityCardUnified from './PillarQuantityCardUnified';
 import ClothQuantityCardUnified from './ClothQuantityCardUnified';
 import BracketQuantityCardUnified from './BracketQuantityCardUnified';
 import BracketConfigCardBulk from './BracketConfigCardBulk';
-import AntiQuantityCard from './AntiQuantityCard';
+import AntiQuantityCardUnified from './AntiQuantityCardUnified';
 import AntiLevelCard from './AntiLevelCard';
+import AntiLevelCardUnified from './AntiLevelCardUnified';
 import BracketConfigCard from './BracketConfigCard';
 import HaneConfigCard from './HaneConfigCard';
 import BraceQuantityCard from './BraceQuantityCard';
@@ -697,6 +698,13 @@ export default function CanvasStage() {
       if (editTargetType === 'ブラケット') {
         e.preventDefault();
         setBulkBracketScope('selected');
+        setEditSelectionMode('bulk');
+        return;
+      }
+      if (editTargetType === 'アンチ') {
+        e.preventDefault();
+        useDrawingStore.getState().setBulkAntiScope('selected');
+        useDrawingStore.getState().setBulkAntiAction('level');
         setEditSelectionMode('bulk');
         return;
       }
@@ -1612,8 +1620,9 @@ export default function CanvasStage() {
       )}
 
       {/* アンチの数量調整カード（オーバーレイ） */}
-      {antiCard && (
-        <AntiQuantityCard
+  {antiCard && (
+        <AntiQuantityCardUnified
+          kind="single"
           groupId={antiCard.groupId}
           partId={antiCard.partId}
           screenPosition={{
@@ -1624,9 +1633,10 @@ export default function CanvasStage() {
         />
       )}
 
-      {/* アンチの段数調整カード（オーバーレイ） */}
+      {/* アンチの段数調整カード（オーバーレイ：単体/統合版） - 選択モード時は表示しない */}
       {antiLevelCard && (
-        <AntiLevelCard
+        <AntiLevelCardUnified
+          kind="single"
           groupId={antiLevelCard.groupId}
           partId={antiLevelCard.partId}
           screenPosition={{
@@ -1636,6 +1646,41 @@ export default function CanvasStage() {
           onClose={() => setAntiLevelCard(null)}
         />
       )}
+
+      {/* アンチの一括カード（数量 or 段数） */}
+      {currentMode === 'edit' && editTargetType === 'アンチ' && editSelectionMode === 'bulk' && (() => {
+        const { bulkAntiScope, bulkAntiAction } = useDrawingStore.getState();
+        if (!(selectedScaffoldPartKeys.length > 0 || bulkAntiScope === 'all')) return null;
+        let anchorCanvas = { x: stageSize.width / 2 / canvasScale, y: stageSize.height / 2 / canvasScale };
+        const firstKey = selectedScaffoldPartKeys[0];
+        const [gid, pid] = firstKey?.split(':') ?? [];
+        const g = scaffoldGroups.find((gg) => gg.id === gid);
+        const p = g?.parts.find((pp) => pp.id === pid);
+        if (g && p && p.type === 'アンチ') {
+          anchorCanvas = { x: p.position.x, y: p.position.y };
+        }
+        return bulkAntiAction === 'level' ? (
+          <AntiLevelCardUnified
+            kind="bulk"
+            scope={bulkAntiScope === 'all' ? 'all' : 'selected'}
+            screenPosition={{
+              left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+              top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+            }}
+            onClose={() => setEditSelectionMode('select')}
+          />
+        ) : (
+          <AntiQuantityCardUnified
+            kind="bulk"
+            scope={bulkAntiScope === 'all' ? 'all' : 'selected'}
+            screenPosition={{
+              left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+              top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+            }}
+            onClose={() => setEditSelectionMode('select')}
+          />
+        );
+      })()}
 
       {/* ブラケットの方向と寸法選択カード（オーバーレイ） */}
       {bracketConfigCard && (
