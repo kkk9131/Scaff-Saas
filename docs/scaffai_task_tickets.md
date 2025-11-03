@@ -640,7 +640,7 @@ app/(protected)/projects/components/
 
 ---
 
-### [TASK-205] 🚀 プロジェクト統合テスト
+### [TASK-205] プロジェクト統合テスト
 ```yaml
 依存: TASK-201, TASK-202, TASK-203
 並列可: なし
@@ -688,7 +688,7 @@ app/(protected)/projects/components/
 
 ---
 
-### [TASK-207] 🚀 Agent Builder連携によるプロジェクト管理エージェント実装
+### [TASK-207]  Agent Builder連携によるプロジェクト管理エージェント実装
 ```yaml
 依存: TASK-201, TASK-202, TASK-203, TASK-205
 並列可: なし
@@ -731,7 +731,7 @@ docs/
 
 > 参照: `docs/scaffai_drawing_mvp_requirements.md`（MVP要件のソース）
 
-### [TASK-301] 🚀 キャンバス基盤・UIレイアウト ✅ 🚀
+### [TASK-301] キャンバス基盤・UIレイアウト
 ```yaml
 依存: TASK-108
 並列可: TASK-302, TASK-309
@@ -764,7 +764,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-302] 🚀 モード切替（タブ＋ショートカット1〜4） 🚀
+### [TASK-302] モード切替（タブ＋ショートカット1〜4）
 ```yaml
 依存: TASK-301
 並列可: TASK-303, TASK-309
@@ -788,7 +788,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-303] 🚀 サックスモード・スパン自動生成エンジン（Core） 🚀
+### [TASK-303] サックスモード・スパン自動生成エンジン（Core）
 ```yaml
 依存: TASK-302
 並列可: TASK-304
@@ -815,7 +815,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-304] 🚀 サックスモード・UI/操作（プレビュー＋確定） 🚀
+### [TASK-304] サックスモード・UI/操作（プレビュー＋確定）
 ```yaml
 依存: TASK-303
 並列可: なし
@@ -839,7 +839,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-305] 編集モード・ポップアップUI 🚀
+### [TASK-305] 編集モード・ポップアップUI
 ```yaml
 依存: TASK-301
 並列可: TASK-306
@@ -886,7 +886,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-307] 🚀 メモモード（注記）
+### [TASK-307] メモモード（注記）
 ```yaml
 依存: TASK-301
 並列可: TASK-306
@@ -909,7 +909,7 @@ app/(protected)/draw/
 
 ---
 
-### [TASK-308] 🚀 ビューモード（ホバーカード）
+### [TASK-308] ビューモード（ホバーカード）
 ```yaml
 依存: TASK-303
 並列可: TASK-310
@@ -958,7 +958,7 @@ frontend/hooks/useDrawingSave.ts
 
 ---
 
-### [TASK-310] ショートカットと方向ルールの単体テスト 🚀
+### [TASK-310] ショートカットと方向ルールの単体テスト
 ```yaml
 依存: TASK-302, TASK-303
 並列可: TASK-308
@@ -982,7 +982,7 @@ frontend/hooks/useDrawingSave.ts
 
 ---
 
-### [TASK-311] 集計・アンダーバー（数量/座標/寸法） 🚀
+### [TASK-311] 集計・アンダーバー（数量/座標/寸法）
 ```yaml
 依存: TASK-301, TASK-306
 並列可: なし
@@ -1563,18 +1563,13 @@ git checkout -b feature/105-api-integration
 #### Phase 3: 作図機能（最大5並列）
 
 **第1波（並列度: 3）**:
-- TASK-301（キャンバス基盤・UI）
-- TASK-302（モード切替）
-- TASK-309（保存・自動保存）
+- TASK-301（Konva基盤）
+- TASK-302（ツールパネル）
+- TASK-303（プロパティ）
 
 **第2波（並列度: 2）**:
-- TASK-303（サックスCore）
-- TASK-304（サックスUI）
-
-**第3波（並列度: 3）**:
-- TASK-305（編集ポップ）
-- TASK-306（柱高さ/集計）
-- TASK-307（メモ）
+- TASK-305（割付ロジック）
+- TASK-307（DXF出力）
 
 ---
 

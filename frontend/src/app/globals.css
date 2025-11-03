@@ -386,7 +386,9 @@
   html:not(.dark) .bulk-pillar-quantity-card,
   html:not(.dark) .memo-card,
   html:not(.dark) .save-modal-card,
-  html:not(.dark) .reset-modal-card {
+  html:not(.dark) .reset-modal-card,
+  html:not(.dark) .project-save-card,
+  html:not(.dark) .png-preview-modal {
     background-color: rgba(255, 255, 255, 0.95) !important;
   }
   html:not(.dark) .pillar-quantity-card::before,
@@ -400,7 +402,9 @@
   html:not(.dark) .bulk-pillar-quantity-card::before,
   html:not(.dark) .memo-card::before,
   html:not(.dark) .save-modal-card::before,
-  html:not(.dark) .reset-modal-card::before {
+  html:not(.dark) .reset-modal-card::before,
+  html:not(.dark) .project-save-card::before,
+  html:not(.dark) .png-preview-modal::before {
     display: none !important;
   }
   /* 保存フォーマットカードのライトモード時の白背景強制 */

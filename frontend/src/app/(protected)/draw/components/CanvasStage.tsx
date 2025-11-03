@@ -13,7 +13,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Group, Rect, Transformer } from 'react-konva';
+import { Stage, Layer, Group, Rect, Transformer, Line } from 'react-konva';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import { generateScaffoldSpan } from '@/lib/sax/spanGenerator';
@@ -38,6 +38,10 @@ import ViewModeInfoCard from './ViewModeInfoCard';
 import AntiAddCard from './AntiAddCard';
 import DeleteSelectCard from './DeleteSelectCard';
 // 旧: BulkPillarQuantityCard は統合版へ移行
+import { useProjectStore } from '@/stores/projectStore';
+import { useDrawingSave } from '@/hooks/useDrawingSave';
+import { v4 as uuidv4 } from 'uuid';
+import { registerStage } from '@/lib/canvasStageRegistry';
 
 /**
  * CanvasStageコンポーネント
@@ -87,9 +91,29 @@ export default function CanvasStage() {
     updateMemo,
     selectedMemoId,
     setSelectedMemoId,
+    // 投げ縄モード関連
+    lassoGlowColor,
+    lassoSelectionArea,
+    setLassoSelectionArea,
+    selectScaffoldParts,
   } = useDrawingStore();
 
   const { currentMode } = useDrawingModeStore();
+
+  // プロジェクトID取得（ダッシュボード等で選択済み前提）
+  const { currentProject } = useProjectStore();
+  // 自動保存フック（10秒 or 10アクション）
+  useDrawingSave({ intervalMs: 10_000, actionThreshold: 10 });
+
+  // Stageのグローバル登録（PNGプレビュー/エクスポート用）
+  useEffect(() => {
+    if (stageRef.current) {
+      registerStage(stageRef.current);
+    }
+    return () => {
+      registerStage(null);
+    };
+  }, []);
 
   // 布材分割ドラッグのプレビュー状態
   const [clothSplit, setClothSplit] = useState<
@@ -141,6 +165,13 @@ export default function CanvasStage() {
     x: number;
     y: number;
   } | null>(null);
+
+  // 投げ縄モード用の状態
+  const [isDrawingLasso, setIsDrawingLasso] = useState(false);
+  const [lassoPath, setLassoPath] = useState<{ x: number; y: number }[]>([]);
+  // パフォーマンス向上のため、パスをrefで保持
+  const lassoPathRef = useRef<{ x: number; y: number }[]>([]);
+  const lastUpdateTimeRef = useRef<number>(0);
 
   // メモ編集カードの状態
   const [memoCard, setMemoCard] = useState<{
@@ -739,6 +770,42 @@ export default function CanvasStage() {
       }
       if (editTargetType === 'アンチ') {
         e.preventDefault();
+        // 緑発光（アンチ未接ブラケット）が選択されていれば、追加カード（bulk/add）を開く
+        const findNoAntiBrackets = () => {
+          const result = new Set<string>();
+          for (const group of scaffoldGroups) {
+            const antiParts = group.parts.filter((p) => p.type === 'アンチ');
+            const bracketParts = group.parts.filter((p) => p.type === 'ブラケット');
+            for (const b of bracketParts) {
+              const bOff = Number(b.meta?.offsetMm);
+              if (!isFinite(bOff)) continue;
+              const bDirDeg = Number(b.meta?.direction ?? 0);
+              const bN = { x: Math.cos((bDirDeg * Math.PI) / 180), y: Math.sin((bDirDeg * Math.PI) / 180) };
+              const sideThresholdPx = mmToPx(80, DEFAULT_SCALE);
+              const touching = antiParts.some((a) => {
+                const aOff = Number(a.meta?.offsetMm ?? 0);
+                const aLen = Number(a.meta?.length ?? 0);
+                if (!(aLen > 0 && bOff >= aOff - 1e-6 && bOff <= aOff + aLen + 1e-6)) return false;
+                const dx = a.position.x - b.position.x;
+                const dy = a.position.y - b.position.y;
+                const dot = dx * bN.x + dy * bN.y;
+                return dot > sideThresholdPx;
+              });
+              if (!touching) result.add(`${group.id}:${b.id}`);
+            }
+          }
+          return result;
+        };
+        const noAntiSet = findNoAntiBrackets();
+        const selected = useDrawingStore.getState().selectedScaffoldPartKeys;
+        const selectedNoAnti = selected.filter((k) => noAntiSet.has(k));
+        if (selectedNoAnti.length > 0) {
+          useDrawingStore.getState().setBulkAntiScope('selected');
+          useDrawingStore.getState().setBulkAntiAction('add');
+          setEditSelectionMode('bulk');
+          return;
+        }
+        // 既存の段数/数量向け（青/黄）
         useDrawingStore.getState().setBulkAntiScope('selected');
         useDrawingStore.getState().setBulkAntiAction('level');
         setEditSelectionMode('bulk');
@@ -923,6 +990,33 @@ export default function CanvasStage() {
       return;
     }
 
+    // 投げ縄モードでの囲い作成開始
+    if (currentMode === 'edit' && editSelectionMode === 'lasso' && lassoGlowColor && !isPanning) {
+      // キャンバス座標系に変換（スケールとポジションを考慮）
+      let canvasX = (pos.x - canvasPosition.x) / canvasScale;
+      let canvasY = (pos.y - canvasPosition.y) / canvasScale;
+
+      // 投げ縄モード時はグリッドスナップを無効化（自由な描画のため）
+      // if (snapToGrid) {
+      //   const snapped = snapPositionToGrid(
+      //     { x: canvasX, y: canvasY },
+      //     gridSize,
+      //     DEFAULT_SCALE
+      //   );
+      //   canvasX = snapped.x;
+      //   canvasY = snapped.y;
+      // }
+
+      setIsDrawingLasso(true);
+      setLassoPath([{ x: canvasX, y: canvasY }]);
+      lassoPathRef.current = [{ x: canvasX, y: canvasY }];
+      lastUpdateTimeRef.current = Date.now();
+      // カーソルをペン描画モードに変更
+      const container = stage.container();
+      container.style.cursor = 'crosshair';
+      return;
+    }
+
     // パンモード時のドラッグ開始
     if (isPanning) {
       setLastPointerPosition(pos);
@@ -950,8 +1044,8 @@ export default function CanvasStage() {
     let canvasX = (pos.x - canvasPosition.x) / canvasScale;
     let canvasY = (pos.y - canvasPosition.y) / canvasScale;
 
-    // グリッドスナップが有効な場合、座標をスナップ
-    if (snapToGrid) {
+    // グリッドスナップが有効な場合、座標をスナップ（投げ縄モード時は無効化）
+    if (snapToGrid && !(currentMode === 'edit' && editSelectionMode === 'lasso' && isDrawingLasso)) {
       const snapped = snapPositionToGrid(
         { x: canvasX, y: canvasY },
         gridSize,
@@ -999,6 +1093,40 @@ export default function CanvasStage() {
     // メモ作成中のプレビュー更新
     if (isDrawingMemo) {
       setMemoCurrent({ x: canvasX, y: canvasY });
+      return;
+    }
+
+    // 投げ縄モードでの囲い作成中のプレビュー更新
+    if (isDrawingLasso) {
+      // マウス移動時に点を追加（滑らかな描画のため距離制限を緩和）
+      const canvasX = (pos.x - canvasPosition.x) / canvasScale;
+      const canvasY = (pos.y - canvasPosition.y) / canvasScale;
+      
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+      
+      // パフォーマンス向上のため、refで直接更新し、適度な間隔でstateを更新
+      if (lassoPathRef.current.length > 0) {
+        const lastPoint = lassoPathRef.current[lassoPathRef.current.length - 1];
+        const distance = Math.sqrt(
+          Math.pow(canvasX - lastPoint.x, 2) + Math.pow(canvasY - lastPoint.y, 2)
+        );
+        // 前の点から0.1px以上離れている場合のみ点を追加（より滑らかな描画）
+        if (distance > 0.1 / canvasScale) {
+          lassoPathRef.current.push({ x: canvasX, y: canvasY });
+          
+          // 16ms（約60fps）ごとにstateを更新して描画を更新
+          if (timeSinceLastUpdate >= 16) {
+            setLassoPath([...lassoPathRef.current]);
+            lastUpdateTimeRef.current = now;
+          }
+        }
+      } else {
+        // 最初の点を追加
+        lassoPathRef.current = [{ x: canvasX, y: canvasY }];
+        setLassoPath([{ x: canvasX, y: canvasY }]);
+        lastUpdateTimeRef.current = now;
+      }
       return;
     }
 
@@ -1125,6 +1253,426 @@ export default function CanvasStage() {
       return;
     }
 
+    // 投げ縄モードでの囲い作成完了時の処理
+    if (isDrawingLasso && lassoPathRef.current.length > 0 && lassoGlowColor) {
+      // 最終的なパスをstateに反映
+      setLassoPath([...lassoPathRef.current]);
+      
+      // カーソルを元に戻す
+      const stage = stageRef.current;
+      if (stage) {
+        const container = stage.container();
+        container.style.cursor = 'default';
+      }
+
+      // パスが2点未満の場合は処理をスキップ
+      if (lassoPathRef.current.length < 2) {
+        setIsDrawingLasso(false);
+        setLassoPath([]);
+        lassoPathRef.current = [];
+        return;
+      }
+
+      // パスを閉じた形状として扱う（開始点と終了点を結ぶ）
+      const closedPath = [...lassoPathRef.current, lassoPathRef.current[0]];
+
+      // パスをストアに保存
+      setLassoSelectionArea(null); // 互換性のため
+      useDrawingStore.getState().setLassoPath(closedPath);
+
+      // 点とポリゴンの内外判定（ray casting algorithm）
+      const pointInPolygon = (px: number, py: number, polygon: { x: number; y: number }[]) => {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+          const xi = polygon[i].x;
+          const yi = polygon[i].y;
+          const xj = polygon[j].x;
+          const yj = polygon[j].y;
+          const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      };
+
+      // ラインとポリゴンの交差判定（簡易版：ラインの複数点がポリゴン内にあるかチェック）
+      const lineIntersectsPolygon = (
+        line: { x1: number; y1: number; x2: number; y2: number },
+        polygon: { x: number; y: number }[]
+      ) => {
+        // ラインの端点がポリゴン内にあるかチェック
+        if (pointInPolygon(line.x1, line.y1, polygon) || pointInPolygon(line.x2, line.y2, polygon)) {
+          return true;
+        }
+        // ラインの中間点を複数チェック
+        const steps = 10;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = line.x1 + (line.x2 - line.x1) * t;
+          const y = line.y1 + (line.y2 - line.y1) * t;
+          if (pointInPolygon(x, y, polygon)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // 矩形とポリゴンの交差判定（簡易版：矩形の4頂点と中心点をチェック）
+      const rectIntersectsPolygon = (
+        rect: { x: number; y: number; width: number; height: number },
+        polygon: { x: number; y: number }[]
+      ) => {
+        const corners = [
+          { x: rect.x, y: rect.y },
+          { x: rect.x + rect.width, y: rect.y },
+          { x: rect.x + rect.width, y: rect.y + rect.height },
+          { x: rect.x, y: rect.y + rect.height },
+          { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, // 中心点
+        ];
+        return corners.some((corner) => pointInPolygon(corner.x, corner.y, polygon));
+      };
+
+      // 囲いの中にある選択された発光色の部材を検出
+      const selectedKeys: string[] = [];
+
+      // アンチ編集時: 緑（未接ブラケットの発光）を投げ縄選択した場合は、
+      // ブラケットの「アンチ未接」ラインを検出して複数対象を一括選択し、
+      // 追加カード（bulk/add）を開く。
+      if (editTargetType === 'アンチ' && lassoGlowColor === 'green') {
+        // ブラケットにアンチが接していないかを検出（ScaffoldRendererと同等ロジック）
+        const findNoAntiBrackets = () => {
+          const result: { groupId: string; bracket: any }[] = [];
+          for (const group of scaffoldGroups) {
+            const antiParts = group.parts.filter((p) => p.type === 'アンチ');
+            const bracketParts = group.parts.filter((p) => p.type === 'ブラケット');
+            for (const b of bracketParts) {
+              const bOff = Number(b.meta?.offsetMm);
+              if (!isFinite(bOff)) continue;
+              const bDirDeg = Number(b.meta?.direction ?? 0);
+              const bN = { x: Math.cos((bDirDeg * Math.PI) / 180), y: Math.sin((bDirDeg * Math.PI) / 180) };
+              const sideThresholdPx = mmToPx(80, DEFAULT_SCALE);
+              const touching = antiParts.some((a) => {
+                const aOff = Number(a.meta?.offsetMm ?? 0);
+                const aLen = Number(a.meta?.length ?? 0);
+                if (!(aLen > 0 && bOff >= aOff - 1e-6 && bOff <= aOff + aLen + 1e-6)) return false;
+                const dx = a.position.x - b.position.x;
+                const dy = a.position.y - b.position.y;
+                const dot = dx * bN.x + dy * bN.y;
+                return dot > sideThresholdPx; // 同側に十分離れて存在
+              });
+              if (!touching) result.push({ groupId: group.id, bracket: b });
+            }
+          }
+          return result;
+        };
+
+        const candidates = findNoAntiBrackets();
+        const toSelectKeys: string[] = [];
+        for (const { groupId, bracket } of candidates) {
+          const wMm = Number(bracket.meta?.width ?? (bracket.meta?.bracketSize === 'W' ? 600 : 355));
+          const dirDeg = Number(bracket.meta?.direction ?? 0);
+          const dir = { x: Math.cos((dirDeg * Math.PI) / 180), y: Math.sin((dirDeg * Math.PI) / 180) };
+          const wPx = mmToPx(wMm, DEFAULT_SCALE);
+          const tip = { x: bracket.position.x + dir.x * wPx, y: bracket.position.y + dir.y * wPx };
+          const seg = { x1: bracket.position.x, y1: bracket.position.y, x2: tip.x, y2: tip.y };
+          if (lineIntersectsPolygon(seg, closedPath)) {
+            toSelectKeys.push(`${groupId}:${bracket.id}`);
+          }
+        }
+        if (toSelectKeys.length > 0) {
+          // 一括追加（add）用に選択セット＆モードを切替
+          selectScaffoldParts(toSelectKeys);
+          useDrawingStore.getState().setBulkAntiScope('selected');
+          useDrawingStore.getState().setBulkAntiAction('add');
+          setEditSelectionMode('bulk');
+          // 投げ縄作成状態をリセット
+          setIsDrawingLasso(false);
+          setLassoPath([]);
+          lassoPathRef.current = [];
+          lastUpdateTimeRef.current = 0;
+          return;
+        }
+        // 対象なし: 通常の選択なしと同様に処理継続（下のselectedKeysは空）
+      }
+      const glowColorMap: Record<string, string> = {
+        yellow: '#FACC15',
+        blue: '#60A5FA',
+        green: '#34D399',
+      };
+      const targetGlowColor = glowColorMap[lassoGlowColor];
+
+      for (const group of scaffoldGroups) {
+        for (const part of group.parts) {
+          // 部材の種類に応じて発光色を判定
+          let partGlowColor: string | null = null;
+          
+          if (editTargetType === '柱' && part.type === '柱') {
+            // 柱編集時の黄色発光
+            partGlowColor = '#FACC15';
+          } else if (editTargetType === '柱' && part.type === 'ブラケット') {
+            // 柱編集時の青色発光（ブラケットの先端: 柱作図用）
+            partGlowColor = '#60A5FA';
+          } else if (editTargetType === '布材' && part.type === '布材') {
+            // 布材編集時の黄色発光
+            partGlowColor = '#FACC15';
+          } else if (editTargetType === 'ブラケット' && part.type === 'ブラケット') {
+            // ブラケット編集時の黄色発光
+            partGlowColor = '#FACC15';
+          } else if (editTargetType === 'ブラケット' && part.type === '柱') {
+            // ブラケット編集時の青色発光（柱）
+            partGlowColor = '#60A5FA';
+          } else if (editTargetType === '階段' && part.type === '布材') {
+            // 階段編集時の黄色発光（通常）または緑色発光（反対側600mm）
+            const lengthMm = Number(part.meta?.length ?? 0);
+            if (lengthMm === 600) {
+              // 反対側600mm布材は緑色発光（判定は複雑なので簡易的に）
+              partGlowColor = '#34D399';
+            } else {
+              // その他の布材は黄色発光
+              partGlowColor = '#FACC15';
+            }
+          } else if (editTargetType === 'アンチ' && part.type === 'アンチ') {
+            // アンチ編集時の発光色判定
+            // 中点位置を計算して判定
+            const antiMidX = part.position.x;
+            const antiMidY = part.position.y;
+            // 同一グループ内の布材の中点と一致するかチェック
+            const cloths = group.parts.filter((p) => p.type === '布材');
+            let hasMatchingClothMid = false;
+            for (const cloth of cloths) {
+              const clothLengthMm = Number(cloth.meta?.length ?? 0);
+              if (clothLengthMm === 0) continue;
+              const dirDeg = Number(cloth.meta?.direction ?? 0);
+              const dir = { x: Math.cos((dirDeg * Math.PI) / 180), y: Math.sin((dirDeg * Math.PI) / 180) };
+              const lengthPx = mmToPx(clothLengthMm, DEFAULT_SCALE);
+              const midX = cloth.position.x + dir.x * (lengthPx / 2);
+              const midY = cloth.position.y + dir.y * (lengthPx / 2);
+              const dist = Math.sqrt(Math.pow(antiMidX - midX, 2) + Math.pow(antiMidY - midY, 2));
+              // 10px以内なら一致とみなす
+              if (dist < 10) {
+                hasMatchingClothMid = true;
+                break;
+              }
+            }
+            if (hasMatchingClothMid) {
+              // 青色発光（中点）
+              partGlowColor = '#60A5FA';
+            } else {
+              // 黄色発光（通常のアンチ）
+              partGlowColor = '#FACC15';
+            }
+          } else if (editTargetType === 'ハネ' && part.type === '柱') {
+            // 羽編集時の黄色発光（柱）
+            partGlowColor = '#FACC15';
+          }
+
+          // 選択された発光色と一致する場合のみ、囲いの中にあるかチェック
+          if (partGlowColor === targetGlowColor) {
+            let isInside = false;
+
+            // 青色発光の場合、先端位置または中点位置で判定
+            if (partGlowColor === '#60A5FA') {
+              if (part.type === '柱') {
+                // 柱は位置だけで判定
+                isInside = pointInPolygon(part.position.x, part.position.y, closedPath);
+              } else if (part.type === 'ブラケット') {
+                // ブラケットの先端位置を計算して判定
+                const bracketWidthMm = part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355);
+                const bracketDirDeg = Number(part.meta?.direction ?? 0);
+                const dir = { x: Math.cos((bracketDirDeg * Math.PI) / 180), y: Math.sin((bracketDirDeg * Math.PI) / 180) };
+                const widthPx = mmToPx(bracketWidthMm, DEFAULT_SCALE);
+                const tipX = part.position.x + dir.x * widthPx;
+                const tipY = part.position.y + dir.y * widthPx;
+                isInside = pointInPolygon(tipX, tipY, closedPath);
+              } else if (part.type === 'アンチ') {
+                // アンチの位置（これが中点位置）で判定
+                isInside = pointInPolygon(part.position.x, part.position.y, closedPath);
+              } else {
+                // その他の部材は位置だけで判定
+                isInside = pointInPolygon(part.position.x, part.position.y, closedPath);
+              }
+            } else {
+              // 黄色・緑色発光の場合、通常の判定
+              if (part.type === '柱') {
+                // 柱は位置だけで判定
+                isInside = pointInPolygon(part.position.x, part.position.y, closedPath);
+              } else if (part.type === '布材') {
+                // 布材はラインなので、ラインの一部が囲いの中にあるかチェック
+                const lengthMm = Number(part.meta?.length ?? 0);
+                const dirDeg = Number(part.meta?.direction ?? 0);
+                const dir = { x: Math.cos((dirDeg * Math.PI) / 180), y: Math.sin((dirDeg * Math.PI) / 180) };
+                const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+                const line = {
+                  x1: part.position.x,
+                  y1: part.position.y,
+                  x2: part.position.x + dir.x * lengthPx,
+                  y2: part.position.y + dir.y * lengthPx,
+                };
+                isInside = lineIntersectsPolygon(line, closedPath);
+              } else if (part.type === 'ブラケット') {
+                // ブラケットは位置だけで判定（簡易的）
+                isInside = pointInPolygon(part.position.x, part.position.y, closedPath);
+              } else if (part.type === 'アンチ') {
+                // アンチは矩形なので、矩形の交差をチェック
+                const lengthMm = Number(part.meta?.length ?? 0);
+                const widthMm = Number(part.meta?.width ?? 400);
+                const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+                const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+                const antiRect = {
+                  x: part.position.x - lengthPx / 2,
+                  y: part.position.y - widthPx / 2,
+                  width: lengthPx,
+                  height: widthPx,
+                };
+                isInside = rectIntersectsPolygon(antiRect, closedPath);
+              } else {
+                // その他の部材は位置だけで判定
+                isInside = pointInPolygon(part.position.x, part.position.y, closedPath);
+              }
+            }
+
+            if (isInside) {
+              selectedKeys.push(`${group.id}:${part.id}`);
+            }
+          }
+        }
+      }
+
+      // 選択された部材をストアに設定
+      selectScaffoldParts(selectedKeys);
+
+      // 柱編集時に青色発光（ブラケットの先端）を選択した場合、柱を自動作図
+      if (editTargetType === '柱' && lassoGlowColor === 'blue' && selectedKeys.length > 0) {
+        // 選択されたブラケットの先端位置に柱を作図
+        for (const key of selectedKeys) {
+          const [groupId, partId] = key.split(':');
+          const group = scaffoldGroups.find((g) => g.id === groupId);
+          if (!group) continue;
+          const part = group.parts.find((p) => p.id === partId);
+          if (!part || part.type !== 'ブラケット') continue;
+
+          // ブラケットの先端位置を計算
+          const bracketWidthMm = part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355);
+          const bracketDirDeg = Number(part.meta?.direction ?? 0);
+          const dir = { x: Math.cos((bracketDirDeg * Math.PI) / 180), y: Math.sin((bracketDirDeg * Math.PI) / 180) };
+          const widthPx = mmToPx(bracketWidthMm, DEFAULT_SCALE);
+          const tipX = part.position.x + dir.x * widthPx;
+          const tipY = part.position.y + dir.y * widthPx;
+
+          // 既存の柱があるかチェック（重複回避）
+          const existingPillar = group.parts.find(
+            (p) =>
+              p.type === '柱' &&
+              Math.abs(p.position.x - tipX) < 1 &&
+              Math.abs(p.position.y - tipY) < 1
+          );
+
+          if (!existingPillar) {
+            // 新しい柱を作成
+            const newPillar = {
+              id: uuidv4(),
+              type: '柱' as const,
+              position: { x: tipX, y: tipY },
+              color: part.color,
+              marker: 'circle' as const,
+              meta: {
+                direction: part.meta?.direction,
+                offsetMm: part.meta?.offsetMm,
+              },
+            };
+            updateScaffoldGroup(group.id, {
+              parts: [...group.parts, newPillar],
+            });
+          }
+        }
+        // 柱作成後は選択をクリア
+        selectScaffoldParts([]);
+        // 投げ縄作成状態をリセット
+        setIsDrawingLasso(false);
+        setLassoPath([]);
+        lassoPathRef.current = [];
+        lastUpdateTimeRef.current = 0;
+        return;
+      }
+
+      // 選択された部材が1件以上の場合、一括編集カードを表示
+      if (selectedKeys.length > 0) {
+        if (editTargetType === '柱') {
+          setBulkPillarScope('selected');
+          setEditSelectionMode('bulk');
+        } else if (editTargetType === '布材') {
+          setBulkClothScope('selected');
+          setEditSelectionMode('bulk');
+        } else if (editTargetType === 'ブラケット') {
+          setBulkBracketScope('selected');
+          setEditSelectionMode('bulk');
+        } else if (editTargetType === 'アンチ') {
+          // アンチ編集時の緑色発光（アンチ未接ブラケット）を囲った場合の処理
+          if (lassoGlowColor === 'green') {
+            // 緑色発光（アンチ未接ブラケット）が選択されている場合、追加カードを表示
+            const findNoAntiBrackets = () => {
+              const result = new Set<string>();
+              for (const group of scaffoldGroups) {
+                const antiParts = group.parts.filter((p) => p.type === 'アンチ');
+                const bracketParts = group.parts.filter((p) => p.type === 'ブラケット');
+                for (const b of bracketParts) {
+                  const bOff = Number(b.meta?.offsetMm);
+                  if (!isFinite(bOff)) continue;
+                  const bDirDeg = Number(b.meta?.direction ?? 0);
+                  const bN = { x: Math.cos((bDirDeg * Math.PI) / 180), y: Math.sin((bDirDeg * Math.PI) / 180) };
+                  const sideThresholdPx = mmToPx(80, DEFAULT_SCALE);
+                  const touching = antiParts.some((a) => {
+                    const aOff = Number(a.meta?.offsetMm ?? 0);
+                    const aLen = Number(a.meta?.length ?? 0);
+                    if (!(aLen > 0 && bOff >= aOff - 1e-6 && bOff <= aOff + aLen + 1e-6)) return false;
+                    const dx = a.position.x - b.position.x;
+                    const dy = a.position.y - b.position.y;
+                    const dot = dx * bN.x + dy * bN.y;
+                    return dot > sideThresholdPx;
+                  });
+                  if (!touching) result.add(`${group.id}:${b.id}`);
+                }
+              }
+              return result;
+            };
+            const noAntiSet = findNoAntiBrackets();
+            const selectedNoAnti = selectedKeys.filter((k) => noAntiSet.has(k));
+            if (selectedNoAnti.length > 0) {
+              useDrawingStore.getState().setBulkAntiScope('selected');
+              useDrawingStore.getState().setBulkAntiAction('add');
+              setEditSelectionMode('bulk');
+            } else {
+              // 緑色発光だがアンチ未接ブラケットではない場合（通常のアンチ）
+              useDrawingStore.getState().setBulkAntiScope('selected');
+              useDrawingStore.getState().setBulkAntiAction('quantity');
+              setEditSelectionMode('bulk');
+            }
+          } else {
+            // アンチの一括カードは発光色に合わせて種類を出し分け
+            // - 黄色: 枚数（quantity）
+            // - 青色: 段数（level）
+            useDrawingStore.getState().setBulkAntiScope('selected');
+            useDrawingStore
+              .getState()
+              .setBulkAntiAction(lassoGlowColor === 'yellow' ? 'quantity' : 'level');
+            setEditSelectionMode('bulk');
+          }
+        } else if (editTargetType === 'ハネ') {
+          // 羽編集モード時、一括編集カードを表示
+          setEditSelectionMode('bulk');
+        } else if (editTargetType === '階段') {
+          // 階段編集モード時、一括編集カードを表示（必要に応じて実装）
+          setEditSelectionMode('bulk');
+        }
+      }
+
+      // 投げ縄作成状態をリセット
+      setIsDrawingLasso(false);
+      setLassoPath([]);
+      lassoPathRef.current = [];
+      lastUpdateTimeRef.current = 0;
+      return;
+    }
+
     // パンモード時のドラッグ終了
     if (isPanning) {
       const stage = stageRef.current;
@@ -1163,6 +1711,25 @@ export default function CanvasStage() {
 
         {/* 足場レイヤー（メイン作図領域） */}
         <Layer name="scaffold-layer">
+          {/* 投げ縄モードでの囲いプレビュー（紫点線の自由形状） */}
+          {isDrawingLasso && lassoPath.length > 0 && (
+            <Group>
+              <Line
+                points={lassoPath.flatMap((p) => [p.x, p.y])}
+                closed={lassoPath.length > 2}
+                fill="rgba(168, 85, 247, 0.15)"
+                stroke="#A855F7"
+                strokeWidth={2.5 / canvasScale}
+                dash={[6 / canvasScale, 4 / canvasScale]}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                shadowBlur={4 / canvasScale}
+                shadowColor="rgba(168, 85, 247, 0.3)"
+                shadowOpacity={0.5}
+              />
+            </Group>
+          )}
           {/* スパン描画プレビュー */}
           <SaxTool
             startPoint={spanStart}
@@ -1726,18 +2293,88 @@ export default function CanvasStage() {
         />
       )}
 
-      {/* アンチの一括カード（数量 or 段数） */}
+      {/* アンチの一括カード（数量/段数/追加） */}
       {currentMode === 'edit' && editTargetType === 'アンチ' && editSelectionMode === 'bulk' && (() => {
         const { bulkAntiScope, bulkAntiAction } = useDrawingStore.getState();
-        if (!(selectedScaffoldPartKeys.length > 0 || bulkAntiScope === 'all')) return null;
+        // 追加（add）は選択がなくても 'all' の場合に開く
+        if (bulkAntiAction !== 'add' && !(selectedScaffoldPartKeys.length > 0 || bulkAntiScope === 'all')) return null;
+
+        // アンカー（既定：画面中央／選択があればその位置）
         let anchorCanvas = { x: stageSize.width / 2 / canvasScale, y: stageSize.height / 2 / canvasScale };
         const firstKey = selectedScaffoldPartKeys[0];
         const [gid, pid] = firstKey?.split(':') ?? [];
         const g = scaffoldGroups.find((gg) => gg.id === gid);
         const p = g?.parts.find((pp) => pp.id === pid);
-        if (g && p && p.type === 'アンチ') {
+        if (g && p) {
           anchorCanvas = { x: p.position.x, y: p.position.y };
         }
+
+        if (bulkAntiAction === 'add') {
+          // 緑発光（アンチ未接ブラケット）対象の抽出
+          const noAntiKeys = new Set<string>();
+          const bracketMap = new Map<string, { groupId: string; part: any }>();
+          for (const gg of scaffoldGroups) {
+            const antiParts = gg.parts.filter((pp) => pp.type === 'アンチ');
+            const bracketParts = gg.parts.filter((pp) => pp.type === 'ブラケット');
+            for (const b of bracketParts) {
+              const bOff = Number(b.meta?.offsetMm);
+              if (!isFinite(bOff)) continue;
+              const bDirDeg = Number(b.meta?.direction ?? 0);
+              const bN = { x: Math.cos((bDirDeg * Math.PI) / 180), y: Math.sin((bDirDeg * Math.PI) / 180) };
+              const sideThresholdPx = mmToPx(80, DEFAULT_SCALE);
+              const touching = antiParts.some((a) => {
+                const aOff = Number(a.meta?.offsetMm ?? 0);
+                const aLen = Number(a.meta?.length ?? 0);
+                if (!(aLen > 0 && bOff >= aOff - 1e-6 && bOff <= aOff + aLen + 1e-6)) return false;
+                const dx = a.position.x - b.position.x;
+                const dy = a.position.y - b.position.y;
+                const dot = dx * bN.x + dy * bN.y;
+                return dot > sideThresholdPx;
+              });
+              if (!touching) {
+                const key = `${gg.id}:${b.id}`;
+                noAntiKeys.add(key);
+                bracketMap.set(key, { groupId: gg.id, part: b });
+              }
+            }
+          }
+
+          // 対象（選択 or 全体）を作成
+          const targets: { groupId: string; bracketId: string }[] = [];
+          if (bulkAntiScope === 'all') {
+            for (const key of noAntiKeys) {
+              const [gId, pId] = key.split(':');
+              targets.push({ groupId: gId, bracketId: pId });
+            }
+          } else {
+            for (const key of selectedScaffoldPartKeys) {
+              if (noAntiKeys.has(key)) {
+                const [gId, pId] = key.split(':');
+                targets.push({ groupId: gId, bracketId: pId });
+              }
+            }
+          }
+
+          if (targets.length === 0) return null;
+          // アンカー：最初の対象の位置
+          const t0 = bracketMap.get(`${targets[0].groupId}:${targets[0].bracketId}`);
+          if (t0) anchorCanvas = { x: t0.part.position.x, y: t0.part.position.y };
+
+          return (
+            <AntiAddCard
+              kind="bulk"
+              targets={targets}
+              screenPosition={{
+                left: anchorCanvas.x * canvasScale + canvasPosition.x + 12,
+                top: anchorCanvas.y * canvasScale + canvasPosition.y + 12,
+              }}
+              onClose={() => setEditSelectionMode('select')}
+              onCreated={() => setEditSelectionMode('select')}
+            />
+          );
+        }
+
+        // 既存の段数/数量
         return bulkAntiAction === 'level' ? (
           <AntiLevelCardUnified
             kind="bulk"

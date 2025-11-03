@@ -57,9 +57,17 @@ export interface ActionButtonsProps {
    * 追加でボタンを非活性にしたい場合に使用
    */
   disabled?: boolean;
+  /**
+   * 作図ボタンの直下に小さく表示する補助ラベル（例: 最終保存日時）
+   */
+  drawSubLabel?: string;
+  /**
+   * 見積ボタンの直下に小さく表示する補助ラベル（例: 最終更新日時）
+   */
+  estimateSubLabel?: string;
 }
 
-export function ActionButtons({ projectId, disabled = false }: ActionButtonsProps) {
+export function ActionButtons({ projectId, disabled = false, drawSubLabel, estimateSubLabel }: ActionButtonsProps) {
   const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
 
@@ -81,27 +89,42 @@ export function ActionButtons({ projectId, disabled = false }: ActionButtonsProp
   const isDisabled = disabled || isPending;
 
   return (
-    <div className="flex items-center gap-3">
-      <Button
-        size="icon"
-        className="h-12 w-12 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#6366F1] text-white shadow-lg hover:from-[#0EA5E9] hover:to-[#6366F1]"
-        onClick={() => handleNavigate(`/projects/${projectId}/draw`)}
-        disabled={isDisabled}
-        isLoading={isPending}
-        iconLeft={drawIcon}
-      >
-        <span className="sr-only">作図へ進む</span>
-      </Button>
-      <Button
-        size="icon"
-        className="h-12 w-12 rounded-xl bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-lg hover:from-[#6366F1] hover:to-[#7C3AED]"
-        onClick={() => handleNavigate(`/projects/${projectId}/estimate`)}
-        disabled={isDisabled}
-        isLoading={isPending}
-        iconLeft={estimateIcon}
-      >
-        <span className="sr-only">見積へ進む</span>
-      </Button>
+    <div className="flex flex-col items-start gap-4">
+      <div className="flex flex-col items-start">
+        <Button
+          size="icon"
+          className="h-12 w-12 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#6366F1] text-white shadow-lg hover:from-[#0EA5E9] hover:to-[#6366F1]"
+          onClick={() => handleNavigate(`/projects/${projectId}/draw`)}
+          disabled={isDisabled}
+          isLoading={isPending}
+          iconLeft={drawIcon}
+        >
+          <span className="sr-only">作図へ進む</span>
+        </Button>
+        {drawSubLabel ? (
+          <span className="mt-1 text-[11px] leading-none text-gray-600 dark:text-gray-300 whitespace-nowrap">
+            {drawSubLabel}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-start">
+        <Button
+          size="icon"
+          className="h-12 w-12 rounded-xl bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-lg hover:from-[#6366F1] hover:to-[#7C3AED]"
+          onClick={() => handleNavigate(`/projects/${projectId}/estimate`)}
+          disabled={isDisabled}
+          isLoading={isPending}
+          iconLeft={estimateIcon}
+        >
+          <span className="sr-only">見積へ進む</span>
+        </Button>
+        {estimateSubLabel ? (
+          <span className="mt-1 text-[11px] leading-none text-gray-600 dark:text-gray-300 whitespace-nowrap">
+            {estimateSubLabel}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

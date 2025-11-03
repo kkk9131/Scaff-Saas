@@ -8,15 +8,19 @@
  * - ライト/ダークモード切り替え
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Image as ImageIcon } from 'lucide-react';
+import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Image as ImageIcon, Upload } from 'lucide-react';
 import { ConfirmModal, Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import PngPreviewModal from './PngPreviewModal';
+import { useProjectStore } from '@/stores/projectStore';
+import type { Project } from '@/types/project';
+import { getProjects } from '@/lib/api/projects';
 
 /**
  * Headerコンポーネント
@@ -28,7 +32,18 @@ export default function Header() {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isPngPreviewOpen, setIsPngPreviewOpen] = useState(false);
+  // 追加: プロジェクト保存モーダル状態
+  const [isProjectSaveOpen, setIsProjectSaveOpen] = useState(false);
+  const [projectList, setProjectList] = useState<Project[]>([]);
+  const [projectLoading, setProjectLoading] = useState(false);
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [isSavingToProject, setIsSavingToProject] = useState(false);
+  const { currentProject } = useProjectStore();
   const isDark = theme === 'dark';
+  // JSONインポート用のinput参照
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const tooltipCls = `pointer-events-none absolute left-full top-1/2 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-50 ${
     isDark ? 'border-slate-700 bg-black text-white' : 'border-slate-300 bg-white text-black'
   }`;
@@ -69,6 +84,109 @@ export default function Header() {
     setIsSaveModalOpen(false);
     setIsPngPreviewOpen(true);
   }, []);
+
+  /**
+   * JSONインポート: ファイル選択ダイアログを開く
+   */
+  const handleImportClick = useCallback(() => {
+    const el = fileInputRef.current;
+    if (!el) return;
+    el.value = '';
+    el.click();
+  }, []);
+
+  /**
+   * JSONインポート: ファイル読み取り→ストアへ反映
+   */
+  const handleImportFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      try {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsImporting(true);
+        const text = await file.text();
+        // importFromJSON は exportToJSON 形式と互換
+        // 失敗時は例外→catchで通知
+        useDrawingStore.getState().importFromJSON(text);
+        alert('JSONを読み込みました。');
+      } catch (err) {
+        console.error('JSONインポート失敗:', err);
+        alert('JSONの読み込みに失敗しました。ファイル形式をご確認ください。');
+      } finally {
+        setIsImporting(false);
+      }
+    },
+    []
+  );
+
+  /**
+   * APIベースURL解決
+   * - NEXT_PUBLIC_API_URL（推奨）
+   * - NEXT_PUBLIC_API_BASE_URL（互換）
+   * - 未設定時は相対パス
+   */
+  const resolveApiBase = () =>
+    process.env.NEXT_PUBLIC_API_URL || (process.env as any).NEXT_PUBLIC_API_BASE_URL || '';
+
+  /**
+   * 「プロジェクトに保存」を選択時にプロジェクト一覧を取得してモーダルを開く
+   */
+  const openProjectSave = useCallback(async () => {
+    try {
+      setIsSaveModalOpen(false);
+      setProjectLoading(true);
+      setProjectError(null);
+      // 認証付きでプロジェクト一覧を取得
+      const resp = await getProjects(1, 100);
+      if (resp.error) {
+        setProjectError(resp.error.message || 'プロジェクト一覧の取得に失敗しました');
+        setProjectList([]);
+      } else {
+        const list = resp.data?.projects || [];
+        setProjectList(list);
+        // デフォルト選択は現在のプロジェクト、無ければ先頭
+        const initial = currentProject?.id || (list[0]?.id ?? '');
+        setSelectedProjectId(initial);
+      }
+    } catch (e: any) {
+      setProjectError(e?.message ?? 'プロジェクト一覧の取得に失敗しました');
+      setProjectList([]);
+    } finally {
+      setProjectLoading(false);
+      setIsProjectSaveOpen(true);
+    }
+  }, [currentProject?.id]);
+
+  /**
+   * プロジェクトに保存を実行
+   */
+  const handleSaveToProject = useCallback(async () => {
+    if (!selectedProjectId) return;
+    try {
+      setIsSavingToProject(true);
+      const jsonStr = exportToJSON();
+      const design_json = JSON.parse(jsonStr);
+      const apiBase = resolveApiBase();
+      const res = await fetch(`${apiBase}/api/drawings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ project_id: selectedProjectId, design_json }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      setIsProjectSaveOpen(false);
+      // 簡易通知
+      alert('プロジェクトに保存しました。');
+    } catch (e) {
+      console.error('プロジェクト保存に失敗しました', e);
+      alert('プロジェクト保存に失敗しました。もう一度お試しください。');
+    } finally {
+      setIsSavingToProject(false);
+    }
+  }, [exportToJSON, selectedProjectId]);
 
   // PNGエクスポート完了処理
   const handlePngExportComplete = useCallback(() => {
@@ -124,14 +242,25 @@ export default function Header() {
               <div className={tooltipCls} role="tooltip">やり直す (Ctrl+Y)</div>
             </button>
 
-            {/* 保存 */}
+          {/* 保存 */}
+          <button
+            onClick={handleSaveClick}
+            className="group relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all"
+            aria-label="保存 (Ctrl+S)"
+          >
+            <Save size={18} />
+            <div className={tooltipCls} role="tooltip">保存 (Ctrl+S)</div>
+          </button>
+
+            {/* インポート */}
             <button
-              onClick={handleSaveClick}
+              onClick={handleImportClick}
               className="group relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all"
-              aria-label="保存 (Ctrl+S)"
+              aria-label="インポート（JSON）"
+              disabled={isImporting}
             >
-              <Save size={18} />
-              <div className={tooltipCls} role="tooltip">保存 (Ctrl+S)</div>
+              <Upload size={18} />
+              <div className={tooltipCls} role="tooltip">インポート（JSON）</div>
             </button>
 
             {/* 区切り線 */}
@@ -160,6 +289,15 @@ export default function Header() {
       </div>
     </header>
 
+    {/* 隠しファイル入力（JSONインポート用） */}
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="application/json,.json"
+      className="hidden"
+      onChange={handleImportFileChange}
+    />
+
     {/* リセット確認モーダル */}
     <ConfirmModal
       isOpen={isResetModalOpen}
@@ -178,69 +316,69 @@ export default function Header() {
       isOpen={isSaveModalOpen}
       onClose={() => setIsSaveModalOpen(false)}
       title="保存形式を選択"
-      description="保存したい形式を選択してください"
       size="sm"
       className="save-modal-card"
       contentClassName="p-4"
       footer={
-        <button
-          onClick={() => setIsSaveModalOpen(false)}
-          className="px-4 py-2 text-sm bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20 rounded-lg border transition-colors"
-        >
-          キャンセル
-        </button>
+        <div className="flex items-center justify-between w-full">
+          {/* 左側: プロジェクトに保存ボタン */}
+          <Button
+            size="sm"
+            onClick={openProjectSave}
+            className="bg-gradient-to-r from-sky-500 via-sky-400 to-sky-600 !text-white shadow-[0_12px_32px_-16px_rgba(14,165,233,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(14,165,233,0.55)] hover:from-sky-600 hover:via-sky-500 hover:to-sky-700 dark:bg-sky-600 dark:hover:bg-sky-700"
+          >
+            <Save size={16} className="mr-2" />
+            プロジェクトに保存
+          </Button>
+          {/* 右側: キャンセルボタン */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsSaveModalOpen(false)}
+            className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
+          >
+            キャンセル
+          </Button>
+        </div>
       }
     >
-      <div className="grid grid-cols-2 gap-3">
-        {/* JSON保存カード */}
+      <div className="flex items-center justify-center gap-4">
+        {/* JSON保存ボタン */}
         <button
           onClick={handleSaveJSON}
           className={cn(
-            'group relative flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-white/40 shadow-sm transition-all',
+            'group relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-white/40 shadow-sm transition-all',
             'hover:border-primary/50 hover:bg-primary/5',
             'dark:hover:bg-primary/10',
             'dark:border-slate-700/50 dark:bg-slate-800/60',
             'cursor-pointer',
             'save-format-card'
           )}
+          aria-label="JSON形式で保存"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
-            <FileJson size={20} className="text-primary" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <FileJson size={24} className="text-primary" />
           </div>
-          <div className="text-center">
-            <h3 className="font-semibold text-sm mb-0.5 text-slate-900 dark:text-slate-100">JSON形式</h3>
-            <p className="text-xs text-slate-700 dark:text-slate-300">
-              作図データをJSON形式で保存します
-            </p>
-          </div>
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-200">JSON</span>
         </button>
 
-        {/* PNG保存カード */}
+        {/* PNG保存ボタン */}
         <button
           onClick={handleSavePNG}
           className={cn(
-            'group relative flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-white/40 shadow-sm transition-all',
+            'group relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-white/40 shadow-sm transition-all',
             'hover:border-primary/50 hover:bg-primary/5',
             'dark:hover:bg-primary/10',
             'dark:border-slate-700/50 dark:bg-slate-800/60',
             'cursor-pointer',
-            'opacity-60 cursor-not-allowed',
             'save-format-card'
           )}
-          disabled
-          aria-label="PNG保存（準備中）"
+          aria-label="PNG形式で保存"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-            <ImageIcon size={20} className="text-muted-foreground" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <ImageIcon size={24} className="text-primary" />
           </div>
-          <div className="text-center">
-            <h3 className="font-semibold text-sm mb-0.5 text-slate-900 dark:text-slate-100">PNG形式</h3>
-            <p className="text-xs text-slate-700 dark:text-slate-300">
-              画像として保存します
-              <br />
-              <span className="text-[10px] text-slate-600 dark:text-slate-400">（準備中）</span>
-            </p>
-          </div>
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-200">PNG</span>
         </button>
       </div>
     </Modal>
@@ -251,6 +389,72 @@ export default function Header() {
       onClose={() => setIsPngPreviewOpen(false)}
       onExport={handlePngExportComplete}
     />
+
+    {/* プロジェクト選択モーダル */}
+    <Modal
+      isOpen={isProjectSaveOpen}
+      onClose={() => setIsProjectSaveOpen(false)}
+      title="保存先のプロジェクトを選択"
+      description="保存先のプロジェクトを選び、「保存する」を押してください"
+      size="sm"
+      className="project-save-card glass-scope"
+      contentClassName="p-4"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsProjectSaveOpen(false)}
+            disabled={isSavingToProject}
+            className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
+          >
+            キャンセル
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSaveToProject}
+            disabled={!selectedProjectId || isSavingToProject}
+            className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 !text-white shadow-[0_12px_32px_-16px_rgba(16,185,129,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(16,185,129,0.55)] hover:from-emerald-600 hover:via-emerald-500 hover:to-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+          >
+            {isSavingToProject ? '保存中...' : '保存する'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        {currentProject ? (
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            現在のプロジェクト: <span className="font-semibold">{currentProject.name}</span>
+          </p>
+        ) : null}
+
+        {projectError ? (
+          <div className="text-sm text-red-600 dark:text-red-400">{projectError}</div>
+        ) : null}
+
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          保存先プロジェクト
+        </label>
+        <select
+          className="w-full rounded-lg border border-white/40 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/40 p-2 text-sm"
+          value={selectedProjectId}
+          onChange={(e) => setSelectedProjectId(e.target.value)}
+          disabled={projectLoading}
+        >
+          {projectLoading ? (
+            <option>読み込み中...</option>
+          ) : projectList.length === 0 ? (
+            <option value="">プロジェクトがありません</option>
+          ) : (
+            projectList.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+    </Modal>
     </>
   );
 }

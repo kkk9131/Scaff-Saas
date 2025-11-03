@@ -119,8 +119,8 @@ interface DrawingState {
    * - 'all': キャンバス内のすべてのブラケット
    */
   bulkBracketScope: 'selected' | 'all';
-  /** アンチ一括の動作種別（数量 or 段数） */
-  bulkAntiAction: 'quantity' | 'level';
+  /** アンチ一括の動作種別（数量/段数/追加） */
+  bulkAntiAction: 'quantity' | 'level' | 'add';
   /** 一括編集時の対象スコープ（アンチ） */
   bulkAntiScope: 'selected' | 'all';
   /**
@@ -129,6 +129,31 @@ interface DrawingState {
    * - 'all': キャンバス内のすべてのアンチ
    */
   bulkAntiScope: 'selected' | 'all';
+
+  /**
+   * 投げ縄モード時の発光色選択
+   * - 'yellow': 黄色発光（#FACC15）
+   * - 'blue': 青色発光（#60A5FA）
+   * - 'green': 緑色発光（#34D399）
+   * - null: 未選択
+   */
+  lassoGlowColor: 'yellow' | 'blue' | 'green' | null;
+
+  /**
+   * 投げ縄モード時のドラッグ範囲
+   * - 投げ縄モードでドラッグ中の囲い範囲を保存
+   */
+  lassoSelectionArea: {
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+  } | null;
+
+  /**
+   * 投げ縄モード時のパス（自由形状）
+   * - 投げ縄モードでドラッグ中のパスを保存
+   * - 点の配列として保存
+   */
+  lassoPath: { x: number; y: number }[] | null;
 
   // 足場グループ
   scaffoldGroups: ScaffoldGroup[];
@@ -195,14 +220,20 @@ interface DrawingState {
    * 同じモードをクリックした場合はnullに解除
    */
   setEditSelectionMode: (mode: 'select' | 'lasso' | 'bulk' | 'delete' | null) => void;
+  /** 投げ縄モード時の発光色を設定 */
+  setLassoGlowColor: (color: 'yellow' | 'blue' | 'green' | null) => void;
+  /** 投げ縄モード時のドラッグ範囲を設定 */
+  setLassoSelectionArea: (area: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
+  /** 投げ縄モード時のパスを設定 */
+  setLassoPath: (path: { x: number; y: number }[] | null) => void;
   /** 一括編集スコープ（柱）の設定 */
   setBulkPillarScope: (scope: 'selected' | 'all') => void;
   /** 一括編集スコープ（布材）の設定 */
   setBulkClothScope: (scope: 'selected' | 'all') => void;
   /** 一括編集スコープ（ブラケット）の設定 */
   setBulkBracketScope: (scope: 'selected' | 'all') => void;
-  /** 一括編集モード（アンチ）の動作を設定（数量/段数） */
-  setBulkAntiAction: (action: 'quantity' | 'level') => void;
+  /** 一括編集モード（アンチ）の動作を設定（数量/段数/追加） */
+  setBulkAntiAction: (action: 'quantity' | 'level' | 'add') => void;
   /** 一括編集スコープ（アンチ）の設定 */
   setBulkAntiScope: (scope: 'selected' | 'all') => void;
   /** 一括編集スコープ（アンチ）の設定 */
@@ -256,6 +287,13 @@ interface DrawingState {
    * @returns エクスポート用のJSONデータ
    */
   exportToJSON: () => string;
+
+  /**
+   * JSONから作図データをインポート
+   * - exportToJSON() が出力する構造、もしくはそれと同等のオブジェクトを受け取る
+   * - 既存の作図状態を上書きする
+   */
+  importFromJSON: (json: string | any) => void;
 }
 
 /**
@@ -299,6 +337,9 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   bulkAntiAction: 'quantity',
   bulkAntiScope: 'selected',
   bulkAntiScope: 'selected', // デフォルトは選択対象のみ
+  lassoGlowColor: null, // 投げ縄モード時の発光色は未選択
+  lassoSelectionArea: null, // 投げ縄モード時のドラッグ範囲は未設定（互換性のため残す）
+  lassoPath: null, // 投げ縄モード時のパスは未設定
 
   // UI状態の初期状態
   leftSidebarOpen: true, // デフォルトで左サイドバー表示
@@ -531,6 +572,13 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
       // 違うモードなら切り替え
       return { editSelectionMode: mode };
     }),
+
+  // 投げ縄モード時の発光色を設定
+  setLassoGlowColor: (color) => set({ lassoGlowColor: color }),
+  // 投げ縄モード時のドラッグ範囲を設定
+  setLassoSelectionArea: (area) => set({ lassoSelectionArea: area }),
+  // 投げ縄モード時のパスを設定
+  setLassoPath: (path) => set({ lassoPath: path }),
 
   // 一括編集スコープ（柱）を設定
   setBulkPillarScope: (scope) => set({ bulkPillarScope: scope }),
@@ -777,4 +825,59 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
     };
     return JSON.stringify(exportData, null, 2);
   },
+
+  // JSONから作図データをインポート
+  importFromJSON: (json) =>
+    set((state) => {
+      try {
+        // 文字列の場合はパース
+        const obj = typeof json === 'string' ? JSON.parse(json) : json;
+        const data = obj?.data ?? obj;
+
+        const scaffoldGroups = Array.isArray(data?.scaffoldGroups)
+          ? data.scaffoldGroups
+          : state.scaffoldGroups;
+        const memos = Array.isArray(data?.memos) ? data.memos : state.memos;
+        const elements = Array.isArray(data?.elements)
+          ? data.elements
+          : state.elements;
+
+        const canvas = data?.canvas ?? {};
+        const grid = data?.grid ?? {};
+        const settings = data?.settings ?? {};
+
+        // 履歴を保存（インポート直後の状態を起点にする）
+        const snapshot: any = {
+          scaffoldGroups: JSON.parse(JSON.stringify(scaffoldGroups)),
+          memos: JSON.parse(JSON.stringify(memos)),
+          elements: [...elements],
+        };
+
+        return {
+          scaffoldGroups,
+          memos,
+          elements,
+          canvasScale: typeof canvas.scale === 'number' ? canvas.scale : state.canvasScale,
+          canvasPosition: canvas.position ?? state.canvasPosition,
+          gridSize: grid.size === 150 || grid.size === 300 ? grid.size : state.gridSize,
+          snapToGrid:
+            typeof grid.snapToGrid === 'boolean' ? grid.snapToGrid : state.snapToGrid,
+          showGrid: typeof grid.showGrid === 'boolean' ? grid.showGrid : state.showGrid,
+          currentColor: settings.currentColor ?? state.currentColor,
+          bracketSize: settings.bracketSize ?? state.bracketSize,
+          directionReversed:
+            typeof settings.directionReversed === 'boolean'
+              ? settings.directionReversed
+              : state.directionReversed,
+          history: [snapshot],
+          historyIndex: 0,
+          selectedElementIds: [],
+          selectedScaffoldPartKeys: [],
+          selectedMemoId: null,
+        };
+      } catch (e) {
+        console.error('作図データのインポートに失敗しました:', e);
+        return {} as any;
+      }
+    }),
 }));

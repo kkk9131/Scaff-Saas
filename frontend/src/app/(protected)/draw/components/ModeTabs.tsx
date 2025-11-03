@@ -36,10 +36,13 @@ export default function ModeTabs() {
     setBulkBracketScope,
     scaffoldGroups,
     selectScaffoldParts,
+    lassoGlowColor,
+    setLassoGlowColor,
   } = useDrawingStore();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const [lassoColorMenuOpen, setLassoColorMenuOpen] = useState(false);
 
   // ショートカットキー（1/2/3/4）のグローバルリスナー
   useEffect(() => {
@@ -209,7 +212,12 @@ export default function ModeTabs() {
               </div>
             </button>
 
-          {/* 投げ縄ボタン */}
+          {/* 投げ縄ボタン（ホバー時に発光カラー選択肢を表示） */}
+          <div
+            className="relative group"
+            onMouseEnter={() => setLassoColorMenuOpen(true)}
+            onMouseLeave={() => setLassoColorMenuOpen(false)}
+          >
             <button
               onClick={() => setEditSelectionMode('lasso')}
               className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
@@ -227,6 +235,70 @@ export default function ModeTabs() {
                 投げ縄
               </div>
             </button>
+
+            {/* 発光カラー選択メニュー（ホバー時に表示） */}
+            {lassoColorMenuOpen && editTargetType !== '階段' && editTargetType !== '梁枠' && (
+              <div 
+                className={`absolute left-full top-0 ml-2 z-[100] min-w-[140px] rounded-lg border shadow-lg py-1 ${
+                  isDark ? 'border-slate-700 bg-black' : 'border-slate-300 bg-white'
+                }`}
+                onMouseEnter={() => setLassoColorMenuOpen(true)}
+                onMouseLeave={() => setLassoColorMenuOpen(false)}
+              >
+                <div className="px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                  発光色を選択
+                </div>
+                {/* 黄色 */}
+                <button
+                  onClick={() => {
+                    setLassoGlowColor('yellow');
+                    setEditSelectionMode('lasso');
+                    setLassoColorMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors ${
+                    lassoGlowColor === 'yellow'
+                      ? 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
+                      : 'text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600" style={{ backgroundColor: '#FACC15' }} />
+                  <span>黄色</span>
+                </button>
+                {/* 青色 */}
+                <button
+                  onClick={() => {
+                    setLassoGlowColor('blue');
+                    setEditSelectionMode('lasso');
+                    setLassoColorMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors ${
+                    lassoGlowColor === 'blue'
+                      ? 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
+                      : 'text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600" style={{ backgroundColor: '#60A5FA' }} />
+                  <span>青色</span>
+                </button>
+                {/* 緑色 */}
+                <button
+                  onClick={() => {
+                    setLassoGlowColor('green');
+                    setEditSelectionMode('lasso');
+                    setLassoColorMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors ${
+                    lassoGlowColor === 'green'
+                      ? 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
+                      : 'text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600" style={{ backgroundColor: '#34D399' }} />
+                  <span>緑色</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* 一括ボタン（ホバー時にサブメニュー表示） */}
           <div
@@ -334,9 +406,20 @@ export default function ModeTabs() {
                 {/* 区切り線 */}
                 <div className="my-1 h-px bg-white/20 dark:bg-slate-700/50" />
 
-                {/* 追加（全黄色/青色発光部 対象の一括カードを表示） */}
+                {/* 追加（全発光部 対象の一括カードを表示） */}
                 <button
                   onClick={() => {
+                    if (editTargetType === 'アンチ') {
+                      // 全緑発光部（アンチ未接ブラケット）の一括追加
+                      const s = useDrawingStore.getState();
+                      s.setBulkAntiScope('all');
+                      s.setBulkAntiAction('add');
+                      setEditSelectionMode('bulk');
+                      setBulkMenuOpen(false);
+                      return;
+                    }
+
+                    // 既存：ハネ等の追加（青色発光と同等）
                     const keys: string[] = [];
                     for (const g of scaffoldGroups) {
                       for (const p of g.parts) {
@@ -350,7 +433,6 @@ export default function ModeTabs() {
                     } else if (editTargetType === 'ハネ') {
                       setEditSelectionMode('bulk');
                     } else {
-                      // 他ターゲットのときはハネに切替して実行（明示意図が必要なら分岐を外す）
                       setEditTargetType('ハネ');
                       setEditSelectionMode('bulk');
                     }

@@ -21,10 +21,14 @@ import { DEFAULT_SCALE, mmToPx, calculateAngleDegrees } from '@/lib/utils/scale'
 export interface AntiAddCardProps {
   /** 左上のスクリーン座標（px） */
   screenPosition: { left: number; top: number };
-  /** 対象グループID */
-  groupId: string;
-  /** 対象ブラケットID（このブラケット位置を基準にアンチを作図） */
-  bracketId: string;
+  /** 単体 or 一括（既定: 単体） */
+  kind?: 'single' | 'bulk';
+  /** 単体: 対象グループID */
+  groupId?: string;
+  /** 単体: 対象ブラケットID（このブラケット位置を基準にアンチを作図） */
+  bracketId?: string;
+  /** 一括: 対象ブラケット配列 */
+  targets?: { groupId: string; bracketId: string }[];
   /** 閉じる */
   onClose: () => void;
   /** 作図完了ハンドラ */
@@ -55,10 +59,10 @@ const SPANS = [1800, 1500, 1200, 900, 600] as const;
 /**
  * アンチ追加カード本体
  */
-export default function AntiAddCard({ screenPosition, groupId, bracketId, onClose, onCreated }: AntiAddCardProps) {
+export default function AntiAddCard({ screenPosition, kind = 'single', groupId, bracketId, targets, onClose, onCreated }: AntiAddCardProps) {
   const { scaffoldGroups, updateScaffoldGroup } = useDrawingStore();
-  const group = React.useMemo(() => scaffoldGroups.find((g) => g.id === groupId), [scaffoldGroups, groupId]);
-  const bracket = React.useMemo(() => group?.parts.find((p) => p.id === bracketId), [group, bracketId]);
+  const group = React.useMemo(() => (groupId ? scaffoldGroups.find((g) => g.id === groupId) : undefined), [scaffoldGroups, groupId]);
+  const bracket = React.useMemo(() => (group && bracketId ? group.parts.find((p) => p.id === bracketId) : undefined), [group, bracketId]);
 
   // 初期値はブラケット情報から幅を推測（W/S）
   const initialWidth = React.useMemo(() => {
@@ -88,65 +92,82 @@ export default function AntiAddCard({ screenPosition, groupId, bracketId, onClos
    * - 作図後はカードを閉じる
    */
   const drawAnti = () => {
-    if (!group || !bracket) return;
-    const line = group.meta?.line;
-    if (!line) return;
-
-    // ブラケットの沿い方向オフセット（mm）
-    const bOff = Number(bracket.meta?.offsetMm ?? NaN);
-    if (!isFinite(bOff)) return;
-
-    // スパン方向角度（度数法）
-    const spanAngle = calculateAngleDegrees(line.start, line.end);
-    const vSpan = { x: Math.cos((spanAngle * Math.PI) / 180), y: Math.sin((spanAngle * Math.PI) / 180) };
-
-    // ライン情報（px）
-    const dx = line.end.x - line.start.x;
-    const dy = line.end.y - line.start.y;
-    const lenPx = Math.sqrt(dx * dx + dy * dy) || 1;
-    const tx = dx / lenPx;
-    const ty = dy / lenPx;
-
-    // 外向き法線（左回転）→ Alt/reversed ではない既定の外側
-    let nx = -ty;
-    let ny = tx;
-    // 向きが「内側」の場合は反転
-    if (orientation === 'inner') {
-      nx = -nx;
-      ny = -ny;
-    }
-
-    // アンチ中心：ブラケットの沿い方向オフセット（bOff）を中心に、法線へ既定クリアランス分だけオフセット
-    // クリアランス: W→150 + 半幅(200) = 350mm, S→50 + 半幅(120) = 170mm
     const antiWidthMm = width;
     const innerClearMm = width >= 380 ? 150 : 50;
-    const centerOffsetPx = mmToPx(innerClearMm + antiWidthMm / 2, DEFAULT_SCALE);
 
-    // ライン上の中心座標（px）: 始点からbOff(mm) だけ進める
-    const alongPx = mmToPx(bOff, DEFAULT_SCALE);
-    const baseX = line.start.x + tx * alongPx;
-    const baseY = line.start.y + ty * alongPx;
+    // 対象を列挙（単体 or 一括）
+    const targetList: { groupId: string; bracketId: string }[] =
+      kind === 'bulk' && Array.isArray(targets) && targets.length > 0 && targets[0].groupId && targets[0].bracketId
+        ? targets
+        : group && bracket
+          ? [{ groupId: group.id, bracketId: bracket.id }]
+          : [];
 
-    const center = { x: baseX + nx * centerOffsetPx, y: baseY + ny * centerOffsetPx };
+    // 追加パーツをグループ単位で集約（既存部材の消し込みを防ぐ）
+    const addMap = new Map<string, any[]>();
 
-    // offsetMm は左端基準。中心= bOff とする場合、左端は (bOff - span/2)
-    const antiOffsetMm = bOff - span / 2;
+    for (const t of targetList) {
+      const g = useDrawingStore.getState().scaffoldGroups.find((gg) => gg.id === t.groupId);
+      if (!g) continue;
+      const b = g.parts.find((pp) => pp.id === t.bracketId);
+      if (!b) continue;
+      const line = g.meta?.line;
+      if (!line) continue;
 
-    const newPart = {
-      id: uuidv4(),
-      type: 'アンチ' as const,
-      position: center,
-      color: bracket.color,
-      meta: {
-        direction: spanAngle,
-        length: span,
-        width: antiWidthMm,
-        bracketSize: width >= 380 ? 'W' : 'S',
-        offsetMm: antiOffsetMm,
-      },
-    };
+      const bOff = Number(b.meta?.offsetMm ?? NaN);
+      if (!isFinite(bOff)) continue;
 
-    updateScaffoldGroup(group.id, { parts: [...group.parts, newPart] });
+      const spanAngle = calculateAngleDegrees(line.start, line.end);
+
+      // ラインの単位ベクトル
+      const dx = line.end.x - line.start.x;
+      const dy = line.end.y - line.start.y;
+      const lenPx = Math.sqrt(dx * dx + dy * dy) || 1;
+      const tx = dx / lenPx;
+      const ty = dy / lenPx;
+
+      // 外向き法線
+      let nx = -ty;
+      let ny = tx;
+      if (orientation === 'inner') {
+        nx = -nx;
+        ny = -ny;
+      }
+
+      // オフセットと中心
+      const centerOffsetPx = mmToPx(innerClearMm + antiWidthMm / 2, DEFAULT_SCALE);
+      const alongPx = mmToPx(bOff, DEFAULT_SCALE);
+      const baseX = line.start.x + tx * alongPx;
+      const baseY = line.start.y + ty * alongPx;
+      const center = { x: baseX + nx * centerOffsetPx, y: baseY + ny * centerOffsetPx };
+      const antiOffsetMm = bOff - span / 2;
+
+      const newPart = {
+        id: uuidv4(),
+        type: 'アンチ' as const,
+        position: center,
+        color: b.color,
+        meta: {
+          direction: spanAngle,
+          length: span,
+          width: antiWidthMm,
+          bracketSize: width >= 380 ? 'W' : 'S',
+          offsetMm: antiOffsetMm,
+        },
+      };
+
+      const arr = addMap.get(g.id) ?? [];
+      arr.push(newPart);
+      addMap.set(g.id, arr);
+    }
+
+    // まとめて反映（各グループにつき1回の更新で新規パーツをまとめて追加）
+    for (const [gid, partsToAdd] of addMap) {
+      const cur = useDrawingStore.getState().scaffoldGroups.find((gg) => gg.id === gid);
+      if (!cur) continue;
+      updateScaffoldGroup(gid, { parts: [...cur.parts, ...partsToAdd] });
+    }
+
     onCreated?.();
   };
 
@@ -161,7 +182,9 @@ export default function AntiAddCard({ screenPosition, groupId, bracketId, onClos
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-slate-700/50">
         <div className="flex items-center gap-2">
           <Plus size={18} className="text-emerald-400" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">アンチを追加</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            アンチを追加{kind === 'bulk' && targets?.length ? `（${targets.length} 箇所）` : ''}
+          </h3>
         </div>
         <div className="flex items-center gap-1">
           <button

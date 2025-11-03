@@ -2032,7 +2032,40 @@ export default function ScaffoldRenderer({
                           listening={false}
                         />
                       )}
-                      {/* クリック用の透明オーバーレイ（アンチ未接ブラケット → アンチ追加カード） */}
+                      {/* 選択時の強調シアン（未接ブラケットをアンチ編集で選択中） */}
+                      {currentMode === 'edit' && editTargetType === 'アンチ' && bracketNoAntiSet.has(part.id) && selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`) && (
+                        <>
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(BRACKET_GLOW.glowWidth * 0.75, 10 * invScale)}
+                            opacity={0.55}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={BRACKET_GLOW.shadowBlur}
+                            shadowOpacity={0.9}
+                            lineCap="round"
+                            lineJoin="round"
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                          />
+                          <Line
+                            points={[part.position.x, part.position.y, x2, y2]}
+                            stroke={'#06B6D4'}
+                            strokeWidth={Math.max(3.5, 4 * invScale)}
+                            opacity={0.98}
+                            shadowColor={'#06B6D4'}
+                            shadowBlur={BRACKET_GLOW.shadowBlur * 0.6}
+                            shadowOpacity={0.95}
+                            lineCap="round"
+                            lineJoin="round"
+                            listening={false}
+                            globalCompositeOperation="lighter"
+                          />
+                        </>
+                      )}
+                      {/* クリック用の透明オーバーレイ（アンチ未接ブラケット）
+                         - 選択系モードではトグル選択（緑発光の一括追加用）
+                         - それ以外は単体のアンチ追加カードを表示 */}
                       {currentMode === 'edit' && editTargetType === 'アンチ' && bracketNoAntiSet.has(part.id) && (
                         <Line
                           points={[part.position.x, part.position.y, x2, y2]}
@@ -2041,10 +2074,22 @@ export default function ScaffoldRenderer({
                           listening={true}
                           onClick={(e) => {
                             e.cancelBubble = true;
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              // 緑発光（アンチ未接ブラケット）を選択トグル
+                              toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                              // 一括アクションを追加（add）にセット（Enterや一括ボタンでの動作に備える）
+                              useDrawingStore.getState().setBulkAntiAction('add');
+                              return;
+                            }
                             onAntiAddRequest?.({ anchor: { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 }, groupId: group.id, bracketId: part.id });
                           }}
                           onTap={(e) => {
                             e.cancelBubble = true;
+                            if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
+                              toggleSelectScaffoldPart(`${group.id}:${part.id}`);
+                              useDrawingStore.getState().setBulkAntiAction('add');
+                              return;
+                            }
                             onAntiAddRequest?.({ anchor: { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 }, groupId: group.id, bracketId: part.id });
                           }}
                           onMouseEnter={(e) => {
