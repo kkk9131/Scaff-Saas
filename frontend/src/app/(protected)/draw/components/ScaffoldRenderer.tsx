@@ -19,7 +19,7 @@ import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import type { ScaffoldGroup, ScaffoldPart } from '@/types/scaffold';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCanvasColor } from '@/lib/utils/colorUtils';
-import { mmToPx, DEFAULT_SCALE } from '@/lib/utils/scale';
+import { mmToPx, DEFAULT_SCALE, pxToMm } from '@/lib/utils/scale';
 import { calculateDirection } from '@/lib/sax/directionRules';
 
 /**
@@ -80,6 +80,31 @@ function translateGroup(
 }
 
 /**
+ * 点と線分の最短距離（px）を計算
+ */
+function pointSegmentDistance(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+) {
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const wx = px - x1;
+  const wy = py - y1;
+  const len2 = vx * vx + vy * vy || 1;
+  let t = (wx * vx + wy * vy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * vx;
+  const cy = y1 + t * vy;
+  const dx = px - cx;
+  const dy = py - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
  * ScaffoldRendererコンポーネント
  * - ストアから足場グループを取得し、Konva要素として描画
  * - グループ単位でドラッグ可能
@@ -95,6 +120,9 @@ export default function ScaffoldRenderer({
   onAntiClick,
   onAntiLevelClick,
   onBracketConfigClick,
+  onBracketConfigAtPillar,
+  onAntiAddRequest,
+  onDeleteChoiceRequest,
   onHaneConfigClick,
   onClothSplitStart,
   onViewPartHover,
@@ -174,6 +202,30 @@ export default function ScaffoldRenderer({
     groupId: string;
     partId: string;
   }) => void;
+  /**
+   * ブラケット編集時の青色発光「柱」クリックで呼び出すコールバック（未作図の柱から新規作図する場合）
+   */
+  onBracketConfigAtPillar?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    pillarId: string;
+  }) => void;
+  /**
+   * アンチが接していないブラケットをクリックした際に呼び出す（アンチ追加カード表示）
+   */
+  onAntiAddRequest?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    bracketId: string;
+  }) => void;
+  /**
+   * 削除モードで重複要素がある場合の選択カード表示要求
+   */
+  onDeleteChoiceRequest?: (args: {
+    anchor: { x: number; y: number };
+    groupId: string;
+    candidates: { id: string; type: '布材' | 'ブラケット' | '柱' | 'アンチ' | '階段' | '梁枠' }[];
+  }) => void;
   /** 布材のスパン分割（ドラッグ開始） */
   onClothSplitStart?: (args: { groupId: string; partId: string }) => void;
   /**
@@ -197,6 +249,24 @@ export default function ScaffoldRenderer({
   } = useDrawingStore();
   const { currentMode } = useDrawingModeStore();
   const { isDark } = useTheme();
+  const deleteMode = currentMode === 'edit' && editSelectionMode === 'delete';
+
+  /**
+   * スパン入れ替え（布材の順序変更）用のドラッグ状態
+   * - groupId: 対象グループ
+   * - partId: ドラッグ中の布材ID
+   * - startIndex: ドラッグ開始時点のインデックス（布材の並び順）
+   * - currentIndex: 現在の狙いインデックス（ドラッグ位置に基づく暫定）
+   *
+   * 注意: 今回はシンプルに「ドロップ時に確定」する実装。
+   * ドラッグ中のリアルタイム入れ替えはUX検討後に拡張可能。
+   */
+  const [spanDragState, setSpanDragState] = React.useState<{
+    groupId: string;
+    partId: string;
+    startIndex: number;
+    currentIndex: number;
+  } | null>(null);
 
   /**
    * 梁枠パターンの選択・ホバー状態
@@ -613,6 +683,294 @@ export default function ScaffoldRenderer({
             )
           : { x: 1, y: 0 };
 
+        /**
+         * ドラッグ中ハンドルの座標をスパン直線上へ拘束する関数
+         * Konva の dragBoundFunc で使用
+         */
+        const boundToLine = (pos: { x: number; y: number }) => {
+          const line = group.meta?.line;
+          if (!line) return pos;
+          const dx = line.end.x - line.start.x;
+          const dy = line.end.y - line.start.y;
+          const len2 = dx * dx + dy * dy || 1;
+          let u = ((pos.x - line.start.x) * dx + (pos.y - line.start.y) * dy) / len2;
+          u = Math.max(0, Math.min(1, u));
+          return {
+            x: line.start.x + u * dx,
+            y: line.start.y + u * dy,
+          };
+        };
+
+        /**
+         * 任意のキャンバス座標を「始点からの距離（mm）」へ変換
+         */
+        const canvasPointToAlongMm = (pt: { x: number; y: number }) => {
+          const line = group.meta?.line;
+          if (!line) return 0;
+          const dx = line.end.x - line.start.x;
+          const dy = line.end.y - line.start.y;
+          const len2 = dx * dx + dy * dy || 1;
+          let u = ((pt.x - line.start.x) * dx + (pt.y - line.start.y) * dy) / len2;
+          u = Math.max(0, Math.min(1, u));
+          const spanPx = Math.sqrt(dx * dx + dy * dy);
+          const alongPx = u * spanPx;
+          // px → mm 変換
+          return pxToMm(alongPx, DEFAULT_SCALE);
+        };
+
+        /**
+         * グループ内の布材（通常スパン）を offsetMm 順に並べる
+         * - dashed な補助線は対象外
+         */
+        const getOrderedCloths = () =>
+          group.parts
+            .filter((p) => p.type === '布材' && p.meta?.lineStyle !== 'dashed')
+            .sort((a, b) => (a.meta?.offsetMm ?? 0) - (b.meta?.offsetMm ?? 0));
+
+        /**
+         * 連続スワップ（多段）用のターゲットインデックス決定
+         * - ドロップ位置（沿い方向mm）を、ドラッグ中のスパンを除いた配列の中間点で区切り
+         * - 得られた挿入位置を、元の全体インデックスへ補正して返す
+         */
+        const decideIndexByDropMm = (dropMm: number, draggedId: string) => {
+          const full = getOrderedCloths();
+          const oldIndex = full.findIndex((c) => c.id === draggedId);
+          if (oldIndex < 0) return 0;
+          const rest = full.filter((c) => c.id !== draggedId);
+          if (rest.length === 0) return 0;
+          const centers = rest.map((c) => (Number(c.meta?.offsetMm ?? 0) + Number(c.meta?.length ?? 0) / 2));
+          const mids: number[] = [];
+          for (let i = 0; i < centers.length - 1; i++) mids.push((centers[i] + centers[i + 1]) / 2);
+          let insertIdx = 0;
+          while (insertIdx < mids.length && dropMm >= mids[insertIdx]) insertIdx++;
+          // 全体配列でのターゲットインデックスへ補正
+          const targetFull = insertIdx <= oldIndex ? insertIdx : insertIdx + 1;
+          return Math.max(0, Math.min(full.length - 1, targetFull));
+        };
+
+        /**
+         * 布材の順序を入れ替え、offsetMm と position を再配置して反映
+         * @param draggedId ドラッグした布材ID
+         * @param targetIndex 新しいインデックス（0..N-1）
+         */
+        const reorderCloths = (draggedId: string, targetIndex: number) => {
+          const line = group.meta?.line;
+          if (!line) return;
+          const cloths = getOrderedCloths();
+          const oldIndex = cloths.findIndex((c) => c.id === draggedId);
+          if (oldIndex === -1) return;
+
+          // 新しい並び順（cloth のみ）
+          const arr = cloths.slice();
+          const [moved] = arr.splice(oldIndex, 1);
+          const insertAt = targetIndex > oldIndex ? targetIndex - 1 : targetIndex;
+          const safeInsert = Math.max(0, Math.min(arr.length, insertAt));
+          arr.splice(safeInsert, 0, moved);
+
+          // 新しいスパン開始オフセットと境界配列
+          const newStartById = new Map<string, number>();
+          const boundary: number[] = [0];
+          let prefix = 0;
+          for (const c of arr) {
+            newStartById.set(c.id, prefix);
+            prefix += Number(c.meta?.length ?? 0);
+            boundary.push(prefix);
+          }
+
+          // ユーティリティ
+          const posAlong = (mm: number) => {
+            const px = mmToPx(mm, DEFAULT_SCALE);
+            return { x: line.start.x + t.x * px, y: line.start.y + t.y * px };
+          };
+          const outwardDir = ((): { x: number; y: number } => {
+            const reversed = Boolean(group.meta?.settings?.reversed);
+            const nx = -t.y;
+            const ny = t.x;
+            return reversed ? { x: -nx, y: -ny } : { x: nx, y: ny };
+          })();
+          const bracketSize = (group.meta?.settings?.bracketSize ?? 'W') as 'W' | 'S';
+          const antiWidthMmDefault = bracketSize === 'W' ? 400 : 240;
+          const innerClearMmDefault = bracketSize === 'W' ? 150 : 50;
+
+          // 旧スパン配列（owner 判定用）
+          type Span = { id: string; start: number; len: number };
+          const oldSpans: Span[] = cloths.map((c) => ({ id: c.id, start: Number(c.meta?.offsetMm ?? 0), len: Number(c.meta?.length ?? 0) }));
+          const findOwner = (mm: number): Span | null => {
+            for (let i = 0; i < oldSpans.length; i++) {
+              const s = oldSpans[i];
+              const last = i === oldSpans.length - 1;
+              if (mm >= s.start && (mm < s.start + s.len || (last && Math.abs(mm - (s.start + s.len)) < 1e-6))) return s;
+            }
+            return null;
+          };
+
+          // 1) 布材を新しい開始オフセットへ
+          const nextPartsCloth = group.parts.map((p) => {
+            if (p.type !== '布材') return p;
+            const newOff = newStartById.get(p.id);
+            if (newOff === undefined) return p;
+            return { ...p, position: posAlong(newOff), meta: { ...(p.meta || {}), offsetMm: newOff } };
+          });
+
+          // 2) アンチ・階段は自スパン相対位置で移動
+          const nextPartsAntiStair = nextPartsCloth.map((p) => {
+            if (p.type !== 'アンチ' && p.type !== '階段') return p;
+            const off = Number(p.meta?.offsetMm ?? NaN);
+            if (!Number.isFinite(off)) return p;
+            const owner = findOwner(off);
+            if (!owner) return p;
+            const newStart = newStartById.get(owner.id);
+            if (newStart === undefined) return p;
+            if (p.type === 'アンチ') {
+              const len = Number(p.meta?.length ?? 0);
+              const centerMm = newStart + (off - owner.start) + len / 2;
+              const antiWidthMm = Number(p.meta?.width ?? antiWidthMmDefault);
+              const innerClearMm = p.meta?.bracketSize ? (p.meta.bracketSize === 'W' ? 150 : 50) : innerClearMmDefault;
+              const centerOffsetPx = mmToPx(innerClearMm + antiWidthMm / 2, DEFAULT_SCALE);
+              const base = posAlong(centerMm);
+              return { ...p, position: { x: base.x + outwardDir.x * centerOffsetPx, y: base.y + outwardDir.y * centerOffsetPx }, meta: { ...(p.meta || {}), offsetMm: newStart + (off - owner.start) } };
+            } else {
+              // 階段: offsetMm は中心 mm として扱う
+              const centerMm = newStart + (off - owner.start);
+              return { ...p, position: posAlong(centerMm), meta: { ...(p.meta || {}), offsetMm: centerMm } };
+            }
+          });
+
+          // 3) 柱・ブラケットは「境界」位置に再配置（数を維持）
+          const pillars = nextPartsAntiStair.filter((p) => p.type === '柱');
+          const brackets = nextPartsAntiStair.filter((p) => p.type === 'ブラケット');
+          const others = nextPartsAntiStair.filter((p) => p.type !== '柱' && p.type !== 'ブラケット' && p.type !== '布材');
+          const clothOnly = nextPartsAntiStair.filter((p) => p.type === '布材');
+
+          const sortByOff = (a: any, b: any) => (Number(a.meta?.offsetMm ?? 0) - Number(b.meta?.offsetMm ?? 0));
+          pillars.sort(sortByOff);
+          brackets.sort(sortByOff);
+
+          const rebasedPillars = pillars.map((p, i) => {
+            const idx = Math.min(i, boundary.length - 1);
+            const boff = boundary[idx];
+            return { ...p, position: posAlong(boff), meta: { ...(p.meta || {}), offsetMm: boff } };
+          });
+          const rebasedBrackets = brackets.map((b, i) => {
+            const idx = Math.min(i, boundary.length - 1);
+            const boff = boundary[idx];
+            return { ...b, position: posAlong(boff), meta: { ...(b.meta || {}), offsetMm: boff } };
+          });
+
+          const newParts = [...others, ...clothOnly, ...rebasedPillars, ...rebasedBrackets];
+          updateScaffoldGroup(group.id, { parts: newParts });
+        };
+
+        // --- ドラッグ中リアルタイム入れ替えプレビュー計算 ---
+        const line = group.meta?.line;
+        let previewLayout: Map<string, { pos: { x: number; y: number }; off: number }> | null = null;
+        let previewPosById: Map<string, { x: number; y: number }> | null = null;
+        let previewInsertTick: { a: { x: number; y: number }; b: { x: number; y: number } } | null = null;
+        if (spanDragState && spanDragState.groupId === group.id && line) {
+          const cloths = getOrderedCloths();
+          const oldIndex = cloths.findIndex((c) => c.id === spanDragState.partId);
+          if (oldIndex !== -1) {
+            const arr = cloths.slice();
+            const [moved] = arr.splice(oldIndex, 1);
+            const insertAt = spanDragState.currentIndex > oldIndex ? spanDragState.currentIndex - 1 : spanDragState.currentIndex;
+            const safeInsert = Math.max(0, Math.min(arr.length, insertAt));
+            arr.splice(safeInsert, 0, moved);
+
+            // 配置計算（布材）
+            previewLayout = new Map();
+            let curOff = 0;
+            for (const c of arr) {
+              const px = mmToPx(curOff, DEFAULT_SCALE);
+              const pos = { x: line.start.x + t.x * px, y: line.start.y + t.y * px };
+              previewLayout.set(c.id, { pos, off: curOff });
+              curOff += Number(c.meta?.length ?? 0);
+            }
+
+            // 移動対象スパン範囲（旧）
+            const movedOldOff = Number(moved.meta?.offsetMm ?? 0);
+            const movedLen = Number(moved.meta?.length ?? 0);
+            const movedNewOff = previewLayout.get(moved.id)?.off ?? movedOldOff;
+            // 直交方向ベクトル
+            const n = { x: -t.y, y: t.x };
+
+            // 挿入位置の目印（直交方向に短い線分）
+            const boundaryMm = arr.slice(0, safeInsert).reduce((a, c) => a + Number(c.meta?.length ?? 0), 0);
+            const bp = { x: line.start.x + t.x * mmToPx(boundaryMm, DEFAULT_SCALE), y: line.start.y + t.y * mmToPx(boundaryMm, DEFAULT_SCALE) };
+            const half = Math.max(10 * invScale, 6);
+            previewInsertTick = {
+              a: { x: bp.x + n.x * half, y: bp.y + n.y * half },
+              b: { x: bp.x - n.x * half, y: bp.y - n.y * half },
+            };
+
+            // 対象スパンの部材一括プレビュー座標
+            previewPosById = new Map();
+            const belongsToMoved = (p: any): boolean => {
+              const off = Number(p.meta?.offsetMm ?? NaN);
+              if (!Number.isFinite(off)) return false;
+              // 布材/アンチ: 開始オフセット
+              if (p.type === '布材' || p.type === 'アンチ') {
+                const len = Number(p.meta?.length ?? NaN);
+                if (!Number.isFinite(len)) return false;
+                return Math.abs(off - movedOldOff) < 1e-6 && Math.abs(len - movedLen) < 1e-6;
+              }
+              // 階段: 中心オフセット
+              if (p.type === '階段') {
+                const len = Number(p.meta?.length ?? NaN);
+                if (!Number.isFinite(len)) return false;
+                const centerOld = movedOldOff + movedLen / 2;
+                return Math.abs(off - centerOld) <= 1e-6 && Math.abs(len - movedLen) < 1e-6;
+              }
+              // 柱/ブラケット: 点オフセット（左閉右開）
+              if (p.type === '柱' || p.type === 'ブラケット') {
+                if (off < movedOldOff) return false;
+                if (off > movedOldOff + movedLen) return false;
+                if (off === movedOldOff + movedLen) {
+                  // 末尾境界は次スパンが所有。移動元が末尾側の境界のみ例外的に含める
+                  return oldIndex === cloths.length - 1;
+                }
+                return true;
+              }
+              return false;
+            };
+
+            const posAlong = (mm: number) => {
+              const px = mmToPx(mm, DEFAULT_SCALE);
+              return { x: line.start.x + t.x * px, y: line.start.y + t.y * px };
+            };
+            const outwardDir = ((): { x: number; y: number } => {
+              // group設定のreversedに応じて法線の向きを決める
+              const reversed = Boolean(group.meta?.settings?.reversed);
+              const nx = -t.y;
+              const ny = t.x;
+              return reversed ? { x: -nx, y: -ny } : { x: nx, y: ny };
+            })();
+            const bracketSize = (group.meta?.settings?.bracketSize ?? 'W') as 'W' | 'S';
+            const antiWidthMm = bracketSize === 'W' ? 400 : 240;
+            const innerClearMm = bracketSize === 'W' ? 150 : 50;
+            const centerOffsetPx = mmToPx(innerClearMm + antiWidthMm / 2, DEFAULT_SCALE);
+
+            for (const p of group.parts) {
+              if (!belongsToMoved(p)) continue;
+              // 相対距離を保って新オフセットへ移動
+              if (p.type === '布材' || p.type === 'ブラケット' || p.type === '柱') {
+                const rel = Number(p.meta?.offsetMm ?? 0) - movedOldOff;
+                const newOff = movedNewOff + rel;
+                previewPosById.set(p.id, posAlong(newOff));
+              } else if (p.type === 'アンチ') {
+                const len = Number(p.meta?.length ?? 0);
+                const relStart = Number(p.meta?.offsetMm ?? 0) - movedOldOff;
+                const centerMm = movedNewOff + relStart + len / 2;
+                const base = posAlong(centerMm);
+                previewPosById.set(p.id, { x: base.x + outwardDir.x * centerOffsetPx, y: base.y + outwardDir.y * centerOffsetPx });
+              } else if (p.type === '階段') {
+                const centerRel = Number(p.meta?.offsetMm ?? 0) - (movedOldOff + movedLen / 2);
+                const centerMm = movedNewOff + movedLen / 2 + centerRel;
+                previewPosById.set(p.id, posAlong(centerMm));
+              }
+            }
+          }
+        }
+
         // 梁枠選択時の布材ハイライト（シーケンス検出）
         // 規則:
         // - [1800,1800] の並び → 黄色
@@ -669,6 +1027,35 @@ export default function ScaffoldRenderer({
 
         // ドラッグ完全無効化（作図済みグループは動かせない）
         const canDrag = false;
+
+        // --- アンチ未接ブラケット検出（アンチ編集モード時のみ使用） ---
+        const bracketNoAntiSet: Set<string> = new Set();
+        if (currentMode === 'edit' && editTargetType === 'アンチ') {
+          const antiParts = group.parts.filter((p) => p.type === 'アンチ');
+          const bracketParts = group.parts.filter((p) => p.type === 'ブラケット');
+          for (const b of bracketParts) {
+            const bOff = Number(b.meta?.offsetMm);
+            if (!isFinite(bOff)) continue;
+            // ブラケットの外向き単位ベクトル（direction）
+            const bDirDeg = Number(b.meta?.direction ?? 0);
+            const bN = degToUnitVector(bDirDeg);
+            const sideThresholdPx = mmToPx(80, DEFAULT_SCALE); // 80mm以上、同じ外側にアンチ中心がある
+
+            // 条件: 1) アンチの沿い方向区間に含まれる（端点含む）
+            //       2) ブラケット外向き方向にアンチ中心が存在（反対側のアンチは除外）
+            const touching = antiParts.some((a) => {
+              const aOff = Number(a.meta?.offsetMm ?? 0);
+              const aLen = Number(a.meta?.length ?? 0);
+              if (!(aLen > 0 && bOff >= aOff - 1e-6 && bOff <= aOff + aLen + 1e-6)) return false;
+              const dx = a.position.x - b.position.x;
+              const dy = a.position.y - b.position.y;
+              const dot = dx * bN.x + dy * bN.y;
+              return dot > sideThresholdPx; // 同じ側に十分離れて存在（=接している扱い）
+            });
+            if (!touching) bracketNoAntiSet.add(b.id);
+          }
+        }
+
         return (
           <Group
             key={group.id}
@@ -686,8 +1073,18 @@ export default function ScaffoldRenderer({
               updateScaffoldGroup(group.id, translated);
             }}
           >
+            {/* ドラッグ中の挿入位置プレビュー（細いティック） */}
+            {previewInsertTick && (
+              <Line
+                points={[previewInsertTick.a.x, previewInsertTick.a.y, previewInsertTick.b.x, previewInsertTick.b.y]}
+                stroke={'#22D3EE'}
+                strokeWidth={2}
+                opacity={0.9}
+                listening={false}
+              />
+            )}
             {group.parts.map((part) => {
-              const stroke = colorToStroke(part.color);
+                const stroke = colorToStroke(part.color);
               // 柱ハイライト
               const highlightPillarYellow =
                 currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ハネ') && part.type === '柱';
@@ -703,6 +1100,13 @@ export default function ScaffoldRenderer({
                   return (
                     <Group
                       key={part.id}
+                      onClick={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
+                      }}
                       onMouseEnter={(e) => {
                         if (currentMode === 'edit' && editTargetType === '梁枠') {
                           const stage = e.target.getStage?.();
@@ -736,6 +1140,11 @@ export default function ScaffoldRenderer({
                     <Group
                       key={part.id}
                       onClick={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
                         // ビューモードでは編集を無効化
                         if (currentMode === 'view') {
                           e.cancelBubble = true;
@@ -763,6 +1172,13 @@ export default function ScaffoldRenderer({
                               anchor: { x: part.position.x, y: part.position.y },
                               groupId: group.id,
                               partId: relatedBracket.id,
+                            });
+                          } else {
+                            // 既存ブラケットが無い → 新規作図用のカードを表示（柱基準）
+                            onBracketConfigAtPillar?.({
+                              anchor: { x: part.position.x, y: part.position.y },
+                              groupId: group.id,
+                              pillarId: part.id,
                             });
                           }
                           return;
@@ -799,6 +1215,11 @@ export default function ScaffoldRenderer({
                         });
                       }}
                       onTap={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
                         // ビューモードでは編集を無効化
                         if (currentMode === 'view') {
                           e.cancelBubble = true;
@@ -838,6 +1259,12 @@ export default function ScaffoldRenderer({
                               anchor: { x: part.position.x, y: part.position.y },
                               groupId: group.id,
                               partId: relatedBracket.id,
+                            });
+                          } else {
+                            onBracketConfigAtPillar?.({
+                              anchor: { x: part.position.x, y: part.position.y },
+                              groupId: group.id,
+                              pillarId: part.id,
                             });
                           }
                           return;
@@ -1076,6 +1503,7 @@ export default function ScaffoldRenderer({
                     typeof part.meta?.direction === 'number'
                       ? degToUnitVector(part.meta.direction)
                       : t;
+                  // ベース描画は常に実データ位置（プレビューは別レイヤで重ね描き）
                   const x2 = part.position.x + dirVec.x * lengthPx;
                   const y2 = part.position.y + dirVec.y * lengthPx;
                   const highlightCloth =
@@ -1142,16 +1570,28 @@ export default function ScaffoldRenderer({
                     : highlightStairOpposite600
                     ? stairOppStroke
                     : stairStroke;
-                  // 150mmの短スパンは中点発光を抑制
+                  // 150mmの短スパンも入れ替えハンドル対象にするが、中点発光は抑制のまま
                   const showMidGlowCloth = highlightCloth && clothLengthMm !== 150;
                   // 階段は 1800/900 かつ階段有りスパン、かつ階段用の並行布材（stairParallel）にのみ中点発光
                   const showMidGlowStair = highlightStairHasStair && Boolean((part.meta as any)?.stairParallel);
                   // 中点座標（各スパンの中心）
                   const midX = part.position.x + dirVec.x * (lengthPx / 2);
                   const midY = part.position.y + dirVec.y * (lengthPx / 2);
+                  // サックスモード（draw）時: スパン入れ替え用ハンドルの表示可否とサイズ
+                  const showReorderHandle = currentMode === 'draw';
+                  const handleRadius = Math.max(6 * invScale, 4);
                   const isSelectedCloth = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
                   return (
-                    <Group key={part.id}>
+                    <Group
+                      key={part.id}
+                      onClick={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
+                      }}
+                    >
                       {/* ビューモード時の数量未確定発光（赤色） */}
                       {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
                         const anchor = { x: midX, y: midY };
@@ -1238,6 +1678,44 @@ export default function ScaffoldRenderer({
                             e.cancelBubble = true;
                             return;
                           }
+                          // 削除モード: クリック座標の付近にブラケットもある場合は選択カード。なければ布材を削除
+                          if (deleteMode) {
+                            e.cancelBubble = true;
+                            const stage = e.target.getStage?.();
+                            const pos = stage?.getPointerPosition();
+                            if (!pos) return;
+                            const clickCanvas = {
+                              x: (pos.x - canvasPosition.x) / canvasScale,
+                              y: (pos.y - canvasPosition.y) / canvasScale,
+                            };
+                            const tol = Math.max(10 * (1 / canvasScale), 8);
+                            // 近傍のブラケット探索（線分距離）
+                            const brackets = group.parts.filter((p) => p.type === 'ブラケット');
+                            const nearBracket = brackets.find((b) => {
+                              const widthMm = b.meta?.width ?? (b.meta?.bracketSize === 'W' ? 600 : 355);
+                              const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+                              const dir = Number(b.meta?.direction ?? 0);
+                              const v = degToUnitVector(dir);
+                              const bx2 = b.position.x + v.x * widthPx;
+                              const by2 = b.position.y + v.y * widthPx;
+                              const d = pointSegmentDistance(clickCanvas.x, clickCanvas.y, b.position.x, b.position.y, bx2, by2);
+                              return d <= tol;
+                            });
+                            if (nearBracket) {
+                              onDeleteChoiceRequest?.({
+                                anchor: clickCanvas,
+                                groupId: group.id,
+                                candidates: [
+                                  { id: part.id, type: '布材' },
+                                  { id: nearBracket.id, type: 'ブラケット' },
+                                ],
+                              });
+                              return;
+                            }
+                            // 直接削除
+                            updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                            return;
+                          }
                           // 布材編集 or 階段編集
                           if (!(currentMode === 'edit' && (editTargetType === '布材' || editTargetType === '階段'))) return;
                           e.cancelBubble = true;
@@ -1269,9 +1747,9 @@ export default function ScaffoldRenderer({
                       {currentMode === 'edit' && editTargetType === '布材' && isSelectedCloth && (
                         <>
                           {/* 選択ハイライトのシアン発光（太めの下地） */}
-                          <Line
-                            points={[part.position.x, part.position.y, x2, y2]}
-                            stroke={'#06B6D4'}
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          stroke={'#06B6D4'}
                             strokeWidth={Math.max(CLOTH_GLOW.glowWidth * 0.75, 10 * invScale)}
                             opacity={0.55}
                             shadowColor={'#06B6D4'}
@@ -1443,6 +1921,70 @@ export default function ScaffoldRenderer({
                           </>
                         );
                       })()}
+                      {/* サックスモード時のスパン入れ替えハンドル */}
+                      {showReorderHandle && (
+                        <Group>
+                          {/* 視認用の小さなハンドル（白縁の丸） */}
+                          <Circle
+                            x={midX}
+                            y={midY}
+                            radius={handleRadius}
+                            fill={isDark ? '#0EA5E9' : '#22D3EE'}
+                            stroke={isDark ? '#0B1220' : '#0F172A'}
+                            strokeWidth={1}
+                            opacity={0.9}
+                            listening={false}
+                          />
+                          {/* 実際のドラッグ用透明ヒット領域（やや大きめ） */}
+                          <Circle
+                            x={midX}
+                            y={midY}
+                            radius={Math.max(handleRadius + 10 * invScale, 14)}
+                            fill={'rgba(0,0,0,0)'}
+                            draggable={true}
+                            dragBoundFunc={boundToLine}
+                            onDragStart={(e) => {
+                              e.cancelBubble = true;
+                              // ドラッグ開始時点のインデックスを記録
+                              const cloths = getOrderedCloths();
+                              const idx = Math.max(0, cloths.findIndex((c) => c.id === part.id));
+                              setSpanDragState({ groupId: group.id, partId: part.id, startIndex: idx, currentIndex: idx });
+                              // つかんだ手カーソル
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'grabbing';
+                            }}
+                            onDragMove={(e) => {
+                              e.cancelBubble = true;
+                              const pt = { x: e.target.x(), y: e.target.y() };
+                              const dropMm = canvasPointToAlongMm(pt);
+                              const nextIdx = decideIndexByDropMm(dropMm, part.id);
+                              setSpanDragState((s) => (s && s.groupId === group.id && s.partId === part.id ? { ...s, currentIndex: nextIdx } : s));
+                            }}
+                            onDragEnd={(e) => {
+                              e.cancelBubble = true;
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'default';
+                              const pt = { x: e.target.x(), y: e.target.y() };
+                              const dropMm = canvasPointToAlongMm(pt);
+                              const targetIndex = decideIndexByDropMm(dropMm, part.id);
+                              reorderCloths(part.id, targetIndex);
+                              setSpanDragState(null);
+                            }}
+                            onMouseDown={(e) => {
+                              // 作図開始（新規スパン生成）を防ぐ
+                              e.cancelBubble = true;
+                            }}
+                            onMouseEnter={(e) => {
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'grab';
+                            }}
+                            onMouseLeave={(e) => {
+                              const stage = e.target.getStage?.();
+                              if (stage) stage.container().style.cursor = 'default';
+                            }}
+                          />
+                        </Group>
+                      )}
                     </Group>
                   );
                 }
@@ -1459,7 +2001,62 @@ export default function ScaffoldRenderer({
                   const highlightBracketLine = currentMode === 'edit' && editTargetType === 'ブラケット';
                   const isSelectedBracket = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
                   return (
-                    <Group key={part.id}>
+                    <Group
+                      key={part.id}
+                      onClick={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
+                      }}
+                      onTap={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
+                      }}
+                    >
+                      {/* アンチ未接ブラケットの緑発光（アンチ編集時） */}
+                      {currentMode === 'edit' && editTargetType === 'アンチ' && bracketNoAntiSet.has(part.id) && (
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          stroke={'#22C55E'}
+                          strokeWidth={BRACKET_GLOW.glowWidth}
+                          opacity={getPulseOpacity(0.9, part.id + '-noanti', { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 })}
+                          shadowColor={'#22C55E'}
+                          shadowBlur={BRACKET_GLOW.shadowBlur}
+                          shadowOpacity={0.95}
+                          globalCompositeOperation="lighter"
+                          listening={false}
+                        />
+                      )}
+                      {/* クリック用の透明オーバーレイ（アンチ未接ブラケット → アンチ追加カード） */}
+                      {currentMode === 'edit' && editTargetType === 'アンチ' && bracketNoAntiSet.has(part.id) && (
+                        <Line
+                          points={[part.position.x, part.position.y, x2, y2]}
+                          strokeWidth={Math.max(20 * invScale, 12)}
+                          stroke={'rgba(0,0,0,0)'}
+                          listening={true}
+                          onClick={(e) => {
+                            e.cancelBubble = true;
+                            onAntiAddRequest?.({ anchor: { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 }, groupId: group.id, bracketId: part.id });
+                          }}
+                          onTap={(e) => {
+                            e.cancelBubble = true;
+                            onAntiAddRequest?.({ anchor: { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 }, groupId: group.id, bracketId: part.id });
+                          }}
+                          onMouseEnter={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'pointer';
+                          }}
+                          onMouseLeave={(e) => {
+                            const stage = e.target.getStage?.();
+                            if (stage) stage.container().style.cursor = 'default';
+                          }}
+                        />
+                      )}
                       {/* ビューモード時の数量未確定発光（赤色） */}
                       {currentMode === 'view' && !isQuantityConfirmed(part) && (() => {
                         const anchor = { x: (part.position.x + x2) / 2, y: (part.position.y + y2) / 2 };
@@ -1734,7 +2331,10 @@ export default function ScaffoldRenderer({
                         }}
                       />
                       {/* ブラケット: 黄色発光上の選択専用ヒット領域（透明・太線） */}
-                      {currentMode === 'edit' && editTargetType === 'ブラケット' && highlightBracketLine && (
+                      {currentMode === 'edit' &&
+                        editTargetType === 'ブラケット' &&
+                        highlightBracketLine &&
+                        (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') && (
                         <Line
                           points={[part.position.x, part.position.y, x2, y2]}
                           stroke="rgba(0,0,0,0)"
@@ -1893,6 +2493,41 @@ export default function ScaffoldRenderer({
                           listening={true}
                           onClick={(e) => {
                             e.cancelBubble = true;
+                            // 削除モード: ブラケット削除 or 布材と重複時は選択カード
+                            if (deleteMode) {
+                              const stage = e.target.getStage?.();
+                              const pos = stage?.getPointerPosition();
+                              if (!pos) return;
+                              const clickCanvas = {
+                                x: (pos.x - canvasPosition.x) / canvasScale,
+                                y: (pos.y - canvasPosition.y) / canvasScale,
+                              };
+                              // 近傍の布材線分にヒットするか
+                              const cloths = group.parts.filter((p) => p.type === '布材');
+                              const tol = Math.max(10 * (1 / canvasScale), 8);
+                              const nearCloth = cloths.find((c) => {
+                                const lenPx = mmToPx(c.meta?.length ?? 1800, DEFAULT_SCALE);
+                                const dv = typeof c.meta?.direction === 'number' ? degToUnitVector(Number(c.meta?.direction)) : t;
+                                const cx2 = c.position.x + dv.x * lenPx;
+                                const cy2 = c.position.y + dv.y * lenPx;
+                                const d = pointSegmentDistance(clickCanvas.x, clickCanvas.y, c.position.x, c.position.y, cx2, cy2);
+                                return d <= tol;
+                              });
+                              if (nearCloth) {
+                                onDeleteChoiceRequest?.({
+                                  anchor: clickCanvas,
+                                  groupId: group.id,
+                                  candidates: [
+                                    { id: part.id, type: 'ブラケット' },
+                                    { id: nearCloth.id, type: '布材' },
+                                  ],
+                                });
+                                return;
+                              }
+                              // 直接削除（ブラケット）
+                              updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                              return;
+                            }
                             const pillarAtBase = group.parts.find(
                               (pp) =>
                                 pp.type === '柱' &&
@@ -1907,6 +2542,38 @@ export default function ScaffoldRenderer({
                           }}
                           onTap={(e) => {
                             e.cancelBubble = true;
+                            if (deleteMode) {
+                              const stage = e.target.getStage?.();
+                              const pos = stage?.getPointerPosition();
+                              if (!pos) return;
+                              const clickCanvas = {
+                                x: (pos.x - canvasPosition.x) / canvasScale,
+                                y: (pos.y - canvasPosition.y) / canvasScale,
+                              };
+                              const cloths = group.parts.filter((p) => p.type === '布材');
+                              const tol = Math.max(10 * (1 / canvasScale), 8);
+                              const nearCloth = cloths.find((c) => {
+                                const lenPx = mmToPx(c.meta?.length ?? 1800, DEFAULT_SCALE);
+                                const dv = typeof c.meta?.direction === 'number' ? degToUnitVector(Number(c.meta?.direction)) : t;
+                                const cx2 = c.position.x + dv.x * lenPx;
+                                const cy2 = c.position.y + dv.y * lenPx;
+                                const d = pointSegmentDistance(clickCanvas.x, clickCanvas.y, c.position.x, c.position.y, cx2, cy2);
+                                return d <= tol;
+                              });
+                              if (nearCloth) {
+                                onDeleteChoiceRequest?.({
+                                  anchor: clickCanvas,
+                                  groupId: group.id,
+                                  candidates: [
+                                    { id: part.id, type: 'ブラケット' },
+                                    { id: nearCloth.id, type: '布材' },
+                                  ],
+                                });
+                                return;
+                              }
+                              updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                              return;
+                            }
                             const pillarAtBase = group.parts.find(
                               (pp) =>
                                 pp.type === '柱' &&
@@ -2135,8 +2802,125 @@ export default function ScaffoldRenderer({
                   const highlightAnti = currentMode === 'edit' && editTargetType === 'アンチ';
                   const isSelectedAnti = selectedScaffoldPartKeys.includes(`${group.id}:${part.id}`);
                   // Rectのpositionは左上なので、中心基準にするためoffsetを設定
+                  const antiDraggable = currentMode === 'edit' && editTargetType === 'アンチ';
+                  // 吸着（スナップ）ロジック: ドラッグ中・ドラッグ終了時に短手（幅）側をブラケットへ吸着
+                  const SNAP_PX = 12 * (1 / canvasScale); // 画面上12px相当
+                  const snapAntiCenterToBrackets = (center: { x: number; y: number }) => {
+                    const vLong = degToUnitVector(angle); // アンチ長手
+                    const L = lengthPx;
+                    const W = widthPx;
+                    const brackets = group.parts.filter((p) => p.type === 'ブラケット');
+                    let best: { center: { x: number; y: number }; score: number } | null = null;
+
+                    const considerCandidate = (cand: { x: number; y: number }, weight = 1) => {
+                      const dx = cand.x - center.x;
+                      const dy = cand.y - center.y;
+                      const dist = Math.sqrt(dx * dx + dy * dy);
+                      if (dist <= SNAP_PX * 2) {
+                        const score = dist / Math.max(1, weight);
+                        if (!best || score < best.score) best = { center: cand, score };
+                      }
+                    };
+
+                    for (const b of brackets) {
+                      const bWidthMm = b.meta?.width ?? (b.meta?.bracketSize === 'W' ? 600 : 355);
+                      const bWidthPx = mmToPx(bWidthMm, DEFAULT_SCALE);
+                      const vB = degToUnitVector(Number(b.meta?.direction ?? 0)); // ブラケット方向（アンチ短手と平行）
+                      const tip = { x: b.position.x + vB.x * bWidthPx, y: b.position.y + vB.y * bWidthPx };
+
+                      // 1) 参照アンチ（既存）からコーナー相対位置を学習
+                      const bOff = Number(b.meta?.offsetMm);
+                      let refCenter: { x: number; y: number } | null = null;
+                      let refV: { x: number; y: number } | null = null;
+                      let refL = 0;
+                      let refW = 0;
+                      if (Number.isFinite(bOff)) {
+                        const refAnti = group.parts
+                          .filter((a) => a.type === 'アンチ' && a.id !== part.id)
+                          .find((a) => {
+                            const aOff = Number(a.meta?.offsetMm ?? NaN);
+                            const aLen = Number(a.meta?.length ?? 0);
+                            return aLen > 0 && Number.isFinite(aOff) && bOff! >= aOff - 1e-6 && bOff! <= aOff + aLen + 1e-6;
+                          });
+                        if (refAnti) {
+                          refCenter = { x: refAnti.position.x, y: refAnti.position.y };
+                          refV = degToUnitVector(Number(refAnti.meta?.direction ?? angle));
+                          refL = mmToPx(Number(refAnti.meta?.length ?? 1800), DEFAULT_SCALE);
+                          refW = mmToPx(Number(refAnti.meta?.width ?? 400), DEFAULT_SCALE);
+                          // 参照アンチの外側コーナー（ブラケット方向側）のうち、先端に近い方
+                          const c1 = {
+                            x: refCenter.x + vB.x * (refW / 2) + refV.x * (refL / 2),
+                            y: refCenter.y + vB.y * (refW / 2) + refV.y * (refL / 2),
+                          };
+                          const c2 = {
+                            x: refCenter.x + vB.x * (refW / 2) - refV.x * (refL / 2),
+                            y: refCenter.y + vB.y * (refW / 2) - refV.y * (refL / 2),
+                          };
+                          const vRef = (distToTip1 => (distToTip1 <= Math.hypot(c2.x - tip.x, c2.y - tip.y) ? { x: c1.x - tip.x, y: c1.y - tip.y } : { x: c2.x - tip.x, y: c2.y - tip.y }))(Math.hypot(c1.x - tip.x, c1.y - tip.y));
+                          // 現アンチの候補センター（外側コーナーを tip+vRef に一致）
+                          const cand1 = { x: tip.x + vRef.x - vB.x * (W / 2) - vLong.x * (L / 2), y: tip.y + vRef.y - vB.y * (W / 2) - vLong.y * (L / 2) };
+                          const cand2 = { x: tip.x + vRef.x - vB.x * (W / 2) + vLong.x * (L / 2), y: tip.y + vRef.y - vB.y * (W / 2) + vLong.y * (L / 2) };
+                          considerCandidate(cand1, 2);
+                          considerCandidate(cand2, 2);
+                          continue; // 参照があれば角スナップを優先
+                        }
+                      }
+
+                      // 2) フォールバック: 短手エッジをブラケット線へ（以前のロジック）
+                      const w = { x: center.x - b.position.x, y: center.y - b.position.y };
+                      const distD = w.x * vLong.x + w.y * vLong.y; // 長手方向距離
+                      const alongB = w.x * vB.x + w.y * vB.y;
+                      if (alongB < -SNAP_PX || alongB > bWidthPx + SNAP_PX) continue;
+                      const targetFront = +L / 2;
+                      const targetBack = -L / 2;
+                      const deltaFront = targetFront - distD;
+                      const deltaBack = targetBack - distD;
+                      const candDelta = Math.abs(deltaFront) <= Math.abs(deltaBack) ? deltaFront : deltaBack;
+                      if (Math.abs(candDelta) <= SNAP_PX) {
+                        const cand = { x: center.x + candDelta * vLong.x, y: center.y + candDelta * vLong.y };
+                        considerCandidate(cand);
+                      }
+                    }
+                    return best ? best.center : center;
+                  };
+
                   return (
-                    <Group key={part.id}>
+                    <Group
+                      key={part.id}
+                      draggable={antiDraggable}
+                      onDragMove={(e) => {
+                        if (!antiDraggable) return;
+                        const node = e.target as any;
+                        const dx = node.x();
+                        const dy = node.y();
+                        const currentCenter = { x: part.position.x + dx, y: part.position.y + dy };
+                        const snapped = snapAntiCenterToBrackets(currentCenter);
+                        // ノード座標をスナップ後の相対座標へ更新（視覚的に吸着）
+                        node.position({ x: snapped.x - part.position.x, y: snapped.y - part.position.y });
+                      }}
+                      onClick={(e) => {
+                        if (deleteMode) {
+                          e.cancelBubble = true;
+                          updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                          return;
+                        }
+                      }}
+                      onDragEnd={(e) => {
+                        if (!antiDraggable) return;
+                        const node = e.target as any;
+                        const dx = node.x();
+                        const dy = node.y();
+                        const currentCenter = { x: part.position.x + dx, y: part.position.y + dy };
+                        const snapped = snapAntiCenterToBrackets(currentCenter);
+                        node.position({ x: 0, y: 0 });
+                        const nextParts = group.parts.map((p) =>
+                          p.id === part.id
+                            ? { ...p, position: { x: snapped.x, y: snapped.y } }
+                            : p
+                        );
+                        updateScaffoldGroup(group.id, { parts: nextParts });
+                      }}
+                    >
                       {/* ビューモード時の数量未確定発光（赤色） */}
                       {currentMode === 'view' && !isQuantityConfirmed(part) && (
                         <Rect
@@ -2232,9 +3016,9 @@ export default function ScaffoldRenderer({
                         stroke={stroke}
                         strokeWidth={1}
                         cornerRadius={2}
-                        // アンチの基礎矩形は、ビューモードとアンチ編集時のみポインターイベントを受け付ける
-                        // ブラケット編集時など他編集モードでは underlying（ブラケット）のクリックを通すために無効化
-                        listening={currentMode === 'view' || (currentMode === 'edit' && editTargetType === 'アンチ')}
+                        // アンチの基礎矩形は、ビューモード・アンチ編集時・削除モードでポインターイベントを受け付ける
+                        // ブラケット編集時など他編集モードでは underlying（ブラケット）を優先するが、削除モードは例外として許可
+                        listening={currentMode === 'view' || deleteMode || (currentMode === 'edit' && editTargetType === 'アンチ')}
                         onMouseEnter={(e) => {
                           if (currentMode === 'view') {
                             // ビューモード: 情報カードを表示
@@ -2270,6 +3054,11 @@ export default function ScaffoldRenderer({
                           }
                         }}
                         onClick={(e) => {
+                          if (deleteMode) {
+                            e.cancelBubble = true;
+                            updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                            return;
+                          }
                           // ビューモードでは編集を無効化
                           if (currentMode === 'view') {
                             e.cancelBubble = true;
@@ -2299,6 +3088,11 @@ export default function ScaffoldRenderer({
                           onAntiClick?.({ anchor: { x: part.position.x, y: part.position.y }, groupId: group.id, partId: part.id });
                         }}
                         onTap={(e) => {
+                          if (deleteMode) {
+                            e.cancelBubble = true;
+                            updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                            return;
+                          }
                           // ビューモードでは編集を無効化
                           if (currentMode === 'view') {
                             e.cancelBubble = true;
@@ -2340,6 +3134,11 @@ export default function ScaffoldRenderer({
                           fill="rgba(0,0,0,0)"
                           listening={true}
                           onClick={(e) => {
+                            if (deleteMode) {
+                              e.cancelBubble = true;
+                              updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                              return;
+                            }
                             // ビューモードでは編集を無効化
                             if (currentMode === 'view') {
                               e.cancelBubble = true;
@@ -2380,6 +3179,11 @@ export default function ScaffoldRenderer({
                             });
                           }}
                           onTap={(e) => {
+                            if (deleteMode) {
+                              e.cancelBubble = true;
+                              updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                              return;
+                            }
                             // ビューモードでは編集を無効化
                             if (currentMode === 'view') {
                               e.cancelBubble = true;
@@ -2504,6 +3308,11 @@ export default function ScaffoldRenderer({
                               fill="rgba(0,0,0,0)"
                               listening={true}
                               onClick={(e) => {
+                                if (deleteMode) {
+                                  e.cancelBubble = true;
+                                  updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                                  return;
+                                }
                                 if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                                 e.cancelBubble = true;
                                 // 選択モード中は段数用の選択トグル（青色発光選択）
@@ -2519,6 +3328,11 @@ export default function ScaffoldRenderer({
                                 });
                               }}
                               onTap={(e) => {
+                                if (deleteMode) {
+                                  e.cancelBubble = true;
+                                  updateScaffoldGroup(group.id, { parts: group.parts.filter((p) => p.id !== part.id) });
+                                  return;
+                                }
                                 if (!(currentMode === 'edit' && editTargetType === 'アンチ')) return;
                                 e.cancelBubble = true;
                                 if (editSelectionMode === 'select' || editSelectionMode === 'lasso' || editSelectionMode === 'bulk') {
@@ -2721,9 +3535,113 @@ export default function ScaffoldRenderer({
                 </>
               );
             })()}
+
+            {/* ドラッグ中: 対象スパンの部材をプレビュー位置に重ね描き（掴んで動いている感） */}
+            {spanDragState && spanDragState.groupId === group.id && previewPosById && (
+              <Group listening={false}>
+                {group.parts.map((p) => {
+                  const pos = previewPosById!.get(p.id);
+                  if (!pos) return null;
+                  if (p.type === '柱') {
+                    return (
+                      <Circle
+                        key={`pv-${p.id}`}
+                        x={pos.x}
+                        y={pos.y}
+                        radius={5}
+                        fill={colorToStroke(p.color)}
+                        opacity={0.85}
+                        shadowColor={'#22D3EE'}
+                        shadowBlur={6}
+                        shadowOpacity={0.6}
+                      />
+                    );
+                  }
+                  if (p.type === 'ブラケット') {
+                    const widthMm = p.meta?.width ?? (p.meta?.bracketSize === 'W' ? 600 : 355);
+                    const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+                    const dir = Number(p.meta?.direction ?? 0);
+                    const v = degToUnitVector(dir);
+                    const x2 = pos.x + v.x * widthPx;
+                    const y2 = pos.y + v.y * widthPx;
+                    return (
+                      <Line
+                        key={`pv-${p.id}`}
+                        points={[pos.x, pos.y, x2, y2]}
+                        stroke={colorToStroke(p.color)}
+                        strokeWidth={2}
+                        opacity={0.9}
+                      />
+                    );
+                  }
+                  if (p.type === '布材') {
+                    const len = Number(p.meta?.length ?? 0);
+                    const v = typeof p.meta?.direction === 'number' ? degToUnitVector(Number(p.meta.direction)) : t;
+                    const x2 = pos.x + v.x * mmToPx(len, DEFAULT_SCALE);
+                    const y2 = pos.y + v.y * mmToPx(len, DEFAULT_SCALE);
+                    return (
+                      <Line
+                        key={`pv-${p.id}`}
+                        points={[pos.x, pos.y, x2, y2]}
+                        stroke={colorToStroke(p.color)}
+                        strokeWidth={3}
+                        opacity={0.85}
+                        shadowColor={'#22D3EE'}
+                        shadowBlur={6}
+                        shadowOpacity={0.6}
+                      />
+                    );
+                  }
+                  if (p.type === 'アンチ') {
+                    const lengthPx = mmToPx(Number(p.meta?.length ?? 0), DEFAULT_SCALE);
+                    const widthPx = mmToPx(Number(p.meta?.width ?? 400), DEFAULT_SCALE);
+                    const angle = Number(p.meta?.direction ?? 0);
+                    return (
+                      <Rect
+                        key={`pv-${p.id}`}
+                        x={pos.x}
+                        y={pos.y}
+                        width={lengthPx}
+                        height={widthPx}
+                        offsetX={lengthPx / 2}
+                        offsetY={widthPx / 2}
+                        rotation={angle}
+                        stroke={colorToStroke(p.color)}
+                        strokeWidth={1.5}
+                        fill={colorToStroke(p.color) + '22'}
+                        opacity={0.9}
+                      />
+                    );
+                  }
+                  if (p.type === '階段') {
+                    const lengthPx = mmToPx(Number(p.meta?.length ?? 1800), DEFAULT_SCALE);
+                    const widthPx = mmToPx(Number(p.meta?.width ?? 400), DEFAULT_SCALE);
+                    const angle = Number(p.meta?.direction ?? 0);
+                    return (
+                      <Rect
+                        key={`pv-${p.id}`}
+                        x={pos.x}
+                        y={pos.y}
+                        width={lengthPx}
+                        height={widthPx}
+                        offsetX={lengthPx / 2}
+                        offsetY={widthPx / 2}
+                        rotation={angle}
+                        stroke={colorToStroke(p.color)}
+                        strokeWidth={1.5}
+                        fill={colorToStroke(p.color) + '22'}
+                        opacity={0.9}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </Group>
+            )}
           </Group>
         );
       })}
     </>
   );
 }
+ 
