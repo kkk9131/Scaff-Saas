@@ -40,6 +40,7 @@ import DeleteSelectCard from './DeleteSelectCard';
 // 旧: BulkPillarQuantityCard は統合版へ移行
 import { useProjectStore } from '@/stores/projectStore';
 import { useDrawingSave } from '@/hooks/useDrawingSave';
+import { registerStage } from '@/lib/canvasStageExporter';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -104,7 +105,11 @@ export default function CanvasStage() {
   // 自動保存フック（10秒 or 10アクション）
   useDrawingSave({ intervalMs: 10_000, actionThreshold: 10 });
 
-  // PNGプレビューのステージ登録は実装リセットのため削除
+  // PNGエクスポート用に Stage を登録
+  useEffect(() => {
+    if (stageRef.current) registerStage(stageRef.current);
+    return () => registerStage(null);
+  }, []);
 
   // 布材分割ドラッグのプレビュー状態
   const [clothSplit, setClothSplit] = useState<
