@@ -41,7 +41,6 @@ import DeleteSelectCard from './DeleteSelectCard';
 import { useProjectStore } from '@/stores/projectStore';
 import { useDrawingSave } from '@/hooks/useDrawingSave';
 import { v4 as uuidv4 } from 'uuid';
-import { registerStage } from '@/lib/canvasStageRegistry';
 
 /**
  * CanvasStageコンポーネント
@@ -105,15 +104,7 @@ export default function CanvasStage() {
   // 自動保存フック（10秒 or 10アクション）
   useDrawingSave({ intervalMs: 10_000, actionThreshold: 10 });
 
-  // Stageのグローバル登録（PNGプレビュー/エクスポート用）
-  useEffect(() => {
-    if (stageRef.current) {
-      registerStage(stageRef.current);
-    }
-    return () => {
-      registerStage(null);
-    };
-  }, []);
+  // PNGプレビューのステージ登録は実装リセットのため削除
 
   // 布材分割ドラッグのプレビュー状態
   const [clothSplit, setClothSplit] = useState<
@@ -1700,7 +1691,7 @@ export default function CanvasStage() {
         onMouseUp={handleMouseUp}
       >
         {/* グリッドレイヤー（最背面） */}
-        <Layer>
+        <Layer name="grid-layer">
           <GridOverlay
             width={stageSize.width}
             height={stageSize.height}

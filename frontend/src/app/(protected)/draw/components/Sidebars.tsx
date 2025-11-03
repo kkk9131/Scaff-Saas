@@ -24,6 +24,7 @@ import {
   ArrowLeftRight,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { scaffoldPartIconMap } from '@/components/draw/ScaffoldPartIcons';
 
 /**
  * 左サイドバーコンポーネント
@@ -80,30 +81,29 @@ function LeftSidebar() {
   /**
    * 編集対象の部材ボタン
    * - 編集モード時のみ表示
-   * - 6種（柱/布材/ブラケット/アンチ/階段/梁枠）
+   * - 7種（柱/布材/ブラケット/アンチ/ハネ/階段/梁枠）
+   * - SVGアイコンで表示
    */
-  const EditTargetButton = ({
-    type,
-    glyph,
-  }: {
-    type: ScaffoldPartType;
-    /** 小さな表示文字（1～2文字） */
-    glyph: string;
-  }) => (
-    <button
-      onClick={() => setEditTargetType(type)}
-      className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold transition-all select-none ${
-        editTargetType === type
-          ? 'bg-gradient-to-br from-cyan-400/20 via-sky-400/20 to-indigo-500/20 outline outline-2 outline-cyan-400 text-sky-300'
-          : 'text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-      }`}
-      aria-label={`編集対象: ${type}`}
-      title={`編集対象: ${type}`}
-    >
-      <span>{glyph}</span>
-      <div className={tooltipCls} role="tooltip">編集対象: {type}</div>
-    </button>
-  );
+  const EditTargetButton = ({ type }: { type: ScaffoldPartType }) => {
+    const Icon = scaffoldPartIconMap[type];
+
+    return (
+      <button
+        onClick={() => setEditTargetType(type)}
+        className={`group relative flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold transition-all select-none ${
+          editTargetType === type
+            ? 'bg-gradient-to-br from-cyan-400/20 via-sky-400/20 to-indigo-500/20 outline outline-2 outline-cyan-400 text-sky-300'
+            : 'text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+        }`}
+        aria-label={`編集対象: ${type}`}
+        title={`編集対象: ${type}`}
+      >
+        <Icon size={22} />
+        <span className="sr-only">{type}</span>
+        <div className={tooltipCls} role="tooltip">編集対象: {type}</div>
+      </button>
+    );
+  };
 
   return (
     <aside
@@ -216,18 +216,15 @@ function LeftSidebar() {
                 <div className="my-2 h-px bg-white/20 dark:bg-slate-700/50" />
                 {/* セクション見出し（視覚的な説明） */}
                 <div className="mb-1 text-[10px] font-semibold tracking-wider text-slate-600 dark:text-slate-400 text-center">編集対象</div>
-                {/* 7種の部材タイプ選択（2列） */}
+                {/* 7種の部材タイプ選択（1列） */}
                 <div className="grid grid-cols-1 gap-2">
-                  {/* 柱 / 布材 */}
-                  <EditTargetButton type="柱" glyph="柱" />
-                  <EditTargetButton type="布材" glyph="布" />
-                  {/* ブラケット / アンチ */}
-                  <EditTargetButton type="ブラケット" glyph="ブ" />
-                  <EditTargetButton type="アンチ" glyph="ア" />
-                  {/* はね / 階段 / 梁枠 */}
-                  <EditTargetButton type="ハネ" glyph="羽" />
-                  <EditTargetButton type="階段" glyph="階" />
-                  <EditTargetButton type="梁枠" glyph="梁" />
+                  <EditTargetButton type="柱" />
+                  <EditTargetButton type="布材" />
+                  <EditTargetButton type="ブラケット" />
+                  <EditTargetButton type="アンチ" />
+                  <EditTargetButton type="ハネ" />
+                  <EditTargetButton type="階段" />
+                  <EditTargetButton type="梁枠" />
                 </div>
               </>
             )}

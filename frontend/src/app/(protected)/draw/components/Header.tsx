@@ -13,11 +13,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Image as ImageIcon, Upload } from 'lucide-react';
+import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Upload } from 'lucide-react';
 import { ConfirmModal, Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import PngPreviewModal from './PngPreviewModal';
 import { useProjectStore } from '@/stores/projectStore';
 import type { Project } from '@/types/project';
 import { getProjects } from '@/lib/api/projects';
@@ -31,7 +30,6 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [isPngPreviewOpen, setIsPngPreviewOpen] = useState(false);
   // 追加: プロジェクト保存モーダル状態
   const [isProjectSaveOpen, setIsProjectSaveOpen] = useState(false);
   const [projectList, setProjectList] = useState<Project[]>([]);
@@ -79,11 +77,8 @@ export default function Header() {
     }
   }, [exportToJSON]);
 
-  // PNG保存処理
-  const handleSavePNG = useCallback(() => {
-    setIsSaveModalOpen(false);
-    setIsPngPreviewOpen(true);
-  }, []);
+  // PNG保存処理（プレビュー実装リセット中のため一時無効化）
+  // 今後の再実装時に差し替える
 
   /**
    * JSONインポート: ファイル選択ダイアログを開く
@@ -188,10 +183,7 @@ export default function Header() {
     }
   }, [exportToJSON, selectedProjectId]);
 
-  // PNGエクスポート完了処理
-  const handlePngExportComplete = useCallback(() => {
-    setIsPngPreviewOpen(false);
-  }, []);
+  // PNGエクスポート完了処理（未使用）
 
   // Ctrl+S キーボードショートカット
   useEffect(() => {
@@ -362,33 +354,11 @@ export default function Header() {
           <span className="text-xs font-medium text-slate-700 dark:text-slate-200">JSON</span>
         </button>
 
-        {/* PNG保存ボタン */}
-        <button
-          onClick={handleSavePNG}
-          className={cn(
-            'group relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-white/40 shadow-sm transition-all',
-            'hover:border-primary/50 hover:bg-primary/5',
-            'dark:hover:bg-primary/10',
-            'dark:border-slate-700/50 dark:bg-slate-800/60',
-            'cursor-pointer',
-            'save-format-card'
-          )}
-          aria-label="PNG形式で保存"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
-            <ImageIcon size={24} className="text-primary" />
-          </div>
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-200">PNG</span>
-        </button>
+        {/* PNG保存ボタン（プレビュー実装リセットのため一時撤去） */}
       </div>
     </Modal>
 
-    {/* PNGプレビューモーダル */}
-    <PngPreviewModal
-      isOpen={isPngPreviewOpen}
-      onClose={() => setIsPngPreviewOpen(false)}
-      onExport={handlePngExportComplete}
-    />
+    {/* PNGプレビューは実装やり直しのため削除 */}
 
     {/* プロジェクト選択モーダル */}
     <Modal
