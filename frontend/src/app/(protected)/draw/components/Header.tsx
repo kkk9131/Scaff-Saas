@@ -26,7 +26,7 @@ import { getProjects } from '@/lib/api/projects';
  * 作図画面上部のナビゲーションとコントロール
  */
 export default function Header() {
-  const { underbarVisible, toggleUnderbar, undo, redo, resetDrawing, exportToJSON } = useDrawingStore();
+  const { underbarVisible, toggleUnderbar, undo, redo, resetDrawing, exportToJSON, scaffoldGroups, memos } = useDrawingStore();
   const { theme, toggleTheme } = useTheme();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -37,6 +37,9 @@ export default function Header() {
   const [projectError, setProjectError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [isSavingToProject, setIsSavingToProject] = useState(false);
+  // PNGプレビュー用の状態
+  const [isPngPreviewOpen, setIsPngPreviewOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const { currentProject } = useProjectStore();
   const isDark = theme === 'dark';
   // JSONインポート用のinput参照
@@ -77,27 +80,86 @@ export default function Header() {
     }
   }, [exportToJSON]);
 
-  // PNG保存（最小実装）: StageからPNGを生成してダウンロード
-  const handleSavePNG = useCallback(() => {
+  // PNGプレビューを開く: StageからPNGを生成してプレビュー表示
+  const handleOpenPngPreview = useCallback(async () => {
+    console.log('========================================');
+    console.log('【Header】PNG保存ボタンクリック');
+    console.log('========================================');
+
     try {
+      // 保存モーダルを閉じる
+      setIsSaveModalOpen(false);
+
       const { exportStageToDataURL } = require('@/lib/canvasStageExporter');
-      const url = exportStageToDataURL({ pixelRatio: 2, whiteBg: true, hideGrid: true });
+      console.log('【Header】exportStageToDataURL関数取得成功');
+
+      // exportStageToDataURLは非同期処理なのでawaitする
+      console.log('【Header】PNG生成開始...');
+      const url = await exportStageToDataURL({
+        pixelRatio: 2,
+        whiteBg: true,
+        hideGrid: true,
+        scaffoldGroups: scaffoldGroups, // 柱情報とアンチ枚数を描画するために渡す
+        memos: memos // メモを描画するために渡す
+      });
+
+      console.log('【Header】PNG生成完了:', {
+        hasUrl: !!url,
+        urlLength: url?.length || 0,
+        urlType: typeof url,
+        urlPrefix: url?.substring(0, 100)
+      });
+
       if (!url) {
-        alert('PNGの生成に失敗しました');
+        console.error('【Header】❌ URLが空です');
         return;
       }
+
+      if (typeof url !== 'string' || !url.startsWith('data:image')) {
+        console.error('【Header】❌ URLの形式が不正です:', url?.substring(0, 100));
+        alert('エラー: 生成されたPNGデータが不正です');
+        return;
+      }
+
+      console.log('【Header】プレビュー状態を設定...');
+      setPreviewImageUrl(url);
+      setIsPngPreviewOpen(true);
+
+      console.log('【Header】✅ プレビューモーダルを開きました');
+      console.log('========================================');
+    } catch (e: any) {
+      console.error('【Header】❌ PNG生成エラー:', e);
+      console.error('エラー詳細:', {
+        message: e.message,
+        stack: e.stack
+      });
+      alert(`PNG生成に失敗しました: ${e.message}`);
+    }
+  }, [scaffoldGroups, memos]);
+
+  // PNG保存を確定: プレビュー画像をダウンロード
+  const handleConfirmSavePNG = useCallback(() => {
+    if (!previewImageUrl) return;
+    try {
       const a = document.createElement('a');
       const date = new Date().toISOString().split('T')[0];
-      a.href = url;
+      a.href = previewImageUrl;
       a.download = `scaffold-drawing-${date}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setIsSaveModalOpen(false);
+      setIsPngPreviewOpen(false);
+      setPreviewImageUrl(null);
     } catch (e) {
       console.error('PNG保存エラー:', e);
       alert('PNG保存に失敗しました');
     }
+  }, [previewImageUrl]);
+
+  // PNGプレビューをキャンセル
+  const handleCancelPngPreview = useCallback(() => {
+    setIsPngPreviewOpen(false);
+    setPreviewImageUrl(null);
   }, []);
 
   /**
@@ -204,6 +266,12 @@ export default function Header() {
   }, [exportToJSON, selectedProjectId]);
 
   // PNGエクスポート完了処理（未使用）
+
+  // デバッグ: 状態変化を追跡
+  useEffect(() => {
+    console.log('【Header State】isPngPreviewOpen:', isPngPreviewOpen);
+    console.log('【Header State】previewImageUrl:', previewImageUrl ? `有 (${previewImageUrl.length}文字)` : '無');
+  }, [isPngPreviewOpen, previewImageUrl]);
 
   // Ctrl+S キーボードショートカット
   useEffect(() => {
@@ -374,9 +442,9 @@ export default function Header() {
           <span className="text-xs font-medium text-slate-700 dark:text-slate-200">JSON</span>
         </button>
 
-        {/* PNG保存ボタン（最小実装） */}
+        {/* PNG保存ボタン（プレビュー付き） */}
         <button
-          onClick={handleSavePNG}
+          onClick={handleOpenPngPreview}
           className={cn(
             'group relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-white/40 shadow-sm transition-all',
             'hover:border-primary/50 hover:bg-primary/5',
@@ -385,7 +453,7 @@ export default function Header() {
             'cursor-pointer',
             'save-format-card'
           )}
-          aria-label="PNG形式で保存"
+          aria-label="PNG形式で保存（プレビュー付き）"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
             <ImageIcon size={24} className="text-primary" />
@@ -395,7 +463,56 @@ export default function Header() {
       </div>
     </Modal>
 
-    {/* PNGプレビューは実装やり直しのため削除 */}
+    {/* PNGプレビューモーダル（フルスクリーン） */}
+    {isPngPreviewOpen && (
+      <div className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-sm">
+
+        {/* プレビュー画像エリア（画面いっぱい） */}
+        <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
+          {previewImageUrl ? (
+            <img
+              src={previewImageUrl}
+              alt="PNG保存プレビュー"
+              className="max-w-full max-h-full object-contain shadow-2xl border-4 border-white/20"
+              onLoad={() => console.log('✅ 画像の読み込み成功')}
+              onError={(e) => {
+                console.error('❌ 画像の読み込み失敗:', e);
+                console.error('画像URL:', previewImageUrl?.substring(0, 100));
+              }}
+            />
+          ) : (
+            <div className="text-white text-center">
+              <div className="text-xl mb-4">⚠️ プレビュー画像がありません</div>
+              <div className="text-sm opacity-70">コンソールログを確認してください</div>
+            </div>
+          )}
+        </div>
+
+        {/* 下部ボタンエリア */}
+        <div className="flex items-center justify-center gap-4 p-6 bg-gradient-to-t from-black/80 to-transparent">
+          {/* キャンセルボタン */}
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={handleCancelPngPreview}
+            className="min-w-[150px] bg-white/10 !text-white !border-white/30 backdrop-blur-sm hover:bg-white/20 hover:!border-white/50"
+          >
+            キャンセル
+          </Button>
+
+          {/* 保存ボタン */}
+          <Button
+            size="lg"
+            onClick={handleConfirmSavePNG}
+            disabled={!previewImageUrl}
+            className="min-w-[150px] bg-gradient-to-r from-sky-500 via-sky-400 to-sky-600 !text-white shadow-[0_12px_32px_-16px_rgba(14,165,233,0.8)] hover:shadow-[0_16px_40px_-16px_rgba(14,165,233,0.7)] hover:from-sky-600 hover:via-sky-500 hover:to-sky-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ImageIcon size={18} className="mr-2" />
+            保存する
+          </Button>
+        </div>
+      </div>
+    )}
 
     {/* プロジェクト選択モーダル */}
     <Modal
