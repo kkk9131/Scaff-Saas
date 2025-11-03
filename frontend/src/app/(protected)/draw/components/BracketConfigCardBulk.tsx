@@ -221,7 +221,7 @@ export default function BracketConfigCardBulk({ screenPosition, onClose }: Brack
   return (
     <div
       style={style}
-      className="glass-scope bracket-config-card fixed z-30 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
+      className="glass-scope bracket-config-card fixed z-30 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-emerald-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-emerald-400/0 before:via-emerald-300/0 before:to-emerald-400/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
       aria-live="polite"
       aria-label="ブラケットの一括設定カード"
     >
@@ -306,7 +306,7 @@ export default function BracketConfigCardBulk({ screenPosition, onClose }: Brack
             variant="outline"
             size="sm"
             onClick={saveBulk}
-            className="bg-white !text-slate-900 !border-slate-400 shadow-[0_8px_24px_-12px_rgba(59,130,246,0.25)] hover:bg-blue-50 hover:!text-blue-700 hover:!border-blue-400 dark:bg-transparent dark:!text-gray-100 dark:!border-gray-600 dark:hover:bg-[#3B82F6]/20"
+            className="bg-white !text-slate-900 !border-slate-400 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.25)] hover:bg-emerald-50 hover:!text-emerald-700 hover:!border-emerald-400 dark:bg-transparent dark:!text-gray-100 dark:!border-gray-600 dark:hover:bg-emerald-900/20"
             aria-label="選択した設定で既存ブラケットを更新"
           >
             変更
@@ -314,7 +314,7 @@ export default function BracketConfigCardBulk({ screenPosition, onClose }: Brack
           <Button
             size="sm"
             onClick={drawBulk}
-            className="bg-gradient-to-r from-[#6366F1] via-[#06B6D4] to-[#3B82F6] !text-white shadow-[0_12px_32px_-16px_rgba(79,70,229,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(59,130,246,0.55)] hover:from-[#4F46E5] hover:via-[#0EA5E9] hover:to-[#2563EB] dark:bg-[#7C3AED] dark:hover:bg-[#8B5CF6]"
+            className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 !text-white shadow-[0_12px_32px_-16px_rgba(16,185,129,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(16,185,129,0.55)] hover:from-emerald-600 hover:via-emerald-500 hover:to-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
           >
             作図
           </Button>

@@ -35,6 +35,8 @@ import BraceQuantityCard from './BraceQuantityCard';
 import MemoRenderer from './MemoRenderer';
 import MemoCard from './MemoCard';
 import ViewModeInfoCard from './ViewModeInfoCard';
+import AntiAddCard from './AntiAddCard';
+import DeleteSelectCard from './DeleteSelectCard';
 // 旧: BulkPillarQuantityCard は統合版へ移行
 
 /**
@@ -598,12 +600,38 @@ export default function CanvasStage() {
     | null
   >(null);
 
+  /**
+   * アンチ追加カードの状態
+   * アンチが接していないブラケットをクリックしたときに表示
+   */
+  const [antiAddCard, setAntiAddCard] = useState<
+    | {
+        anchor: { x: number; y: number };
+        groupId: string;
+        bracketId: string;
+      }
+    | null
+  >(null);
+
+  /** 削除選択カードの状態（布材とブラケットが重複する場合等） */
+  const [deleteSelectCard, setDeleteSelectCard] = useState<
+    | {
+        anchor: { x: number; y: number };
+        candidates: { id: string; type: '布材' | 'ブラケット' | '柱' | 'アンチ' | '階段' | '梁枠' }[];
+        groupId: string;
+      }
+    | null
+  >(null);
+
   /** ブラケット設定カードの状態 */
   const [bracketConfigCard, setBracketConfigCard] = useState<
     | {
         anchor: { x: number; y: number };
         groupId: string;
-        partId: string;
+        /** 既存ブラケット編集 */
+        partId?: string;
+        /** 未作図の柱から新規作図 */
+        pillarId?: string;
       }
     | null
   >(null);
@@ -675,14 +703,22 @@ export default function CanvasStage() {
   }, [isPanning]);
 
   /**
-   * Enterキー: 柱・選択モードで一括編集カードを開く
+   * Enterキー: 編集モードでの一括編集カードを開く
+   *
+   * 変更点（バグ修正）
+   * - これまで「選択が2件以上」の時のみ一括カードを開いていたが、
+   *   柱を1本だけ選択しているケースでもブラケットの追加ができるよう、
+   *   選択数の条件を「> 0」に緩和する。
+   * - 文脈: ブラケット編集＋選択モード時に青色発光した柱をクリックすると
+   *   選択トグルになる仕様だが、1本だけではEnterでカードが開かず追加できない問題があったため。
    */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' && e.code !== 'Enter') return;
       if (currentMode !== 'edit') return;
-      // 複数選択時に Enter で一括カードを開く（柱/布材）
-      if (!(selectedScaffoldPartKeys.length > 1)) return;
+      // 1件以上選択時に Enter で一括カードを開く（柱/布材/ブラケット/アンチ/ハネ）
+      // 以前は >1（2件以上）だったが、1件のみ選択でも一括カードを開けるようにする。
+      if (!(selectedScaffoldPartKeys.length > 0)) return;
       if (editTargetType === '柱') {
         e.preventDefault();
         setBulkPillarScope('selected');
@@ -1320,11 +1356,20 @@ export default function CanvasStage() {
             onBracketConfigClick={({ anchor, groupId, partId }) => {
               setBracketConfigCard({ anchor, groupId, partId });
             }}
+            onBracketConfigAtPillar={({ anchor, groupId, pillarId }) => {
+              setBracketConfigCard({ anchor, groupId, pillarId });
+            }}
             onHaneConfigClick={({ anchor, groupId, partId }) => {
               setHaneCard({ anchor, groupId, partId });
             }}
             onViewPartHover={(info) => {
               setHoveredViewPart(info);
+            }}
+            onAntiAddRequest={({ anchor, groupId, bracketId }) => {
+              setAntiAddCard({ anchor, groupId, bracketId });
+            }}
+            onDeleteChoiceRequest={({ anchor, groupId, candidates }) => {
+              setDeleteSelectCard({ anchor, groupId, candidates });
             }}
           />
         </Layer>
@@ -1647,6 +1692,40 @@ export default function CanvasStage() {
         />
       )}
 
+      {/* アンチ追加カード（アンチ未接ブラケットをクリック時に表示） */}
+      {antiAddCard && (
+        <AntiAddCard
+          groupId={antiAddCard.groupId}
+          bracketId={antiAddCard.bracketId}
+          screenPosition={{
+            left: antiAddCard.anchor.x * canvasScale + canvasPosition.x + 12,
+            top: antiAddCard.anchor.y * canvasScale + canvasPosition.y + 12,
+          }}
+          onClose={() => setAntiAddCard(null)}
+          onCreated={() => setAntiAddCard(null)}
+        />
+      )}
+
+      {/* 削除対象選択カード */}
+      {deleteSelectCard && (
+        <DeleteSelectCard
+          screenPosition={{
+            left: deleteSelectCard.anchor.x * canvasScale + canvasPosition.x + 12,
+            top: deleteSelectCard.anchor.y * canvasScale + canvasPosition.y + 12,
+          }}
+          candidates={deleteSelectCard.candidates}
+          onSelect={(c) => {
+            const { groupId } = deleteSelectCard;
+            const g = useDrawingStore.getState().scaffoldGroups.find((gg) => gg.id === groupId);
+            if (!g) return setDeleteSelectCard(null);
+            const next = { ...g, parts: g.parts.filter((p) => p.id !== c.id) };
+            updateScaffoldGroup(groupId, next);
+            setDeleteSelectCard(null);
+          }}
+          onClose={() => setDeleteSelectCard(null)}
+        />
+      )}
+
       {/* アンチの一括カード（数量 or 段数） */}
       {currentMode === 'edit' && editTargetType === 'アンチ' && editSelectionMode === 'bulk' && (() => {
         const { bulkAntiScope, bulkAntiAction } = useDrawingStore.getState();
@@ -1687,6 +1766,7 @@ export default function CanvasStage() {
         <BracketConfigCard
           groupId={bracketConfigCard.groupId}
           partId={bracketConfigCard.partId}
+          pillarId={bracketConfigCard.pillarId}
           screenPosition={{
             left: bracketConfigCard.anchor.x * canvasScale + canvasPosition.x + 12,
             top: bracketConfigCard.anchor.y * canvasScale + canvasPosition.y + 12,

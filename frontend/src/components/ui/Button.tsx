@@ -30,12 +30,12 @@ const buttonVariants = cva(
     variants: {
       // バリアント（色とスタイルの種類）
       variant: {
-        // デフォルト: モダンなIndigo（主要アクション）
+        // デフォルト: シアングラデーション（主要アクション）
         default: cn(
-          'bg-[#6366F1] text-white',
-          'shadow-md shadow-[#6366F1]/20 hover:shadow-xl hover:shadow-[#6366F1]/40',
-          'hover:scale-105 hover:bg-[#7C3AED]',
-          'dark:bg-[#7C3AED] dark:hover:bg-[#8B5CF6]'
+          'bg-gradient-to-r from-cyan-500 via-cyan-400 to-cyan-600 text-white',
+          'shadow-md shadow-cyan-500/20 hover:shadow-xl hover:shadow-cyan-500/40',
+          'hover:scale-105 hover:from-cyan-600 hover:via-cyan-500 hover:to-cyan-700',
+          'dark:bg-gradient-to-r dark:from-cyan-600 dark:via-cyan-500 dark:to-cyan-700 dark:hover:from-cyan-700 dark:hover:via-cyan-600 dark:hover:to-cyan-800'
         ),
 
         // 破壊的アクション: レッド（削除など）
@@ -56,10 +56,10 @@ const buttonVariants = cva(
 
         // セカンダリ: パープル（補助アクション）
         secondary: cn(
-          'bg-[#8B5CF6] text-white',
-          'shadow-md shadow-[#8B5CF6]/20 hover:shadow-xl hover:shadow-[#8B5CF6]/40',
-          'hover:scale-105 hover:bg-[#7C3AED]',
-          'dark:bg-[#7C3AED] dark:hover:bg-[#6D28D9]'
+          'bg-emerald-600 text-white',
+          'shadow-md shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/40',
+          'hover:scale-105 hover:bg-emerald-700',
+          'dark:bg-emerald-700 dark:hover:bg-emerald-800'
         ),
 
         // ゴースト: 背景なし（テキストリンク風）
@@ -70,14 +70,14 @@ const buttonVariants = cva(
         ),
 
         // リンク: テキストリンク
-        link: 'text-[#6366F1] underline-offset-4 hover:underline dark:text-[#8B5CF6]',
+        link: 'text-emerald-600 underline-offset-4 hover:underline dark:text-emerald-400',
 
-        // 成功: エメラルドグリーン（完了・確定）
+        // 成功: シアングラデーション（完了・確定）
         success: cn(
-          'bg-[#10B981] text-white',
-          'shadow-md shadow-[#10B981]/20 hover:shadow-xl hover:shadow-[#10B981]/40',
-          'hover:scale-105 hover:bg-[#059669]',
-          'dark:bg-[#059669] dark:hover:bg-[#047857]'
+          'bg-gradient-to-r from-cyan-500 via-cyan-400 to-cyan-600 text-white',
+          'shadow-md shadow-cyan-500/20 hover:shadow-xl hover:shadow-cyan-500/40',
+          'hover:scale-105 hover:from-cyan-600 hover:via-cyan-500 hover:to-cyan-700',
+          'dark:bg-gradient-to-r dark:from-cyan-600 dark:via-cyan-500 dark:to-cyan-700 dark:hover:from-cyan-700 dark:hover:via-cyan-600 dark:hover:to-cyan-800'
         ),
 
         // 警告: アンバー（注意喚起）

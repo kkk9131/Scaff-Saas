@@ -99,7 +99,7 @@ interface DrawingState {
    * - 'bulk': 一括選択モード（複数要素を一括操作）
    * - null: 選択モード未選択
    */
-  editSelectionMode: 'select' | 'lasso' | 'bulk' | null;
+  editSelectionMode: 'select' | 'lasso' | 'bulk' | 'delete' | null;
 
   /**
    * 一括編集時の対象スコープ（柱）
@@ -194,7 +194,7 @@ interface DrawingState {
    * @param mode - 'select' | 'lasso' | 'bulk' | null
    * 同じモードをクリックした場合はnullに解除
    */
-  setEditSelectionMode: (mode: 'select' | 'lasso' | 'bulk' | null) => void;
+  setEditSelectionMode: (mode: 'select' | 'lasso' | 'bulk' | 'delete' | null) => void;
   /** 一括編集スコープ（柱）の設定 */
   setBulkPillarScope: (scope: 'selected' | 'all') => void;
   /** 一括編集スコープ（布材）の設定 */

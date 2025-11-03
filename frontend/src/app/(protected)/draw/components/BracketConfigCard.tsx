@@ -22,8 +22,10 @@ export interface BracketConfigCardProps {
   screenPosition: { left: number; top: number };
   /** 対象のグループID */
   groupId: string;
-  /** 対象のブラケットpart ID */
-  partId: string;
+  /** 対象のブラケットpart ID（既存編集時） */
+  partId?: string;
+  /** 対象の柱part ID（未作図の柱から新規作図する時） */
+  pillarId?: string;
   /** 閉じる */
   onClose: () => void;
 }
@@ -42,12 +44,14 @@ const SIZES = [355, 600, 750, 900] as const;
 /**
  * ブラケットの方向と寸法選択カード
  */
-export default function BracketConfigCard({ screenPosition, groupId, partId, onClose }: BracketConfigCardProps) {
+export default function BracketConfigCard({ screenPosition, groupId, partId, pillarId, onClose }: BracketConfigCardProps) {
   const { scaffoldGroups, updateScaffoldGroup } = useDrawingStore();
   const group = React.useMemo(() => scaffoldGroups.find((g) => g.id === groupId), [scaffoldGroups, groupId]);
-  const part = React.useMemo(() => group?.parts.find((p) => p.id === partId), [group, partId]);
+  const part = React.useMemo(() => (partId ? group?.parts.find((p) => p.id === partId) : undefined), [group, partId]);
+  const pillar = React.useMemo(() => (pillarId ? group?.parts.find((p) => p.id === pillarId) : undefined), [group, pillarId]);
 
-  const initialDirection = Number(part?.meta?.direction ?? 0);
+  const baseForInit = part ?? pillar; // 既存ブラケットが無ければ柱情報を初期値の参考に
+  const initialDirection = Number(baseForInit?.meta?.direction ?? 0);
   const initialSize = Number(part?.meta?.width ?? 600);
 
   const [direction, setDirection] = React.useState<number>(
@@ -65,6 +69,11 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
 
   const save = () => {
     if (!group) return;
+    // 既存ブラケットが無い（pillarからの作図）場合は更新ではなく作図にフォールバック
+    if (!partId) {
+      drawBracket();
+      return;
+    }
     const nextParts = group.parts.map((p) =>
       p.id === partId
         ? {
@@ -87,11 +96,12 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
    * - 該当が無い場合のみ新規追加します。
    */
   const drawBracket = () => {
-    if (!group || !part) return;
-
-    // 現在のブラケット（カードを開いた基準）と同一座標
-    const ax = part.position.x;
-    const ay = part.position.y;
+    if (!group) return;
+    // 基準（既存ブラケット or 柱）
+    const base = part ?? pillar;
+    if (!base) return;
+    const ax = base.position.x;
+    const ay = base.position.y;
 
     // 方向比較は基準方向（0/90/180/270）に丸めて比較
     const dirSel = roundToCardinalDirection(direction);
@@ -133,11 +143,11 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
       id: uuidv4(),
       type: 'ブラケット' as const,
       position: { x: ax, y: ay },
-      color: part.color,
+      color: base.color,
       meta: {
         width: size,
         direction: dirSel,
-        offsetMm: Number(part.meta?.offsetMm ?? 0),
+        offsetMm: Number(base.meta?.offsetMm ?? 0),
         ...(bracketSize ? { bracketSize } : {}),
       },
     } as const;
@@ -149,14 +159,14 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
   return (
     <div
       style={style}
-      className="glass-scope bracket-config-card fixed z-30 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-sky-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-[#6366F1]/0 before:via-[#8B5CF6]/0 before:to-[#6366F1]/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
+      className="glass-scope bracket-config-card fixed z-30 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-emerald-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-emerald-400/0 before:via-emerald-300/0 before:to-emerald-400/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
       aria-live="polite"
       aria-label="ブラケットの設定カード"
     >
       {/* ヘッダー */}
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-slate-700/50">
         <div className="flex items-center gap-2">
-          <Navigation size={18} className="text-blue-400" />
+          <Navigation size={18} className="text-emerald-400" />
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ブラケットの設定</h3>
         </div>
         <div className="flex items-center gap-1">
@@ -183,7 +193,7 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
                 size="sm"
                 className={`h-8 text-[11px] ${
                   direction === dir.value
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                     : 'bg-white/60 text-slate-700 hover:bg-white/80 dark:bg-slate-800/60 dark:text-slate-200'
                 }`}
                 onClick={() => setDirection(dir.value)}
@@ -206,7 +216,7 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
                 size="sm"
                 className={`h-8 text-[11px] ${
                   size === s
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                     : 'bg-white/60 text-slate-700 hover:bg-white/80 dark:bg-slate-800/60 dark:text-slate-200'
                 }`}
                 onClick={() => setSize(s)}
@@ -232,7 +242,7 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
             variant="outline"
             size="sm"
             onClick={drawBracket}
-            className="bg-white !text-slate-900 !border-slate-400 shadow-[0_8px_24px_-12px_rgba(59,130,246,0.25)] hover:bg-blue-50 hover:!text-blue-700 hover:!border-blue-400 dark:bg-transparent dark:!text-gray-100 dark:!border-gray-600 dark:hover:bg-[#3B82F6]/20"
+            className="bg-white !text-slate-900 !border-slate-400 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.25)] hover:bg-emerald-50 hover:!text-emerald-700 hover:!border-emerald-400 dark:bg-transparent dark:!text-gray-100 dark:!border-gray-600 dark:hover:bg-emerald-900/20"
             aria-label="選択した設定でブラケットを作図"
           >
             作図
@@ -240,7 +250,7 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, onC
           <Button
             size="sm"
             onClick={save}
-            className="bg-gradient-to-r from-[#6366F1] via-[#06B6D4] to-[#3B82F6] !text-white shadow-[0_12px_32px_-16px_rgba(79,70,229,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(59,130,246,0.55)] hover:from-[#4F46E5] hover:via-[#0EA5E9] hover:to-[#2563EB] dark:bg-[#7C3AED] dark:hover:bg-[#8B5CF6]"
+            className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 !text-white shadow-[0_12px_32px_-16px_rgba(16,185,129,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(16,185,129,0.55)] hover:from-emerald-600 hover:via-emerald-500 hover:to-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
           >
             変更
           </Button>

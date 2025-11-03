@@ -14,7 +14,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useDrawingModeStore, DrawingMode, MODES } from '@/stores/drawingModeStore';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ChevronLeft, ChevronRight, PencilRuler, Wrench, StickyNote, Eye, MousePointer2, Lasso, Layers, Table, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PencilRuler, Wrench, StickyNote, Eye, MousePointer2, Lasso, Layers, Table, Plus, Trash2 } from 'lucide-react';
 // 追加カード表示ではID生成やmm変換は使用しないため、不要インポートを削除
 
 /**
@@ -298,9 +298,11 @@ export default function ModeTabs() {
                     <span>数量</span>
                   </button>
                   {editTargetType === 'アンチ' && (
-                    <div className="absolute left-full top-0 ml-2 min-w-[120px] rounded-lg border shadow-lg py-1 z-[101] dark:border-slate-700 dark:bg-black border-slate-300 bg-white">
+                    <div className={`absolute left-full top-0 ml-2 min-w-[140px] rounded-lg border shadow-lg py-1 z-[101] ${
+                      isDark ? 'border-slate-700 bg-black' : 'border-slate-300 bg-white'
+                    }`}>
                       <button
-                        className="w-full px-3 py-2 text-left text-[11px] hover:bg-white/10 dark:hover:bg-slate-800"
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800`}
                         onClick={() => {
                           const s = useDrawingStore.getState();
                           s.setBulkAntiAction('quantity');
@@ -309,10 +311,11 @@ export default function ModeTabs() {
                           setBulkMenuOpen(false);
                         }}
                       >
-                        枚数
+                        <Table size={14} />
+                        <span>枚数</span>
                       </button>
                       <button
-                        className="w-full px-3 py-2 text-left text-[11px] hover:bg-white/10 dark:hover:bg-slate-800"
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors text-slate-700 hover:bg-white/10 dark:text-slate-300 dark:hover:bg-slate-800`}
                         onClick={() => {
                           const s = useDrawingStore.getState();
                           s.setBulkAntiAction('level');
@@ -321,7 +324,8 @@ export default function ModeTabs() {
                           setBulkMenuOpen(false);
                         }}
                       >
-                        段数
+                        <Table size={14} />
+                        <span>段数</span>
                       </button>
                     </div>
                   )}
@@ -362,6 +366,25 @@ export default function ModeTabs() {
               </div>
             )}
           </div>
+
+          {/* 削除ボタン（編集ツールの下） */}
+          <button
+            onClick={() => setEditSelectionMode('delete')}
+            className={`group relative mt-1 flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ${
+              editSelectionMode === 'delete'
+                ? 'bg-gradient-to-br from-rose-400/20 via-rose-400/20 to-red-500/20 outline outline-2 outline-rose-400 text-rose-300'
+                : 'text-slate-600 hover:bg-white/10 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400'
+            }`}
+            title="削除モード"
+            aria-label="削除モード"
+          >
+            <Trash2 size={18} />
+            <div className={`pointer-events-none absolute left-full top-1/2 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-lg border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-50 ${
+              isDark ? 'border-slate-700 bg-black text-white' : 'border-slate-300 bg-white text-black'
+            }`} role="tooltip">
+              削除
+            </div>
+          </button>
           </div>
         </>
       )}
