@@ -14,6 +14,7 @@
 import { useRef, useEffect } from 'react';
 import { Group, Rect, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import type Konva from 'konva';
 import type { Memo } from '@/stores/drawingStore';
 
 interface MemoRendererProps {
@@ -27,7 +28,7 @@ interface MemoRendererProps {
   /** 選択中かどうか */
   isSelected?: boolean;
   /** Transformerの参照を設定 */
-  setTransformerTarget?: (target: any) => void;
+  setTransformerTarget?: (target: Konva.Group | null) => void;
 }
 
 /**
@@ -41,7 +42,7 @@ export default function MemoRenderer({
   isSelected = false,
   setTransformerTarget,
 }: MemoRendererProps) {
-  const groupRef = useRef<any>(null);
+  const groupRef = useRef<Konva.Group | null>(null);
   const { position, size, text } = memo;
 
   // Transformerのターゲットを設定
@@ -145,4 +146,3 @@ export default function MemoRenderer({
     </Group>
   );
 }
-

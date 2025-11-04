@@ -38,7 +38,7 @@ export default function ProjectScopedDrawPage() {
   const isDark = theme === 'dark'
 
   // 認証
-  const { user, loading: authLoading } = useAuth()
+  const { loading: authLoading } = useAuth()
 
   // プロジェクトストア
   const { setCurrentProject } = useProjectStore()
@@ -47,7 +47,7 @@ export default function ProjectScopedDrawPage() {
    * プロジェクト取得
    * - 取得後、ZustandのProjectStoreにセット
    */
-  const { data: project, isLoading, isFetching, error } = useQuery({
+  const { data: project, isLoading, error } = useQuery({
     queryKey: ['project-draw', projectId],
     enabled: Boolean(projectId) && !authLoading,
     queryFn: async () => {
@@ -127,4 +127,3 @@ export default function ProjectScopedDrawPage() {
     </main>
   )
 }
-

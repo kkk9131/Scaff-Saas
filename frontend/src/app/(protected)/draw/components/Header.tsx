@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/projectStore';
 import type { Project } from '@/types/project';
 import { getProjects } from '@/lib/api/projects';
+import Image from 'next/image';
+
+const toError = (error: unknown): Error => (error instanceof Error ? error : new Error(String(error)));
 
 /**
  * Headerコンポーネント
@@ -86,7 +89,7 @@ export default function Header() {
       // 保存モーダルを閉じる
       setIsSaveModalOpen(false);
 
-      const { exportStageToDataURL } = require('@/lib/canvasStageExporter');
+      const { exportStageToDataURL } = await import('@/lib/canvasStageExporter');
 
       const url = await exportStageToDataURL({
         pixelRatio: 2,
@@ -109,13 +112,14 @@ export default function Header() {
 
       setPreviewImageUrl(url);
       setIsPngPreviewOpen(true);
-    } catch (e: any) {
-      console.error('【Header】❌ PNG生成エラー:', e);
+    } catch (error: unknown) {
+      const err = toError(error);
+      console.error('【Header】❌ PNG生成エラー:', err);
       console.error('エラー詳細:', {
-        message: e.message,
-        stack: e.stack
+        message: err.message,
+        stack: err.stack,
       });
-      alert(`PNG生成に失敗しました: ${e.message}`);
+      alert(`PNG生成に失敗しました: ${err.message}`);
     }
   }, [scaffoldGroups, memos]);
 
@@ -132,8 +136,9 @@ export default function Header() {
       document.body.removeChild(a);
       setIsPngPreviewOpen(false);
       setPreviewImageUrl(null);
-    } catch (e) {
-      console.error('PNG保存エラー:', e);
+    } catch (error: unknown) {
+      const err = toError(error);
+      console.error('PNG保存エラー:', err);
       alert('PNG保存に失敗しました');
     }
   }, [previewImageUrl]);
@@ -168,7 +173,8 @@ export default function Header() {
         // 失敗時は例外→catchで通知
         useDrawingStore.getState().importFromJSON(text);
         alert('JSONを読み込みました。');
-      } catch (err) {
+      } catch (error: unknown) {
+        const err = toError(error);
         console.error('JSONインポート失敗:', err);
         alert('JSONの読み込みに失敗しました。ファイル形式をご確認ください。');
       } finally {
@@ -185,7 +191,7 @@ export default function Header() {
    * - 未設定時は相対パス
    */
   const resolveApiBase = () =>
-    process.env.NEXT_PUBLIC_API_URL || (process.env as any).NEXT_PUBLIC_API_BASE_URL || '';
+    process.env.NEXT_PUBLIC_API_URL || (process.env as Record<string, string | undefined>).NEXT_PUBLIC_API_BASE_URL || '';
 
   /**
    * 「プロジェクトに保存」を選択時にプロジェクト一覧を取得してモーダルを開く
@@ -207,8 +213,9 @@ export default function Header() {
         const initial = currentProject?.id || (list[0]?.id ?? '');
         setSelectedProjectId(initial);
       }
-    } catch (e: any) {
-      setProjectError(e?.message ?? 'プロジェクト一覧の取得に失敗しました');
+    } catch (error: unknown) {
+      const err = toError(error);
+      setProjectError(err.message || 'プロジェクト一覧の取得に失敗しました');
       setProjectList([]);
     } finally {
       setProjectLoading(false);
@@ -239,8 +246,9 @@ export default function Header() {
       setIsProjectSaveOpen(false);
       // 簡易通知
       alert('プロジェクトに保存しました。');
-    } catch (e) {
-      console.error('プロジェクト保存に失敗しました', e);
+    } catch (error: unknown) {
+      const err = toError(error);
+      console.error('プロジェクト保存に失敗しました', err);
       alert('プロジェクト保存に失敗しました。もう一度お試しください。');
     } finally {
       setIsSavingToProject(false);
@@ -446,11 +454,19 @@ export default function Header() {
         {/* プレビュー画像エリア（画面いっぱい） */}
         <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
           {previewImageUrl ? (
-            <img
-              src={previewImageUrl}
-              alt="PNG保存プレビュー"
-              className="max-w-full max-h-full object-contain shadow-2xl border-4 border-white/20"
-            />
+            <div
+              className="relative w-full max-w-5xl max-h-full min-h-[200px]"
+              style={{ height: 'min(80vh, 720px)' }}
+            >
+              <Image
+                src={previewImageUrl}
+                alt="PNG保存プレビュー"
+                fill
+                className="object-contain shadow-2xl border-4 border-white/20 rounded-xl"
+                priority
+                sizes="(max-width: 768px) 100vw, 80vw"
+              />
+            </div>
           ) : (
             <div className="text-white text-center">
               <div className="text-xl mb-4">⚠️ プレビュー画像がありません</div>

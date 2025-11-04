@@ -11,10 +11,13 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useDrawingModeStore, DrawingMode, MODES } from '@/stores/drawingModeStore';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ChevronLeft, ChevronRight, PencilRuler, Wrench, StickyNote, Eye, MousePointer2, Lasso, Layers, Table, Plus, Trash2 } from 'lucide-react';
+import { DEFAULT_SCALE, mmToPx } from '@/lib/utils/scale';
+import type { ScaffoldPart } from '@/types/scaffold';
 // 追加カード表示ではID生成やmm変換は使用しないため、不要インポートを削除
 
 /**
@@ -415,6 +418,101 @@ export default function ModeTabs() {
                       s.setBulkAntiScope('all');
                       s.setBulkAntiAction('add');
                       setEditSelectionMode('bulk');
+                      setBulkMenuOpen(false);
+                      return;
+                    }
+
+                    if (editTargetType === '柱') {
+                      const { scaffoldGroups: currentGroups, updateScaffoldGroup } = useDrawingStore.getState();
+                      for (const group of currentGroups) {
+                        let nextParts: ScaffoldPart[] = [...group.parts];
+                        let groupChanged = false;
+
+                        for (const part of group.parts) {
+                          if (part.type !== 'ブラケット') continue;
+
+                          const widthRaw = part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355);
+                          const widthMm = Number(widthRaw);
+                          if (!Number.isFinite(widthMm) || widthMm <= 0) {
+                            continue;
+                          }
+
+                          const directionDeg = Number(part.meta?.direction ?? 0);
+                          const rad = (directionDeg * Math.PI) / 180;
+                          const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+                          const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+                          const tipX = part.position.x + dir.x * widthPx;
+                          const tipY = part.position.y + dir.y * widthPx;
+
+                          const hasExistingPillar = nextParts.some((candidate) => {
+                            if (candidate.type !== '柱') return false;
+                            const dx = candidate.position.x - tipX;
+                            const dy = candidate.position.y - tipY;
+                            return Math.hypot(dx, dy) < 1;
+                          });
+                          if (hasExistingPillar) {
+                            continue;
+                          }
+
+                          const offsetMm = typeof part.meta?.offsetMm === 'number' ? part.meta?.offsetMm : undefined;
+
+                          const newPillar: ScaffoldPart = {
+                            id: uuidv4(),
+                            type: '柱',
+                            position: { x: tipX, y: tipY },
+                            color: part.color,
+                            marker: 'circle',
+                            meta: {
+                              direction: directionDeg,
+                              offsetMm,
+                            },
+                          };
+
+                          const additions: ScaffoldPart[] = [newPillar];
+                          const spanLenMm = typeof group.meta?.spanLength === 'number' ? group.meta?.spanLength : undefined;
+                          const line = group.meta?.line;
+
+                          if (offsetMm != null && Number.isFinite(offsetMm) && spanLenMm && line) {
+                            const ratio = Math.max(0, Math.min(1, offsetMm / spanLenMm));
+                            const startX = line.start.x + (line.end.x - line.start.x) * ratio;
+                            const startY = line.start.y + (line.end.y - line.start.y) * ratio;
+
+                            const hasCloth = nextParts.some((candidate) => {
+                              if (candidate.type !== '布材') return false;
+                              const candidateOffset = Number(candidate.meta?.offsetMm ?? NaN);
+                              const candidateLength = Number(candidate.meta?.length ?? NaN);
+                              const candidateDirection = Number(candidate.meta?.direction ?? NaN);
+                              return (
+                                Math.abs(candidateOffset - offsetMm) < 1e-6 &&
+                                Math.abs(candidateLength - widthMm) < 1e-6 &&
+                                candidateDirection === directionDeg
+                              );
+                            });
+
+                            if (!hasCloth) {
+                              additions.push({
+                                id: uuidv4(),
+                                type: '布材',
+                                position: { x: startX, y: startY },
+                                color: part.color,
+                                meta: {
+                                  length: widthMm,
+                                  direction: directionDeg,
+                                  offsetMm,
+                                },
+                              });
+                            }
+                          }
+
+                          nextParts = [...nextParts, ...additions];
+                          groupChanged = true;
+                        }
+
+                        if (groupChanged) {
+                          updateScaffoldGroup(group.id, { parts: nextParts });
+                        }
+                      }
+
                       setBulkMenuOpen(false);
                       return;
                     }

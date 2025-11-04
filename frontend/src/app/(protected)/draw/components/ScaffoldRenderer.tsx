@@ -14,13 +14,14 @@ import * as React from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Group, Line, Circle, Rect, Text, RegularPolygon } from 'react-konva';
+import type Konva from 'konva';
+import { useShallow } from 'zustand/react/shallow';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import type { ScaffoldGroup, ScaffoldPart } from '@/types/scaffold';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCanvasColor } from '@/lib/utils/colorUtils';
 import { mmToPx, DEFAULT_SCALE, pxToMm } from '@/lib/utils/scale';
-import { calculateDirection } from '@/lib/sax/directionRules';
 
 /**
  * 角度（度）から単位ベクトル（px座標系）へ変換
@@ -239,17 +240,178 @@ export default function ScaffoldRenderer({
 }) {
   const {
     scaffoldGroups,
-    updateScaffoldGroup,
     editTargetType,
     canvasScale,
     canvasPosition,
     editSelectionMode,
     selectedScaffoldPartKeys,
-    toggleSelectScaffoldPart,
-  } = useDrawingStore();
+  } = useDrawingStore(
+    useShallow((state) => ({
+      scaffoldGroups: state.scaffoldGroups,
+      editTargetType: state.editTargetType,
+      canvasScale: state.canvasScale,
+      canvasPosition: state.canvasPosition,
+      editSelectionMode: state.editSelectionMode,
+      selectedScaffoldPartKeys: state.selectedScaffoldPartKeys,
+    }))
+  );
+  const updateScaffoldGroup = useDrawingStore((state) => state.updateScaffoldGroup);
+  const toggleSelectScaffoldPart = useDrawingStore((state) => state.toggleSelectScaffoldPart);
   const { currentMode } = useDrawingModeStore();
   const { isDark } = useTheme();
   const deleteMode = currentMode === 'edit' && editSelectionMode === 'delete';
+
+  const canvasOffsetX = canvasPosition.x;
+  const canvasOffsetY = canvasPosition.y;
+  const visibleBounds = React.useMemo(() => {
+    const safeScale = Math.abs(canvasScale) < 0.0001 ? 1 : canvasScale;
+    const inv = 1 / safeScale;
+    const left = (-canvasOffsetX) * inv;
+    const top = (-canvasOffsetY) * inv;
+    const right = left + stageWidth * inv;
+    const bottom = top + stageHeight * inv;
+    return { left, right, top, bottom };
+  }, [canvasOffsetX, canvasOffsetY, canvasScale, stageWidth, stageHeight]);
+  const VIEWPORT_MARGIN = 480;
+  const isPartVisible = (part: ScaffoldPart): boolean => {
+    const { left, right, top, bottom } = visibleBounds;
+    const intersectsViewport = (minX: number, maxX: number, minY: number, maxY: number) =>
+      maxX >= left - VIEWPORT_MARGIN &&
+      minX <= right + VIEWPORT_MARGIN &&
+      maxY >= top - VIEWPORT_MARGIN &&
+      minY <= bottom + VIEWPORT_MARGIN;
+
+    if (isOnScreenPoint(part.position.x, part.position.y, VIEWPORT_MARGIN)) {
+      return true;
+    }
+
+    switch (part.type) {
+      case '布材': {
+        const lengthMm = Number(part.meta?.length ?? 0);
+        if (!(lengthMm > 0)) {
+          return intersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const directionDeg = Number(part.meta?.direction ?? 0);
+        const dir = degToUnitVector(directionDeg);
+        const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+        const endX = part.position.x + dir.x * lengthPx;
+        const endY = part.position.y + dir.y * lengthPx;
+        if (isOnScreenPoint(endX, endY, VIEWPORT_MARGIN)) {
+          return true;
+        }
+        const minX = Math.min(part.position.x, endX);
+        const maxX = Math.max(part.position.x, endX);
+        const minY = Math.min(part.position.y, endY);
+        const maxY = Math.max(part.position.y, endY);
+        return intersectsViewport(minX, maxX, minY, maxY);
+      }
+      case 'ブラケット': {
+        const widthMm = Number(part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355));
+        if (!(widthMm > 0)) {
+          return intersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const dirDeg = Number(part.meta?.direction ?? 0);
+        const dir = degToUnitVector(dirDeg);
+        const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+        const endX = part.position.x + dir.x * widthPx;
+        const endY = part.position.y + dir.y * widthPx;
+        if (isOnScreenPoint(endX, endY, VIEWPORT_MARGIN)) {
+          return true;
+        }
+        const minX = Math.min(part.position.x, endX);
+        const maxX = Math.max(part.position.x, endX);
+        const minY = Math.min(part.position.y, endY);
+        const maxY = Math.max(part.position.y, endY);
+        return intersectsViewport(minX, maxX, minY, maxY);
+      }
+      case 'アンチ': {
+        const lengthMm = Number(part.meta?.length ?? 0);
+        const widthMm = Number(part.meta?.width ?? 0);
+        if (!(lengthMm > 0 && widthMm > 0)) {
+          return intersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+        const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+        const halfLen = lengthPx / 2;
+        const halfWidth = widthPx / 2;
+        const dir = degToUnitVector(Number(part.meta?.direction ?? 0));
+        const normal = { x: -dir.y, y: dir.x };
+        const corners = [
+          {
+            x: part.position.x + dir.x * halfLen + normal.x * halfWidth,
+            y: part.position.y + dir.y * halfLen + normal.y * halfWidth,
+          },
+          {
+            x: part.position.x + dir.x * halfLen - normal.x * halfWidth,
+            y: part.position.y + dir.y * halfLen - normal.y * halfWidth,
+          },
+          {
+            x: part.position.x - dir.x * halfLen + normal.x * halfWidth,
+            y: part.position.y - dir.y * halfLen + normal.y * halfWidth,
+          },
+          {
+            x: part.position.x - dir.x * halfLen - normal.x * halfWidth,
+            y: part.position.y - dir.y * halfLen - normal.y * halfWidth,
+          },
+        ];
+        if (corners.some((corner) => isOnScreenPoint(corner.x, corner.y, VIEWPORT_MARGIN))) {
+          return true;
+        }
+        const xs = corners.map((c) => c.x);
+        const ys = corners.map((c) => c.y);
+        return intersectsViewport(
+          Math.min(...xs),
+          Math.max(...xs),
+          Math.min(...ys),
+          Math.max(...ys)
+        );
+      }
+      case '階段': {
+        const lengthMm = Number(part.meta?.length ?? 0);
+        const widthMm = Number(part.meta?.width ?? 0);
+        if (!(lengthMm > 0 && widthMm > 0)) {
+          return intersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+        const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+        const halfLen = lengthPx / 2;
+        const halfWidth = widthPx / 2;
+        const dir = degToUnitVector(Number(part.meta?.direction ?? 0));
+        const normal = { x: -dir.y, y: dir.x };
+        const corners = [
+          {
+            x: part.position.x + dir.x * halfLen + normal.x * halfWidth,
+            y: part.position.y + dir.y * halfLen + normal.y * halfWidth,
+          },
+          {
+            x: part.position.x + dir.x * halfLen - normal.x * halfWidth,
+            y: part.position.y + dir.y * halfLen - normal.y * halfWidth,
+          },
+          {
+            x: part.position.x - dir.x * halfLen + normal.x * halfWidth,
+            y: part.position.y - dir.y * halfLen + normal.y * halfWidth,
+          },
+          {
+            x: part.position.x - dir.x * halfLen - normal.x * halfWidth,
+            y: part.position.y - dir.y * halfLen - normal.y * halfWidth,
+          },
+        ];
+        if (corners.some((corner) => isOnScreenPoint(corner.x, corner.y, VIEWPORT_MARGIN))) {
+          return true;
+        }
+        const xs = corners.map((c) => c.x);
+        const ys = corners.map((c) => c.y);
+        return intersectsViewport(
+          Math.min(...xs),
+          Math.max(...xs),
+          Math.min(...ys),
+          Math.max(...ys)
+        );
+      }
+      default:
+        return intersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+    }
+  };
 
   /**
    * スパン入れ替え（布材の順序変更）用のドラッグ状態
@@ -372,11 +534,15 @@ export default function ScaffoldRenderer({
           const clothIds = new Set(
             Array.from({ length: active.length }, (_, i) => cloths[active.start + i]?.id).filter(Boolean) as string[]
           );
-          parts = parts.map((p) =>
-            p.type === '布材' && clothIds.has(p.id)
-              ? ({ ...p, meta: { ...(p.meta || {}), lineStyle: 'dashed' } } as any)
-              : p
-          );
+          parts = parts.map((p) => {
+            if (p.type === '布材' && clothIds.has(p.id)) {
+              return {
+                ...p,
+                meta: { ...(p.meta ?? {}), lineStyle: 'dashed' as const },
+              };
+            }
+            return p;
+          });
           // 2) 間柱を三角化（境界オフセットで柱を検索）
           const first = cloths[active.start];
           let offMm = Number(first?.meta?.offsetMm ?? 0);
@@ -406,13 +572,19 @@ export default function ScaffoldRenderer({
           const startPos = { x: firstCloth.position.x, y: firstCloth.position.y };
           const endPos = { x: lastCloth.position.x + lastDir.x * lastLenPx, y: lastCloth.position.y + lastDir.y * lastLenPx };
           const anchor = { x: (startPos.x + endPos.x) / 2, y: (startPos.y + endPos.y) / 2 };
-          parts.push({
+          const beamFramePart: ScaffoldPart = {
             id: uuidv4(),
             type: '梁枠',
             position: anchor,
             color: 'green',
-            meta: { length: combinedLen, quantity: 1, startOffsetMm: Number(first?.meta?.offsetMm ?? 0), endOffsetMm: offMm },
-          } as any);
+            meta: {
+              length: combinedLen,
+              quantity: 1,
+              startOffsetMm: Number(first?.meta?.offsetMm ?? 0),
+              endOffsetMm: offMm,
+            },
+          };
+          parts.push(beamFramePart);
           changed = true;
         }
 
@@ -440,9 +612,14 @@ export default function ScaffoldRenderer({
       const { groupId, partId } = hoveredBeamFrame;
       const group = scaffoldGroups.find((g) => g.id === groupId);
       if (!group) return;
-      const parts = group.parts.map((p) =>
-        p.id === partId ? ({ ...p, meta: { ...(p.meta || {}), quantity: Number(p.meta?.quantity ?? 1) + 1 } } as any) : p
-      );
+      const parts = group.parts.map((p) => {
+        if (p.id !== partId) return p;
+        const nextQuantity = Number(p.meta?.quantity ?? 1) + 1;
+        return {
+          ...p,
+          meta: { ...(p.meta ?? {}), quantity: nextQuantity },
+        };
+      });
       updateScaffoldGroup(groupId, { parts });
     };
     window.addEventListener('keydown', onKeyDown);
@@ -460,13 +637,6 @@ export default function ScaffoldRenderer({
     | null
   >(null);
   
-  // ビューモード時のホバー中の部材（情報カード表示用）
-  const [hoveredViewPart, setHoveredViewPart] = React.useState<{
-    groupId: string;
-    partId: string;
-    screenPosition: { x: number; y: number };
-  } | null>(null);
-
   // ダーク/ライトでの白色変換対応
   const colorToStroke = (color: string) =>
     getCanvasColor(color as 'white' | 'red' | 'blue' | 'green', isDark);
@@ -502,27 +672,27 @@ export default function ScaffoldRenderer({
    * - 互換: 値が入っている場合（pillarCounts/quantity/antiW/antiS/braceQty）も確定扱い
    */
   const isQuantityConfirmed = (p: ScaffoldPart): boolean => {
-    const m: any = p.meta || {};
-    if (m.quantityConfirmed === true) return true;
+    const meta = p.meta ?? {};
+    if (meta.quantityConfirmed === true) return true;
     switch (p.type) {
       case '柱': {
-        const counts = m.pillarCounts as Record<string, number> | undefined;
+        const counts = meta.pillarCounts;
         if (counts) {
-          for (const k of Object.keys(counts)) {
-            if (Number(counts[k] || 0) > 0) return true;
+          for (const key of Object.keys(counts)) {
+            if (Number(counts[key] ?? 0) > 0) return true;
           }
         }
         return false;
       }
       case '布材':
         return (
-          Number(m.quantity || 0) > 0 ||
-          Number(m.braceQty || 0) > 0
+          Number(meta.quantity ?? 0) > 0 ||
+          Number(meta.braceQty ?? 0) > 0
         );
       case 'ブラケット':
-        return Number(m.quantity || 0) > 0;
+        return Number(meta.quantity ?? 0) > 0;
       case 'アンチ':
-        return Number(m.antiW || 0) > 0 || Number(m.antiS || 0) > 0;
+        return Number(meta.antiW ?? 0) > 0 || Number(meta.antiS ?? 0) > 0;
       default:
         return false;
     }
@@ -531,12 +701,16 @@ export default function ScaffoldRenderer({
   // パルスアニメーション（編集モード中のみ駆動、約30fps）
   const [pulseTime, setPulseTime] = React.useState(0);
   React.useEffect(() => {
-    if (currentMode !== 'edit' && currentMode !== 'view') return; // 編集時とビューモード時のみ
+    if (currentMode !== 'edit' && currentMode !== 'view') {
+      return undefined;
+    }
     let raf = 0;
-    let last = 0;
+    let last = performance.now();
     const loop = (t: number) => {
-      if (t - last >= 33) {
-        setPulseTime(t / 1000);
+      const elapsed = t - last;
+      // document.hidden 中は描画を止める（バックグラウンドでの無駄な再描画を抑制）
+      if (!document.hidden && elapsed >= 120) {
+        setPulseTime((prev) => prev + elapsed / 1000);
         last = t;
       }
       raf = requestAnimationFrame(loop);
@@ -560,11 +734,14 @@ export default function ScaffoldRenderer({
       const len = Number(target.meta?.length ?? 0);
       if (len !== 1800) return; // 対象は1800のみ
       const nextQty = Math.max(1, Number(target.meta?.quantity ?? 1) + 1);
-      useDrawingStore.getState().updateScaffoldGroup(groupId, {
-        parts: group.parts.map((p) =>
-          p.id === partId ? ({ ...p, meta: { ...(p.meta || {}), quantity: nextQty } } as any) : p
-        ),
+      const nextParts = group.parts.map((p) => {
+        if (p.id !== partId) return p;
+        return {
+          ...p,
+          meta: { ...(p.meta ?? {}), quantity: nextQty },
+        };
       });
+      useDrawingStore.getState().updateScaffoldGroup(groupId, { parts: nextParts });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -625,55 +802,56 @@ export default function ScaffoldRenderer({
     colorRing: '#60A5FA',
   } as const;
 
+  // スペースキーでマーカー種別を切替（ホバー中の柱が対象）
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (!hoveredPillar) return;
+      if (!(currentMode === 'edit' && editTargetType === '柱')) return;
+      e.preventDefault();
+      const { groupId, partId } = hoveredPillar;
+      const group = scaffoldGroups.find((g) => g.id === groupId);
+      if (!group) return;
+      const parts = group.parts.map((p) => {
+        if (p.id !== partId) return p;
+        const current = p.marker || 'circle';
+        const dir = typeof p.meta?.markerDirection === 'number' ? p.meta.markerDirection : 0;
+        let nextMarker: 'circle' | 'triangle' | 'square' = 'circle';
+        let nextDir = 0;
+        if (current === 'circle') {
+          nextMarker = 'triangle';
+          nextDir = 0;
+        } else if (current === 'triangle') {
+          const seq = [0, 90, 180, 270] as const;
+          const idx = seq.findIndex((degree) => degree === dir);
+          if (idx === -1) {
+            nextMarker = 'triangle';
+            nextDir = seq[0];
+          } else if (idx < seq.length - 1) {
+            nextMarker = 'triangle';
+            nextDir = seq[idx + 1];
+          } else {
+            nextMarker = 'square';
+            nextDir = 0;
+          }
+        } else if (current === 'square') {
+          nextMarker = 'circle';
+          nextDir = 0;
+        }
+        return {
+          ...p,
+          marker: nextMarker,
+          meta: { ...(p.meta ?? {}), markerDirection: nextDir },
+        };
+      });
+      updateScaffoldGroup(groupId, { parts });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [hoveredPillar, currentMode, editTargetType, scaffoldGroups, updateScaffoldGroup]);
+
   return (
     <>
-      {/* スペースキーでマーカー種別を切替（ホバー中の柱が対象） */}
-      {React.useEffect(() => {
-        const onKeyDown = (e: KeyboardEvent) => {
-          if (e.code !== 'Space') return;
-          if (!hoveredPillar) return;
-          if (!(currentMode === 'edit' && editTargetType === '柱')) return;
-          e.preventDefault();
-          const { groupId, partId } = hoveredPillar;
-          // 現在のグループを取得
-          const group = scaffoldGroups.find((g) => g.id === groupId);
-          if (!group) return;
-          const parts = group.parts.map((p) => {
-            if (p.id !== partId) return p;
-            // 現在のマーカー種別と方向を取得
-            const current = p.marker || 'circle';
-            const dir = typeof p.meta?.markerDirection === 'number' ? p.meta!.markerDirection : 0;
-            let nextMarker: 'circle' | 'triangle' | 'square' = 'circle';
-            let nextDir = 0;
-            if (current === 'circle') {
-              nextMarker = 'triangle';
-              nextDir = 0; // 右（0°）
-            } else if (current === 'triangle') {
-              // 0→90→180→270→square
-              const seq = [0, 90, 180, 270] as const;
-              const idx = Math.max(0, seq.indexOf(dir as any));
-              if (idx < seq.length - 1) {
-                nextMarker = 'triangle';
-                nextDir = seq[idx + 1];
-              } else {
-                nextMarker = 'square';
-                nextDir = 0;
-              }
-            } else if (current === 'square') {
-              nextMarker = 'circle';
-              nextDir = 0;
-            }
-            return {
-              ...p,
-              marker: nextMarker,
-              meta: { ...(p.meta || {}), markerDirection: nextDir },
-            };
-          });
-          updateScaffoldGroup(groupId, { parts });
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-      }, [hoveredPillar, currentMode, editTargetType, scaffoldGroups, updateScaffoldGroup])}
       {scaffoldGroups.map((group) => {
         // スパン方向の単位ベクトル（px）を計算（布材・アンチ描画に使用）
         const t = group.meta?.line
@@ -842,7 +1020,8 @@ export default function ScaffoldRenderer({
           const others = nextPartsAntiStair.filter((p) => p.type !== '柱' && p.type !== 'ブラケット' && p.type !== '布材');
           const clothOnly = nextPartsAntiStair.filter((p) => p.type === '布材');
 
-          const sortByOff = (a: any, b: any) => (Number(a.meta?.offsetMm ?? 0) - Number(b.meta?.offsetMm ?? 0));
+          const sortByOff = (a: ScaffoldPart, b: ScaffoldPart) =>
+            Number(a.meta?.offsetMm ?? 0) - Number(b.meta?.offsetMm ?? 0);
           pillars.sort(sortByOff);
           brackets.sort(sortByOff);
 
@@ -904,7 +1083,7 @@ export default function ScaffoldRenderer({
 
             // 対象スパンの部材一括プレビュー座標
             previewPosById = new Map();
-            const belongsToMoved = (p: any): boolean => {
+            const belongsToMoved = (p: ScaffoldPart): boolean => {
               const off = Number(p.meta?.offsetMm ?? NaN);
               if (!Number.isFinite(off)) return false;
               // 布材/アンチ: 開始オフセット
@@ -1056,6 +1235,10 @@ export default function ScaffoldRenderer({
           }
         }
 
+        if (!group.parts.some(isPartVisible)) {
+          return null;
+        }
+
         return (
           <Group
             key={group.id}
@@ -1084,6 +1267,9 @@ export default function ScaffoldRenderer({
               />
             )}
             {group.parts.map((part) => {
+                if (!isPartVisible(part)) {
+                  return null;
+                }
                 const stroke = colorToStroke(part.color);
               // 柱ハイライト
               const highlightPillarYellow =
@@ -1290,11 +1476,6 @@ export default function ScaffoldRenderer({
                             const rect = container.getBoundingClientRect();
                             const screenX = (part.position.x * canvasScale + canvasPosition.x) + rect.left;
                             const screenY = (part.position.y * canvasScale + canvasPosition.y) + rect.top;
-                            setHoveredViewPart({
-                              groupId: group.id,
-                              partId: part.id,
-                              screenPosition: { x: screenX, y: screenY },
-                            });
                             onViewPartHover?.({
                               groupId: group.id,
                               partId: part.id,
@@ -1303,19 +1484,22 @@ export default function ScaffoldRenderer({
                             container.style.cursor = 'default';
                           }
                         } else if (currentMode === 'edit' && (editTargetType === '柱' || editTargetType === 'ブラケット')) {
-                          e.target.getStage()?.container().style &&
-                            (e.target.getStage()!.container().style.cursor = 'pointer');
+                          const stage = e.target.getStage();
+                          if (stage) {
+                            stage.container().style.cursor = 'pointer';
+                          }
                           if (editTargetType === '柱') {
                             setHoveredPillar({ groupId: group.id, partId: part.id });
                           }
                         }
                       }}
                       onMouseLeave={(e) => {
-                        e.target.getStage()?.container().style &&
-                          (e.target.getStage()!.container().style.cursor = 'default');
+                        const stage = e.target.getStage();
+                        if (stage) {
+                          stage.container().style.cursor = 'default';
+                        }
                         setHoveredPillar((h) => (h && h.partId === part.id ? null : h));
                         if (currentMode === 'view') {
-                          setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
                           onViewPartHover?.(null);
                         }
                       }}
@@ -1429,7 +1613,10 @@ export default function ScaffoldRenderer({
                       {/* 本体（マーカー自体も軽く発光）: circle / triangle / square */}
                       {(() => {
                         const marker = part.marker || 'circle';
-                        const commonProps = {
+                        const commonProps: Pick<
+                          Konva.ShapeConfig,
+                          'x' | 'y' | 'fill' | 'stroke' | 'strokeWidth' | 'shadowColor' | 'shadowBlur' | 'shadowOpacity'
+                        > = {
                           x: part.position.x,
                           y: part.position.y,
                           fill: stroke,
@@ -1442,7 +1629,7 @@ export default function ScaffoldRenderer({
                             : undefined,
                           shadowBlur: isPillarHighlighted ? GLOW.shadowBlur : 0,
                           shadowOpacity: isPillarHighlighted ? 0.8 : 0,
-                        } as any;
+                        };
                         if (marker === 'square') {
                           const size = 10;
                           return (
@@ -1573,7 +1760,7 @@ export default function ScaffoldRenderer({
                   // 150mmの短スパンも入れ替えハンドル対象にするが、中点発光は抑制のまま
                   const showMidGlowCloth = highlightCloth && clothLengthMm !== 150;
                   // 階段は 1800/900 かつ階段有りスパン、かつ階段用の並行布材（stairParallel）にのみ中点発光
-                  const showMidGlowStair = highlightStairHasStair && Boolean((part.meta as any)?.stairParallel);
+                  const showMidGlowStair = highlightStairHasStair && Boolean(part.meta?.stairParallel);
                   // 中点座標（各スパンの中心）
                   const midX = part.position.x + dirVec.x * (lengthPx / 2);
                   const midY = part.position.y + dirVec.y * (lengthPx / 2);
@@ -1646,11 +1833,6 @@ export default function ScaffoldRenderer({
                               const rect = container.getBoundingClientRect();
                               const screenX = (midX * canvasScale + canvasPosition.x) + rect.left;
                               const screenY = (midY * canvasScale + canvasPosition.y) + rect.top;
-                              setHoveredViewPart({
-                                groupId: group.id,
-                                partId: part.id,
-                                screenPosition: { x: screenX, y: screenY },
-                              });
                               onViewPartHover?.({
                                 groupId: group.id,
                                 partId: part.id,
@@ -1668,7 +1850,6 @@ export default function ScaffoldRenderer({
                           const stage = e.target.getStage?.();
                           if (stage) stage.container().style.cursor = 'default';
                           if (currentMode === 'view') {
-                            setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
                             onViewPartHover?.(null);
                           }
                         }}
@@ -2307,11 +2488,6 @@ export default function ScaffoldRenderer({
                               const midY = (part.position.y + y2) / 2;
                               const screenX = (midX * canvasScale + canvasPosition.x) + rect.left;
                               const screenY = (midY * canvasScale + canvasPosition.y) + rect.top;
-                              setHoveredViewPart({
-                                groupId: group.id,
-                                partId: part.id,
-                                screenPosition: { x: screenX, y: screenY },
-                              });
                               onViewPartHover?.({
                                 groupId: group.id,
                                 partId: part.id,
@@ -2328,7 +2504,6 @@ export default function ScaffoldRenderer({
                           const stage = e.target.getStage?.();
                           if (stage) stage.container().style.cursor = 'default';
                           if (currentMode === 'view') {
-                            setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
                             onViewPartHover?.(null);
                           }
                         }}
@@ -2748,12 +2923,6 @@ export default function ScaffoldRenderer({
                             if (lineMeta && spanLenMm > 0) {
                               // スパン方向ベクトル（px）
                               const spanAngleDeg = angle; // 階段の長手方向はスパン方向
-                              const vr = degToUnitVector(spanAngleDeg);
-                              // 左法線（reversed=false）をベクトルで算出（calculateDirection依存を避ける）
-                              const dxL = lineMeta.end.x - lineMeta.start.x;
-                              const dyL = lineMeta.end.y - lineMeta.start.y;
-                              const lenL = Math.sqrt(dxL * dxL + dyL * dyL) || 1;
-                              const nLeft = { x: -dyL / lenL, y: dxL / lenL };
                               // ライン上の中心点（offsetCenterMm / spanLenMm）
                               const r = Math.max(0, Math.min(1, offsetCenterMm / spanLenMm));
                               const base = {
@@ -2764,7 +2933,7 @@ export default function ScaffoldRenderer({
                               const pos = { x: part.position.x, y: part.position.y };
                               // offsetMm は区間の開始オフセット（中心から長手/2 引く）
                               const offsetStartMm = offsetCenterMm - lengthMm / 2;
-                              const antiPart = {
+                              const antiPart: ScaffoldPart = {
                                 id: part.id,
                                 type: 'アンチ' as const,
                                 position: pos, // 正しい350mm中心位置
@@ -2778,7 +2947,7 @@ export default function ScaffoldRenderer({
                                 },
                               };
                               // 追加: 元ライン中心に S 幅（240mm）のアンチを追加作図
-                              const sAntiPart = {
+                              const sAntiPart: ScaffoldPart = {
                                 id: uuidv4(),
                                 type: 'アンチ' as const,
                                 position: { x: base.x, y: base.y }, // ライン上の中心
@@ -2792,7 +2961,7 @@ export default function ScaffoldRenderer({
                                 },
                               };
                               const replaced = group.parts.map((p) =>
-                                p.id === part.id ? (antiPart as any) : p
+                                p.id === part.id ? antiPart : p
                               );
                               updateScaffoldGroup(group.id, {
                                 parts: [...replaced, sAntiPart],
@@ -2806,10 +2975,10 @@ export default function ScaffoldRenderer({
                           updateScaffoldGroup(group.id, {
                             parts: group.parts.map((p) =>
                               p.id === part.id
-                                ? ({
+                                ? {
                                     ...p,
-                                    meta: { ...(p.meta || {}), direction: flipped },
-                                  } as any)
+                                    meta: { ...(p.meta ?? {}), direction: flipped },
+                                  }
                                 : p
                             ),
                           });
@@ -2935,7 +3104,7 @@ export default function ScaffoldRenderer({
                       draggable={antiDraggable}
                       onDragMove={(e) => {
                         if (!antiDraggable) return;
-                        const node = e.target as any;
+                        const node = e.target as Konva.Node;
                         const dx = node.x();
                         const dy = node.y();
                         const currentCenter = { x: part.position.x + dx, y: part.position.y + dy };
@@ -2952,7 +3121,7 @@ export default function ScaffoldRenderer({
                       }}
                       onDragEnd={(e) => {
                         if (!antiDraggable) return;
-                        const node = e.target as any;
+                        const node = e.target as Konva.Node;
                         const dx = node.x();
                         const dy = node.y();
                         const currentCenter = { x: part.position.x + dx, y: part.position.y + dy };
@@ -3073,11 +3242,6 @@ export default function ScaffoldRenderer({
                               const rect = container.getBoundingClientRect();
                               const screenX = (part.position.x * canvasScale + canvasPosition.x) + rect.left;
                               const screenY = (part.position.y * canvasScale + canvasPosition.y) + rect.top;
-                              setHoveredViewPart({
-                                groupId: group.id,
-                                partId: part.id,
-                                screenPosition: { x: screenX, y: screenY },
-                              });
                               onViewPartHover?.({
                                 groupId: group.id,
                                 partId: part.id,
@@ -3094,7 +3258,6 @@ export default function ScaffoldRenderer({
                           const stage = e.target.getStage?.();
                           if (stage) stage.container().style.cursor = 'default';
                           if (currentMode === 'view') {
-                            setHoveredViewPart((h) => (h && h.partId === part.id ? null : h));
                             onViewPartHover?.(null);
                           }
                         }}

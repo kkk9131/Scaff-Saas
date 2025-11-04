@@ -13,6 +13,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Minus, Plus, Table, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export interface BraceQuantityCardProps {
   /** 左上のスクリーン座標（px） */
@@ -49,18 +50,17 @@ export default function BraceQuantityCard({ screenPosition, groupId, partId, onC
 
   const save = () => {
     if (!group) return;
-    const nextParts = group.parts.map((p) =>
-      p.id === partId
-        ? ({
-            ...p,
-            meta: {
-              ...(p.meta || {}),
-              braceQty: Math.max(0, qty),
-              quantityConfirmed: true,
-            },
-          } as any)
-        : p
-    );
+    const nextParts = group.parts.map((part: ScaffoldPart) => {
+      if (part.id !== partId || part.type !== '布材') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          braceQty: Math.max(0, qty),
+          quantityConfirmed: true,
+        },
+      };
+    });
     updateScaffoldGroup(group.id, { parts: nextParts });
     onClose();
   };

@@ -52,6 +52,11 @@ interface DrawingSnapshot {
   elements: DrawingElement[];
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
 // 作図ツールの型
 export type DrawingTool =
   | 'select'
@@ -121,8 +126,6 @@ interface DrawingState {
   bulkBracketScope: 'selected' | 'all';
   /** アンチ一括の動作種別（数量/段数/追加） */
   bulkAntiAction: 'quantity' | 'level' | 'add';
-  /** 一括編集時の対象スコープ（アンチ） */
-  bulkAntiScope: 'selected' | 'all';
   /**
    * 一括編集時の対象スコープ（アンチ）
    * - 'selected': ユーザーが選択したアンチのみ
@@ -236,8 +239,6 @@ interface DrawingState {
   setBulkAntiAction: (action: 'quantity' | 'level' | 'add') => void;
   /** 一括編集スコープ（アンチ）の設定 */
   setBulkAntiScope: (scope: 'selected' | 'all') => void;
-  /** 一括編集スコープ（アンチ）の設定 */
-  setBulkAntiScope: (scope: 'selected' | 'all') => void;
 
   // 編集モード用: 足場パーツ選択操作
   /** 選択をすべて解除 */
@@ -293,7 +294,7 @@ interface DrawingState {
    * - exportToJSON() が出力する構造、もしくはそれと同等のオブジェクトを受け取る
    * - 既存の作図状態を上書きする
    */
-  importFromJSON: (json: string | any) => void;
+  importFromJSON: (json: string | Record<string, unknown>) => void;
 }
 
 /**
@@ -335,7 +336,6 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   bulkClothScope: 'selected', // デフォルトは選択対象のみ
   bulkBracketScope: 'selected', // デフォルトは選択対象のみ
   bulkAntiAction: 'quantity',
-  bulkAntiScope: 'selected',
   bulkAntiScope: 'selected', // デフォルトは選択対象のみ
   lassoGlowColor: null, // 投げ縄モード時の発光色は未選択
   lassoSelectionArea: null, // 投げ縄モード時のドラッグ範囲は未設定（互換性のため残す）
@@ -553,7 +553,7 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
 
   // 編集モード操作 - 編集対象部材の設定
   setEditTargetType: (type) =>
-    set((state) => ({
+    set(() => ({
       /**
        * 編集対象の部材種別を切り替える際に、既存の選択（selectedScaffoldPartKeys）をクリアする。
        * 例: 柱選択のまま布材編集に入った場合でも、柱の選択ハイライトが残らないようにするため。
@@ -587,7 +587,6 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   // 一括編集スコープ（ブラケット）を設定
   setBulkBracketScope: (scope) => set({ bulkBracketScope: scope }),
   setBulkAntiAction: (action) => set({ bulkAntiAction: action }),
-  setBulkAntiScope: (scope) => set({ bulkAntiScope: scope }),
   // 一括編集スコープ（アンチ）を設定
   setBulkAntiScope: (scope) => set({ bulkAntiScope: scope }),
 
@@ -831,25 +830,26 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
     set((state) => {
       try {
         // 文字列の場合はパース
-        const obj = typeof json === 'string' ? JSON.parse(json) : json;
-        const data = obj?.data ?? obj;
+        const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+        const rawData = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : parsed;
+        const data = isRecord(rawData) ? rawData : {};
 
-        const scaffoldGroups = Array.isArray(data?.scaffoldGroups)
-          ? data.scaffoldGroups
+        const scaffoldGroups = Array.isArray(data.scaffoldGroups)
+          ? (data.scaffoldGroups as ScaffoldGroup[])
           : state.scaffoldGroups;
-        const memos = Array.isArray(data?.memos) ? data.memos : state.memos;
-        const elements = Array.isArray(data?.elements)
-          ? data.elements
+        const memos = Array.isArray(data.memos) ? (data.memos as Memo[]) : state.memos;
+        const elements = Array.isArray(data.elements)
+          ? (data.elements as DrawingElement[])
           : state.elements;
 
-        const canvas = data?.canvas ?? {};
-        const grid = data?.grid ?? {};
-        const settings = data?.settings ?? {};
+        const canvas = isRecord(data.canvas) ? data.canvas : {};
+        const grid = isRecord(data.grid) ? data.grid : {};
+        const settings = isRecord(data.settings) ? data.settings : {};
 
         // 履歴を保存（インポート直後の状態を起点にする）
-        const snapshot: any = {
-          scaffoldGroups: JSON.parse(JSON.stringify(scaffoldGroups)),
-          memos: JSON.parse(JSON.stringify(memos)),
+        const snapshot: DrawingSnapshot = {
+          scaffoldGroups: deepClone(scaffoldGroups),
+          memos: deepClone(memos),
           elements: [...elements],
         };
 
@@ -875,9 +875,9 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
           selectedScaffoldPartKeys: [],
           selectedMemoId: null,
         };
-      } catch (e) {
-        console.error('作図データのインポートに失敗しました:', e);
-        return {} as any;
+      } catch (error) {
+        console.error('作図データのインポートに失敗しました:', error);
+        return state;
       }
     }),
 }));

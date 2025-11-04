@@ -33,7 +33,7 @@ export async function createServerSupabaseClient() {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options });
-          } catch (error) {
+          } catch {
             // Server Componentではset/removeは呼び出せないため、
             // エラーが発生しても無視します
           }
@@ -42,7 +42,7 @@ export async function createServerSupabaseClient() {
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options });
-          } catch (error) {
+          } catch {
             // Server Componentではset/removeは呼び出せないため、
             // エラーが発生しても無視します
           }

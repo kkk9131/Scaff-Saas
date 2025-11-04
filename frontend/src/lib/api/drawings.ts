@@ -15,7 +15,7 @@ export interface DrawingRecord {
   /** プロジェクトID */
   project_id: string
   /** 作図データ（Konva/ストア出力のJSON互換） */
-  design_json: any
+  design_json: unknown
   /** 作成日時 */
   created_at?: string
   /** 更新日時 */
@@ -39,4 +39,3 @@ export async function getLatestDrawing(
   }
   return resp as ApiResponse<DrawingRecord | null>
 }
-

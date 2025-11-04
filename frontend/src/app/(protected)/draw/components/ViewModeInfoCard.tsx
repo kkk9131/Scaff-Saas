@@ -17,8 +17,6 @@ interface ViewModeInfoCardProps {
   screenPosition: { x: number; y: number };
   /** 対象の部材 */
   part: ScaffoldPart;
-  /** グループID */
-  groupId: string;
 }
 
 /**
@@ -144,7 +142,7 @@ function getQuantityInfo(part: ScaffoldPart): {
 /**
  * ビューモード情報カード
  */
-export default function ViewModeInfoCard({ screenPosition, part, groupId }: ViewModeInfoCardProps) {
+export default function ViewModeInfoCard({ screenPosition, part }: ViewModeInfoCardProps) {
   const { isConfirmed, displayText, pillarTypes } = getQuantityInfo(part);
 
   // スクリーン座標での配置スタイル
@@ -182,4 +180,3 @@ export default function ViewModeInfoCard({ screenPosition, part, groupId }: View
     </div>
   );
 }
-

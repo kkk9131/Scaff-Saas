@@ -10,6 +10,17 @@ import { supabase } from '@/lib/supabase';
 // APIベースURL（環境変数から取得）
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const toJsonString = (value: unknown): string => {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
 /**
  * APIエラーコード型定義
  * より詳細なエラー分類を提供
@@ -28,7 +39,7 @@ export type ApiErrorCode =
 /**
  * API レスポンス型定義
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data?: T;
   /**
    * バックエンドが success レスポンスを返したかどうか
@@ -53,7 +64,7 @@ export interface ApiResponse<T = any> {
  * リクエストオプション型定義
  */
 interface RequestOptions {
-  body?: any;
+  body?: unknown;
   requireAuth?: boolean;
   timeout?: number;
   retries?: number;
@@ -120,7 +131,7 @@ class ApiClient {
    * - エラーハンドリング
    * - タイムアウト処理
    */
-  private async request<T = any>(
+  private async request<T = unknown>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
     options: RequestOptions = {}
@@ -158,10 +169,11 @@ class ApiClient {
       clearTimeout(timeoutId);
 
       // レスポンスのJSONパース
-      let data: any;
+      let data: unknown;
       try {
         data = await response.json();
       } catch (parseError) {
+        console.warn('レスポンスのJSONパースに失敗しました', parseError);
         // JSONパースに失敗した場合
         if (!response.ok) {
           return {
@@ -181,23 +193,26 @@ class ApiClient {
         // エラーメッセージの抽出
         let errorMessage = 'リクエストに失敗しました';
 
-        if (data.detail) {
-          // FastAPIのバリデーションエラー(422)の場合、detailは配列
-          if (Array.isArray(data.detail)) {
-            // 各エラーオブジェクトからmsgを抽出して結合
-            errorMessage = data.detail
-              .map((err: any) => err.msg || JSON.stringify(err))
-              .join(', ');
-          } else if (typeof data.detail === 'string') {
-            // detailが文字列の場合はそのまま使用
-            errorMessage = data.detail;
-          } else {
-            // detailがオブジェクトの場合はJSON文字列化
-            errorMessage = JSON.stringify(data.detail);
+        const bodyRecord = isRecord(data) ? data : null;
+
+        if (bodyRecord && 'detail' in bodyRecord) {
+          const detail = bodyRecord.detail;
+          if (Array.isArray(detail)) {
+            const messages = detail.map((item) => {
+              if (isRecord(item) && typeof item.msg === 'string') {
+                return item.msg;
+              }
+              return toJsonString(item);
+            });
+            errorMessage = messages.join(', ');
+          } else if (typeof detail === 'string') {
+            errorMessage = detail;
+          } else if (isRecord(detail)) {
+            errorMessage = toJsonString(detail);
           }
-        } else if (data.message) {
+        } else if (bodyRecord && typeof bodyRecord.message === 'string') {
           // messageフィールドがある場合
-          errorMessage = data.message;
+          errorMessage = bodyRecord.message;
         }
 
         return {
@@ -206,18 +221,18 @@ class ApiClient {
             message: errorMessage,
             statusCode: response.status,
           },
-          message: typeof data?.message === 'string' ? data.message : undefined,
-          success: typeof data?.success === 'boolean' ? data.success : undefined,
+          message: bodyRecord && typeof bodyRecord.message === 'string' ? bodyRecord.message : undefined,
+          success: bodyRecord && typeof bodyRecord.success === 'boolean' ? bodyRecord.success : undefined,
           raw: data,
         };
       }
 
       // successレスポンスを標準形式に正規化
-      if (data && typeof data === 'object') {
+      if (isRecord(data)) {
         const successValue = typeof data.success === 'boolean' ? data.success : undefined;
         const messageValue = typeof data.message === 'string' ? data.message : undefined;
 
-        if (successValue !== undefined && Object.prototype.hasOwnProperty.call(data, 'data')) {
+        if (Object.prototype.hasOwnProperty.call(data, 'data')) {
           return {
             data: (data as { data: T }).data,
             success: successValue,
@@ -227,14 +242,14 @@ class ApiClient {
         }
 
         return {
-          data,
+          data: data as unknown as T,
           success: successValue,
           message: messageValue,
           raw: data,
         };
       }
 
-      return { data };
+      return { data: data as T };
     } catch (error) {
       // ネットワークエラーまたはタイムアウト
       if (error instanceof Error) {
@@ -270,7 +285,7 @@ class ApiClient {
    * ネットワークエラーやタイムアウトの場合に自動リトライ
    * 指数バックオフ戦略を使用（1秒 → 2秒 → 4秒）
    */
-  private async requestWithRetry<T = any>(
+  private async requestWithRetry<T = unknown>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
     options: RequestOptions = {}
@@ -311,7 +326,14 @@ class ApiClient {
       }
     }
 
-    return lastError!;
+    return (
+      lastError ?? {
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: 'リトライ上限に達しました',
+        },
+      }
+    );
   }
 
   /**
@@ -321,7 +343,7 @@ class ApiClient {
    * @param requireAuth - 認証が必要な場合true
    * @param options - タイムアウトやリトライ設定
    */
-  async get<T = any>(
+  async get<T = unknown>(
     endpoint: string,
     requireAuth = false,
     options: Omit<RequestOptions, 'body' | 'requireAuth'> = {}
@@ -340,9 +362,9 @@ class ApiClient {
    * @param requireAuth - 認証が必要な場合true
    * @param options - タイムアウトやリトライ設定
    */
-  async post<T = any>(
+  async post<T = unknown>(
     endpoint: string,
-    body?: any,
+    body?: unknown,
     requireAuth = false,
     options: Omit<RequestOptions, 'body' | 'requireAuth'> = {}
   ): Promise<ApiResponse<T>> {
@@ -361,9 +383,9 @@ class ApiClient {
    * @param requireAuth - 認証が必要な場合true
    * @param options - タイムアウトやリトライ設定
    */
-  async put<T = any>(
+  async put<T = unknown>(
     endpoint: string,
-    body?: any,
+    body?: unknown,
     requireAuth = false,
     options: Omit<RequestOptions, 'body' | 'requireAuth'> = {}
   ): Promise<ApiResponse<T>> {
@@ -381,7 +403,7 @@ class ApiClient {
    * @param requireAuth - 認証が必要な場合true
    * @param options - タイムアウトやリトライ設定
    */
-  async delete<T = any>(
+  async delete<T = unknown>(
     endpoint: string,
     requireAuth = false,
     options: Omit<RequestOptions, 'body' | 'requireAuth'> = {}

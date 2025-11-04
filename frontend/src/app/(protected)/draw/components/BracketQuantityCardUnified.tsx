@@ -9,6 +9,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Minus, Plus, Table, Layers, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export type BracketQuantityCardUnifiedProps =
   | {
@@ -27,28 +28,34 @@ export type BracketQuantityCardUnifiedProps =
 
 export default function BracketQuantityCardUnified(props: BracketQuantityCardUnifiedProps) {
   const { scaffoldGroups, updateScaffoldGroup, selectedScaffoldPartKeys, clearScaffoldSelection } = useDrawingStore();
-  const isBulk = props.kind === 'bulk';
+  const { kind, onClose, screenPosition } = props;
+  const isBulk = kind === 'bulk';
   const headerTitle = isBulk ? 'ブラケットの一括数量調整' : 'ブラケットの数量調整';
 
+  const singleGroupId = kind === 'single' ? props.groupId : null;
+  const singlePartId = kind === 'single' ? props.partId : null;
+  const bulkScope = kind === 'bulk' ? props.scope : null;
+
   const initial = React.useMemo(() => {
-    if (props.kind === 'single') {
-      const g = scaffoldGroups.find((gg) => gg.id === props.groupId);
-      const p = g?.parts.find((pp) => pp.id === props.partId);
+    if (singleGroupId && singlePartId) {
+      const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+      const part = group?.parts.find((candidate) => candidate.id === singlePartId);
+      const target = part && part.type === 'ブラケット' ? part : null;
       return {
-        qty: Number(p?.meta?.quantity ?? 0),
-        bracketSize: p?.meta?.bracketSize ?? '-',
+        qty: Number(target?.meta?.quantity ?? 0),
+        bracketSize: target?.meta?.bracketSize ?? '-',
       };
     }
     return { qty: 0, bracketSize: '-' };
-  }, [props, scaffoldGroups]);
+  }, [scaffoldGroups, singleGroupId, singlePartId]);
 
   const [qty, setQty] = React.useState<number>(isNaN(initial.qty) ? 0 : initial.qty);
   const [mode, setMode] = React.useState<'replace' | 'add'>('replace');
 
   const style: React.CSSProperties = {
     position: 'absolute',
-    left: `${props.screenPosition.left}px`,
-    top: `${props.screenPosition.top}px`,
+    left: `${screenPosition.left}px`,
+    top: `${screenPosition.top}px`,
     zIndex: 40,
     width: 360,
   };
@@ -60,58 +67,86 @@ export default function BracketQuantityCardUnified(props: BracketQuantityCardUni
     return p?.type === 'ブラケット';
   }).length;
 
-  const handleSave = () => {
-    if (props.kind === 'single') {
-      const g = scaffoldGroups.find((gg) => gg.id === (props as any).groupId);
-      if (!g) return;
-      const pid = (props as any).partId as string;
-      const nextParts = g.parts.map((p) =>
-        p.id === pid
-          ? ({
-              ...p,
-              meta: { ...(p.meta || {}), quantity: Math.max(0, qty), quantityConfirmed: true },
-            } as any)
-          : p
-      );
-      updateScaffoldGroup(g.id, { parts: nextParts });
-      props.onClose();
-      return;
-    }
+  const applySingle = React.useCallback(() => {
+    if (!singleGroupId || !singlePartId) return;
+    const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+    if (!group) return;
+    const nextParts = group.parts.map((part) => {
+      if (part.id !== singlePartId || part.type !== 'ブラケット') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          quantity: Math.max(0, qty),
+          quantityConfirmed: true,
+        },
+      };
+    });
+    updateScaffoldGroup(group.id, { parts: nextParts });
+    onClose();
+  }, [singleGroupId, singlePartId, scaffoldGroups, qty, updateScaffoldGroup, onClose]);
 
-    const applyTo = (p: any) => {
-      if (p.type !== 'ブラケット') return p;
-      const base = Number(p.meta?.quantity ?? 0);
+  const applyBulk = React.useCallback(() => {
+    if (kind !== 'bulk' || !bulkScope) return;
+    const applyTo = (part: ScaffoldPart): ScaffoldPart => {
+      if (part.type !== 'ブラケット') return part;
+      const base = Number(part.meta?.quantity ?? 0);
       const next = mode === 'add' ? Math.max(0, base + Math.max(0, qty)) : Math.max(0, qty);
-      return { ...p, meta: { ...(p.meta || {}), quantity: isNaN(qty) ? base : next, quantityConfirmed: true } };
+      const quantityValue = Number.isNaN(qty) ? base : next;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          quantity: quantityValue,
+          quantityConfirmed: true,
+        },
+      };
     };
 
-    if (props.scope === 'selected') {
-      const grouped: Record<string, string[]> = {};
-      for (const key of selectedScaffoldPartKeys) {
+    if (bulkScope === 'selected') {
+      const grouped = selectedScaffoldPartKeys.reduce<Record<string, Set<string>>>((acc, key) => {
         const [gid, pid] = key.split(':');
-        if (!grouped[gid]) grouped[gid] = [];
-        grouped[gid].push(pid);
-      }
-      for (const gid of Object.keys(grouped)) {
-        const g = scaffoldGroups.find((gg) => gg.id === gid);
-        if (!g) continue;
-        const target = new Set(grouped[gid]);
-        const nextParts = g.parts.map((p) => (target.has(p.id) ? applyTo(p) : p));
+        if (!acc[gid]) acc[gid] = new Set();
+        acc[gid]!.add(pid);
+        return acc;
+      }, {});
+
+      Object.entries(grouped).forEach(([gid, ids]) => {
+        const group = scaffoldGroups.find((candidate) => candidate.id === gid);
+        if (!group) return;
+        const nextParts = group.parts.map((part) => (ids.has(part.id) ? applyTo(part) : part));
         updateScaffoldGroup(gid, { parts: nextParts });
-      }
+      });
       clearScaffoldSelection();
-      props.onClose();
+      onClose();
       return;
     }
 
-    // all
-    for (const g of scaffoldGroups) {
-      const nextParts = g.parts.map((p) => applyTo(p));
-      updateScaffoldGroup(g.id, { parts: nextParts });
-    }
+    scaffoldGroups.forEach((group) => {
+      const nextParts = group.parts.map((part) => applyTo(part));
+      updateScaffoldGroup(group.id, { parts: nextParts });
+    });
     clearScaffoldSelection();
-    props.onClose();
-  };
+    onClose();
+  }, [
+    bulkScope,
+    clearScaffoldSelection,
+    mode,
+    kind,
+    onClose,
+    scaffoldGroups,
+    selectedScaffoldPartKeys,
+    qty,
+    updateScaffoldGroup,
+  ]);
+
+  const handleSave = React.useCallback(() => {
+    if (kind === 'single') {
+      applySingle();
+    } else {
+      applyBulk();
+    }
+  }, [applyBulk, applySingle, kind]);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -137,7 +172,7 @@ export default function BracketQuantityCardUnified(props: BracketQuantityCardUni
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{headerTitle}</h3>
           {isBulk ? (
             <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
-              {props.scope === 'all' ? '対象 全ブラケット' : `対象 ${selectedCount} 箇所`}
+              {bulkScope === 'all' ? '対象 全ブラケット' : `対象 ${selectedCount} 箇所`}
             </span>
           ) : (
             <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
@@ -150,7 +185,7 @@ export default function BracketQuantityCardUnified(props: BracketQuantityCardUni
             <button
               onClick={() => {
                 clearScaffoldSelection();
-                props.onClose();
+                onClose();
               }}
               className="flex h-8 items-center justify-center rounded-lg px-2 text-[11px] text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
               title="選択解除"
@@ -160,7 +195,7 @@ export default function BracketQuantityCardUnified(props: BracketQuantityCardUni
             </button>
           )}
           <button
-            onClick={props.onClose}
+            onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
             aria-label="閉じる"
           >
@@ -224,7 +259,7 @@ export default function BracketQuantityCardUnified(props: BracketQuantityCardUni
           <Button
             variant="outline"
             size="sm"
-            onClick={props.onClose}
+            onClick={onClose}
             className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
           >
             キャンセル
@@ -241,4 +276,3 @@ export default function BracketQuantityCardUnified(props: BracketQuantityCardUni
     </div>
   );
 }
-

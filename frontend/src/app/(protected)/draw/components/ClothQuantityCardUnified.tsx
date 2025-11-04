@@ -12,6 +12,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Minus, Plus, Table, Layers, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export type ClothQuantityCardUnifiedProps =
   | {
@@ -30,23 +31,29 @@ export type ClothQuantityCardUnifiedProps =
 
 export default function ClothQuantityCardUnified(props: ClothQuantityCardUnifiedProps) {
   const { scaffoldGroups, updateScaffoldGroup, selectedScaffoldPartKeys, clearScaffoldSelection } = useDrawingStore();
+  const { kind, onClose, screenPosition } = props;
 
-  const isBulk = props.kind === 'bulk';
+  const isBulk = kind === 'bulk';
   const headerTitle = isBulk ? '布材の一括数量調整' : '布材の数量調整';
+
+  const singleGroupId = kind === 'single' ? props.groupId : null;
+  const singlePartId = kind === 'single' ? props.partId : null;
+  const bulkScope = kind === 'bulk' ? props.scope : null;
 
   // 初期値（単体時のみ）
   const initial = React.useMemo(() => {
-    if (props.kind === 'single') {
-      const g = scaffoldGroups.find((gg) => gg.id === props.groupId);
-      const p = g?.parts.find((pp) => pp.id === props.partId);
+    if (singleGroupId && singlePartId) {
+      const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+      const part = group?.parts.find((candidate) => candidate.id === singlePartId);
+      const target = part && part.type === '布材' ? part : null;
       return {
-        qty: Number(p?.meta?.quantity ?? 0),
-        tsubo: Number(p?.meta?.tsubo ?? 0),
-        lengthMm: Number(p?.meta?.length ?? 0),
+        qty: Number(target?.meta?.quantity ?? 0),
+        tsubo: Number(target?.meta?.tsubo ?? 0),
+        lengthMm: Number(target?.meta?.length ?? 0),
       };
     }
     return { qty: 0, tsubo: 0, lengthMm: 0 };
-  }, [props, scaffoldGroups]);
+  }, [scaffoldGroups, singleGroupId, singlePartId]);
 
   const [qty, setQty] = React.useState<number>(isNaN(initial.qty) ? 0 : initial.qty);
   const [tsubo, setTsubo] = React.useState<number>(isNaN(initial.tsubo) ? 0 : initial.tsubo);
@@ -54,8 +61,8 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
 
   const style: React.CSSProperties = {
     position: 'absolute',
-    left: `${props.screenPosition.left}px`,
-    top: `${props.screenPosition.top}px`,
+    left: `${screenPosition.left}px`,
+    top: `${screenPosition.top}px`,
     zIndex: 40,
     width: 380,
   };
@@ -67,77 +74,81 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
     return p?.type === '布材';
   }).length;
 
-  const handleSave = () => {
-    if (props.kind === 'single') {
-      const g = scaffoldGroups.find((gg) => gg.id === (props as any).groupId);
-      if (!g) return;
-      const pid = (props as any).partId as string;
-      const nextParts = g.parts.map((p) =>
-        p.id === pid
-          ? ({
-              ...p,
-              meta: {
-                ...(p.meta || {}),
-                quantity: Math.max(0, qty),
-                tsubo: Math.max(0, tsubo),
-                quantityConfirmed: true,
-              },
-            } as any)
-          : p
-      );
-      updateScaffoldGroup(g.id, { parts: nextParts });
-      props.onClose();
-      return;
-    }
+  const applySingle = React.useCallback(() => {
+    if (!singleGroupId || !singlePartId) return;
+    const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+    if (!group) return;
+    const nextParts = group.parts.map((part) => {
+      if (part.id !== singlePartId || part.type !== '布材') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          quantity: Math.max(0, qty),
+          tsubo: Math.max(0, tsubo),
+          quantityConfirmed: true,
+        },
+      };
+    });
+    updateScaffoldGroup(group.id, { parts: nextParts });
+    onClose();
+  }, [qty, scaffoldGroups, singleGroupId, singlePartId, tsubo, updateScaffoldGroup, onClose]);
 
-    // bulk
-    const applyToPart = (p: any) => {
-      if (p.type !== '布材') return p;
-      const baseQty = Number(p.meta?.quantity ?? 0);
-      const baseTsubo = Number(p.meta?.tsubo ?? 0);
+  const applyBulk = React.useCallback(() => {
+    if (kind !== 'bulk' || !bulkScope) return;
+
+    const applyToPart = (part: ScaffoldPart): ScaffoldPart => {
+      if (part.type !== '布材') return part;
+      const baseQty = Number(part.meta?.quantity ?? 0);
+      const baseTsubo = Number(part.meta?.tsubo ?? 0);
       const nextQty = mode === 'add' ? Math.max(0, baseQty + Math.max(0, qty)) : Math.max(0, qty);
       const nextTsubo = mode === 'add' ? Math.max(0, baseTsubo + Math.max(0, tsubo)) : Math.max(0, tsubo);
       return {
-        ...p,
+        ...part,
         meta: {
-          ...(p.meta || {}),
-          quantity: isNaN(qty) ? baseQty : nextQty,
-          tsubo: isNaN(tsubo) ? baseTsubo : nextTsubo,
+          ...(part.meta ?? {}),
+          quantity: Number.isNaN(qty) ? baseQty : nextQty,
+          tsubo: Number.isNaN(tsubo) ? baseTsubo : nextTsubo,
           quantityConfirmed: true,
         },
       };
     };
 
-    if (props.scope === 'selected') {
-      // グループ別にまとめて更新
-      const grouped: Record<string, string[]> = {};
-      for (const key of selectedScaffoldPartKeys) {
+    if (bulkScope === 'selected') {
+      const grouped = selectedScaffoldPartKeys.reduce<Record<string, Set<string>>>((acc, key) => {
         const [gid, pid] = key.split(':');
-        if (!grouped[gid]) grouped[gid] = [];
-        grouped[gid].push(pid);
-      }
-      for (const gid of Object.keys(grouped)) {
-        const g = scaffoldGroups.find((gg) => gg.id === gid);
-        if (!g) continue;
-        const target = new Set(grouped[gid]);
-        const nextParts = g.parts.map((p) => (target.has(p.id) ? applyToPart(p) : p));
+        if (!acc[gid]) acc[gid] = new Set();
+        acc[gid]!.add(pid);
+        return acc;
+      }, {});
+
+      Object.entries(grouped).forEach(([gid, ids]) => {
+        const group = scaffoldGroups.find((candidate) => candidate.id === gid);
+        if (!group) return;
+        const nextParts = group.parts.map((part) => (ids.has(part.id) ? applyToPart(part) : part));
         updateScaffoldGroup(gid, { parts: nextParts });
-      }
+      });
       clearScaffoldSelection();
-      props.onClose();
+      onClose();
       return;
     }
 
-    // scope === 'all'
-    for (const g of scaffoldGroups) {
-      const nextParts = g.parts.map((p) => applyToPart(p));
-      updateScaffoldGroup(g.id, { parts: nextParts });
-    }
+    scaffoldGroups.forEach((group) => {
+      const nextParts = group.parts.map((part) => applyToPart(part));
+      updateScaffoldGroup(group.id, { parts: nextParts });
+    });
     clearScaffoldSelection();
-    props.onClose();
-  };
+    onClose();
+  }, [bulkScope, clearScaffoldSelection, kind, mode, onClose, qty, scaffoldGroups, selectedScaffoldPartKeys, tsubo, updateScaffoldGroup]);
 
-  // Enterキーで保存
+  const handleSave = React.useCallback(() => {
+    if (kind === 'single') {
+      applySingle();
+    } else {
+      applyBulk();
+    }
+  }, [applyBulk, applySingle, kind]);
+
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.code === 'Enter') {
@@ -167,10 +178,10 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{headerTitle}</h3>
           {isBulk && (
             <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
-              {props.kind === 'bulk' && props.scope === 'all' ? '対象 全布材' : `対象 ${selectedCount} 箇所`}
+              {bulkScope === 'all' ? '対象 全布材' : `対象 ${selectedCount} 箇所`}
             </span>
           )}
-          {props.kind === 'single' && initial.lengthMm > 0 && (
+          {kind === 'single' && initial.lengthMm > 0 && (
             <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
               {`${initial.lengthMm}mm`}
             </span>
@@ -181,7 +192,7 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
             <button
               onClick={() => {
                 clearScaffoldSelection();
-                props.onClose();
+                onClose();
               }}
               className="flex h-8 items-center justify-center rounded-lg px-2 text-[11px] text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
               title="選択解除"
@@ -191,7 +202,7 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
             </button>
           )}
           <button
-            onClick={props.onClose}
+            onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
             title="閉じる"
             aria-label="閉じる"
@@ -281,7 +292,7 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
           <Button
             variant="outline"
             size="sm"
-            onClick={props.onClose}
+            onClick={onClose}
             className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
           >
             キャンセル
@@ -298,4 +309,3 @@ export default function ClothQuantityCardUnified(props: ClothQuantityCardUnified
     </div>
   );
 }
-

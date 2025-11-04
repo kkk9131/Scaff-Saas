@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { type ChatMessage, Button, LoadingSpinner, useToast, GradientText, Muted } from '@/components';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { getProject } from '@/lib/api/projects';
 import { getLatestDrawing, type DrawingRecord } from '@/lib/api/drawings';
 import type { Project } from '@/types/project';
@@ -57,8 +56,7 @@ export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
-  const { isDark } = useTheme();
+  const { loading: authLoading } = useAuth();
 
   const projectId = React.useMemo(() => {
     const rawId = params?.id;

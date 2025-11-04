@@ -17,6 +17,7 @@ import { X, Plus } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_SCALE, mmToPx, calculateAngleDegrees } from '@/lib/utils/scale';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export interface AntiAddCardProps {
   /** 左上のスクリーン座標（px） */
@@ -104,7 +105,7 @@ export default function AntiAddCard({ screenPosition, kind = 'single', groupId, 
           : [];
 
     // 追加パーツをグループ単位で集約（既存部材の消し込みを防ぐ）
-    const addMap = new Map<string, any[]>();
+    const addMap = new Map<string, ScaffoldPart[]>();
 
     for (const t of targetList) {
       const g = useDrawingStore.getState().scaffoldGroups.find((gg) => gg.id === t.groupId);
@@ -142,7 +143,7 @@ export default function AntiAddCard({ screenPosition, kind = 'single', groupId, 
       const center = { x: baseX + nx * centerOffsetPx, y: baseY + ny * centerOffsetPx };
       const antiOffsetMm = bOff - span / 2;
 
-      const newPart = {
+      const newPart: ScaffoldPart = {
         id: uuidv4(),
         type: 'アンチ' as const,
         position: center,

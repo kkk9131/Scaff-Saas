@@ -12,8 +12,9 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Group, Rect, Transformer, Line } from 'react-konva';
+import { useShallow } from 'zustand/react/shallow';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useDrawingModeStore } from '@/stores/drawingModeStore';
 import { generateScaffoldSpan } from '@/lib/sax/spanGenerator';
@@ -27,7 +28,6 @@ import ClothQuantityCardUnified from './ClothQuantityCardUnified';
 import BracketQuantityCardUnified from './BracketQuantityCardUnified';
 import BracketConfigCardBulk from './BracketConfigCardBulk';
 import AntiQuantityCardUnified from './AntiQuantityCardUnified';
-import AntiLevelCard from './AntiLevelCard';
 import AntiLevelCardUnified from './AntiLevelCardUnified';
 import BracketConfigCard from './BracketConfigCard';
 import HaneConfigCard from './HaneConfigCard';
@@ -37,11 +37,20 @@ import MemoCard from './MemoCard';
 import ViewModeInfoCard from './ViewModeInfoCard';
 import AntiAddCard from './AntiAddCard';
 import DeleteSelectCard from './DeleteSelectCard';
-// 旧: BulkPillarQuantityCard は統合版へ移行
-import { useProjectStore } from '@/stores/projectStore';
 import { useDrawingSave } from '@/hooks/useDrawingSave';
 import { registerStage } from '@/lib/canvasStageExporter';
 import { v4 as uuidv4 } from 'uuid';
+import type Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type { ScaffoldPart } from '@/types/scaffold';
+
+type BracketPart = ScaffoldPart & { type: 'ブラケット' };
+type AntiPart = ScaffoldPart & { type: 'アンチ' };
+type StairPart = ScaffoldPart & { type: '階段' };
+
+const isBracketPart = (part: ScaffoldPart): part is BracketPart => part.type === 'ブラケット';
+const isAntiPart = (part: ScaffoldPart): part is AntiPart => part.type === 'アンチ';
+const isStairPart = (part: ScaffoldPart): part is StairPart => part.type === '階段';
 
 /**
  * CanvasStageコンポーネント
@@ -50,13 +59,15 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export default function CanvasStage() {
   // Konva Stageへの参照
-  const stageRef = useRef<any>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
 
   // キャンバスのサイズ状態
   const [stageSize, setStageSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800,
   });
+  const stageWidth = stageSize.width;
+  const stageHeight = stageSize.height;
 
   // Zustandストアから状態と操作を取得
   const {
@@ -66,42 +77,182 @@ export default function CanvasStage() {
     currentColor,
     bracketSize,
     directionReversed,
-    setCanvasScale,
-    setCanvasPosition,
-    setMousePosition,
-    addScaffoldGroup,
-    setBracketSize,
-    setDirectionReversed,
-    updateScaffoldGroup,
-    // 追加: 一括編集/選択
     selectedScaffoldPartKeys,
     editSelectionMode,
     editTargetType,
-    setEditSelectionMode,
-    setBulkPillarScope,
     scaffoldGroups,
     bulkPillarScope,
     bulkClothScope,
-    setBulkClothScope,
     bulkBracketScope,
-    setBulkBracketScope,
-    // メモ関連
     memos,
-    addMemo,
-    updateMemo,
     selectedMemoId,
-    setSelectedMemoId,
-    // 投げ縄モード関連
     lassoGlowColor,
-    lassoSelectionArea,
-    setLassoSelectionArea,
-    selectScaffoldParts,
-  } = useDrawingStore();
+    snapToGrid,
+    gridSize,
+  } = useDrawingStore(
+    useShallow((state) => ({
+      canvasScale: state.canvasScale,
+      canvasPosition: state.canvasPosition,
+      currentTool: state.currentTool,
+      currentColor: state.currentColor,
+      bracketSize: state.bracketSize,
+      directionReversed: state.directionReversed,
+      selectedScaffoldPartKeys: state.selectedScaffoldPartKeys,
+      editSelectionMode: state.editSelectionMode,
+      editTargetType: state.editTargetType,
+      scaffoldGroups: state.scaffoldGroups,
+      bulkPillarScope: state.bulkPillarScope,
+      bulkClothScope: state.bulkClothScope,
+      bulkBracketScope: state.bulkBracketScope,
+      memos: state.memos,
+      selectedMemoId: state.selectedMemoId,
+      lassoGlowColor: state.lassoGlowColor,
+      snapToGrid: state.snapToGrid,
+      gridSize: state.gridSize,
+    }))
+  );
+  const setCanvasScale = useDrawingStore((state) => state.setCanvasScale);
+  const setCanvasPosition = useDrawingStore((state) => state.setCanvasPosition);
+  const setMousePosition = useDrawingStore((state) => state.setMousePosition);
+  const addScaffoldGroup = useDrawingStore((state) => state.addScaffoldGroup);
+  const setBracketSize = useDrawingStore((state) => state.setBracketSize);
+  const setDirectionReversed = useDrawingStore((state) => state.setDirectionReversed);
+  const updateScaffoldGroup = useDrawingStore((state) => state.updateScaffoldGroup);
+  const setEditSelectionMode = useDrawingStore((state) => state.setEditSelectionMode);
+  const setBulkPillarScope = useDrawingStore((state) => state.setBulkPillarScope);
+  const setBulkClothScope = useDrawingStore((state) => state.setBulkClothScope);
+  const setBulkBracketScope = useDrawingStore((state) => state.setBulkBracketScope);
+  const addMemo = useDrawingStore((state) => state.addMemo);
+  const updateMemo = useDrawingStore((state) => state.updateMemo);
+  const setSelectedMemoId = useDrawingStore((state) => state.setSelectedMemoId);
+  const setLassoSelectionArea = useDrawingStore((state) => state.setLassoSelectionArea);
+  const selectScaffoldParts = useDrawingStore((state) => state.selectScaffoldParts);
+
+  const canvasOffsetX = canvasPosition.x;
+  const canvasOffsetY = canvasPosition.y;
+  const visibleBounds = useMemo(() => {
+    const safeScale = Math.abs(canvasScale) < 0.0001 ? 1 : canvasScale;
+    const inv = 1 / safeScale;
+    const left = (-canvasOffsetX) * inv;
+    const top = (-canvasOffsetY) * inv;
+    const right = left + stageWidth * inv;
+    const bottom = top + stageHeight * inv;
+    return { left, right, top, bottom };
+  }, [canvasOffsetX, canvasOffsetY, canvasScale, stageWidth, stageHeight]);
+  const VIEWPORT_MARGIN = 480;
+  const isPartWithinViewport = (part: ScaffoldPart): boolean => {
+    const { left, right, top, bottom } = visibleBounds;
+    const pointInViewport = (x: number, y: number, margin = VIEWPORT_MARGIN) =>
+      x >= left - margin &&
+      x <= right + margin &&
+      y >= top - margin &&
+      y <= bottom + margin;
+    const rectIntersectsViewport = (minX: number, maxX: number, minY: number, maxY: number) =>
+      maxX >= left - VIEWPORT_MARGIN &&
+      minX <= right + VIEWPORT_MARGIN &&
+      maxY >= top - VIEWPORT_MARGIN &&
+      minY <= bottom + VIEWPORT_MARGIN;
+
+    if (pointInViewport(part.position.x, part.position.y)) {
+      return true;
+    }
+
+    switch (part.type) {
+      case '布材': {
+        const lengthMm = Number(part.meta?.length ?? 0);
+        if (!(lengthMm > 0)) {
+          return rectIntersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const directionDeg = Number(part.meta?.direction ?? 0);
+        const rad = (directionDeg * Math.PI) / 180;
+        const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+        const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+        const endX = part.position.x + dir.x * lengthPx;
+        const endY = part.position.y + dir.y * lengthPx;
+        if (pointInViewport(endX, endY)) {
+          return true;
+        }
+        const minX = Math.min(part.position.x, endX);
+        const maxX = Math.max(part.position.x, endX);
+        const minY = Math.min(part.position.y, endY);
+        const maxY = Math.max(part.position.y, endY);
+        return rectIntersectsViewport(minX, maxX, minY, maxY);
+      }
+      case 'ブラケット': {
+        const widthMmRaw = part.meta?.width ?? (part.meta?.bracketSize === 'W' ? 600 : 355);
+        const widthMm = Number(widthMmRaw);
+        if (!(widthMm > 0)) {
+          return rectIntersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const dirDeg = Number(part.meta?.direction ?? 0);
+        const rad = (dirDeg * Math.PI) / 180;
+        const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+        const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+        const endX = part.position.x + dir.x * widthPx;
+        const endY = part.position.y + dir.y * widthPx;
+        if (pointInViewport(endX, endY)) {
+          return true;
+        }
+        const minX = Math.min(part.position.x, endX);
+        const maxX = Math.max(part.position.x, endX);
+        const minY = Math.min(part.position.y, endY);
+        const maxY = Math.max(part.position.y, endY);
+        return rectIntersectsViewport(minX, maxX, minY, maxY);
+      }
+      case 'アンチ':
+      case '階段': {
+        const lengthMmRaw = part.meta?.length ?? 0;
+        const widthMmRaw = part.meta?.width ?? (part.type === 'アンチ' ? 400 : 0);
+        const lengthMm = Number(lengthMmRaw);
+        const widthMm = Number(widthMmRaw);
+        if (!(lengthMm > 0 && widthMm > 0)) {
+          return rectIntersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+        }
+        const lengthPx = mmToPx(lengthMm, DEFAULT_SCALE);
+        const widthPx = mmToPx(widthMm, DEFAULT_SCALE);
+        const halfLen = lengthPx / 2;
+        const halfWidth = widthPx / 2;
+        const directionDeg = Number(part.meta?.direction ?? 0);
+        const rad = (directionDeg * Math.PI) / 180;
+        const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+        const normal = { x: -dir.y, y: dir.x };
+        const corners = [
+          {
+            x: part.position.x + dir.x * halfLen + normal.x * halfWidth,
+            y: part.position.y + dir.y * halfLen + normal.y * halfWidth,
+          },
+          {
+            x: part.position.x + dir.x * halfLen - normal.x * halfWidth,
+            y: part.position.y + dir.y * halfLen - normal.y * halfWidth,
+          },
+          {
+            x: part.position.x - dir.x * halfLen + normal.x * halfWidth,
+            y: part.position.y - dir.y * halfLen + normal.y * halfWidth,
+          },
+          {
+            x: part.position.x - dir.x * halfLen - normal.x * halfWidth,
+            y: part.position.y - dir.y * halfLen - normal.y * halfWidth,
+          },
+        ];
+        if (corners.some((corner) => pointInViewport(corner.x, corner.y))) {
+          return true;
+        }
+        const xs = corners.map((c) => c.x);
+        const ys = corners.map((c) => c.y);
+        return rectIntersectsViewport(
+          Math.min(...xs),
+          Math.max(...xs),
+          Math.min(...ys),
+          Math.max(...ys)
+        );
+      }
+      default:
+        return rectIntersectsViewport(part.position.x, part.position.x, part.position.y, part.position.y);
+    }
+  };
 
   const { currentMode } = useDrawingModeStore();
 
-  // プロジェクトID取得（ダッシュボード等で選択済み前提）
-  const { currentProject } = useProjectStore();
   // 自動保存フック（10秒 or 10アクション）
   useDrawingSave({ intervalMs: 10_000, actionThreshold: 10 });
 
@@ -135,8 +286,6 @@ export default function CanvasStage() {
     | null
   >(null);
 
-  // グリッド設定を取得
-  const { snapToGrid, gridSize } = useDrawingStore();
 
   // パンモード（スペースキー押下中）の状態
   const [isPanning, setIsPanning] = useState(false);
@@ -183,11 +332,11 @@ export default function CanvasStage() {
   } | null>(null);
 
   // Transformerの参照（メモのリサイズ用）
-  const transformerRef = useRef<any>(null);
-  const transformerTargetRef = useRef<any>(null);
+  const transformerRef = useRef<Konva.Transformer | null>(null);
+  const transformerTargetRef = useRef<Konva.Node | null>(null);
 
   // Transformerのターゲットを設定する関数
-  const setTransformerTarget = (target: any) => {
+  const setTransformerTarget = (target: Konva.Node | null) => {
     transformerTargetRef.current = target;
     if (transformerRef.current && target) {
       transformerRef.current.nodes([target]);
@@ -324,7 +473,7 @@ export default function CanvasStage() {
       y: start.y + dir.y * mmToPx(leftMm, DEFAULT_SCALE),
     };
     // 連続布材を生成
-    const clothParts: any[] = [];
+    const clothParts: ScaffoldPart[] = [];
     // 左側
     {
       let curOff = offsetMm;
@@ -367,7 +516,7 @@ export default function CanvasStage() {
     };
 
     let baseParts = group.parts.filter((p) => p.id !== part.id);
-    let addParts: any[] = [];
+    let addParts: ScaffoldPart[] = [];
     if (mode === 'with-anti') {
       // 布材は分割して差し替え（アンチ分割もこの後に実施）
       addParts = [...clothParts, pillar];
@@ -550,30 +699,6 @@ export default function CanvasStage() {
   const randomId = () => 'id_' + Math.random().toString(36).slice(2, 10);
 
   // 分割ヒントの表示用（150を境界へ寄せた内訳表示）
-  const splitIntoAllowed = (len: number): number[] => {
-    const allowed = [1800, 1500, 1200, 900, 600, 300, 150];
-    let remaining = len;
-    const segs: number[] = [];
-    for (const a of allowed) {
-      while (remaining >= a) {
-        segs.push(a);
-        remaining -= a;
-      }
-    }
-    if (remaining > 0) {
-      const snap = Math.round(remaining / 150) * 150;
-      if (snap > 0) segs.push(snap);
-    }
-    return segs;
-  };
-  const moveOne150To = (segs: number[], side: 'start' | 'end') => {
-    const idx = segs.indexOf(150);
-    if (idx === -1) return segs;
-    const s = [...segs];
-    s.splice(idx, 1);
-    return side === 'start' ? [150, ...s] : [...s, 150];
-  };
-
   /**
    * 柱数量カードの状態
    * - オーバーレイはStageコンテナ内で絶対配置
@@ -727,7 +852,7 @@ export default function CanvasStage() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isPanning]);
+  }, [currentMode, isPanning]);
 
   /**
    * Enterキー: 編集モードでの一括編集カードを開く
@@ -815,7 +940,7 @@ export default function CanvasStage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentMode, editTargetType, selectedScaffoldPartKeys.length, setEditSelectionMode, setBulkPillarScope, setBulkClothScope, setBulkBracketScope]);
+  }, [currentMode, editTargetType, scaffoldGroups, selectedScaffoldPartKeys.length, setEditSelectionMode, setBulkPillarScope, setBulkClothScope, setBulkBracketScope]);
 
   /**
    * Shift/Altキーでサックスモード設定を切替
@@ -859,7 +984,7 @@ export default function CanvasStage() {
    * マウスホイールで拡大・縮小を実現
    * マウスポインタ位置を中心にズーム
    */
-  const handleWheel = (e: any) => {
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
 
     const stage = stageRef.current;
@@ -867,6 +992,7 @@ export default function CanvasStage() {
 
     const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
+    if (!pointer) return;
 
     // ズーム倍率の計算（0.1〜5倍の範囲）
     const scaleBy = 1.05;
@@ -897,7 +1023,7 @@ export default function CanvasStage() {
    * パンモード時のドラッグ開始位置を記録
    * スパン描画モード時の描画開始
    */
-  const handleMouseDown = (e: any) => {
+  const handleMouseDown = () => {
     const stage = stageRef.current;
     if (!stage) return;
 
@@ -965,32 +1091,23 @@ export default function CanvasStage() {
 
     // メモモードでのメモ領域作成開始
     if (currentMode === 'memo' && !isPanning) {
-      // キャンバス座標系に変換（スケールとポジションを考慮）
-      let canvasX = (pos.x - canvasPosition.x) / canvasScale;
-      let canvasY = (pos.y - canvasPosition.y) / canvasScale;
-
-      // グリッドスナップが有効な場合、座標をスナップ
-      if (snapToGrid) {
-        const snapped = snapPositionToGrid(
-          { x: canvasX, y: canvasY },
-          gridSize,
-          DEFAULT_SCALE
-        );
-        canvasX = snapped.x;
-        canvasY = snapped.y;
-      }
+      const rawX = (pos.x - canvasPosition.x) / canvasScale;
+      const rawY = (pos.y - canvasPosition.y) / canvasScale;
+      const { x: memoX, y: memoY } = snapToGrid
+        ? snapPositionToGrid({ x: rawX, y: rawY }, gridSize, DEFAULT_SCALE)
+        : { x: rawX, y: rawY };
 
       setIsDrawingMemo(true);
-      setMemoStart({ x: canvasX, y: canvasY });
-      setMemoCurrent({ x: canvasX, y: canvasY });
+      setMemoStart({ x: memoX, y: memoY });
+      setMemoCurrent({ x: memoX, y: memoY });
       return;
     }
 
     // 投げ縄モードでの囲い作成開始
     if (currentMode === 'edit' && editSelectionMode === 'lasso' && lassoGlowColor && !isPanning) {
       // キャンバス座標系に変換（スケールとポジションを考慮）
-      let canvasX = (pos.x - canvasPosition.x) / canvasScale;
-      let canvasY = (pos.y - canvasPosition.y) / canvasScale;
+      const canvasX = (pos.x - canvasPosition.x) / canvasScale;
+      const canvasY = (pos.y - canvasPosition.y) / canvasScale;
 
       // 投げ縄モード時はグリッドスナップを無効化（自由な描画のため）
       // if (snapToGrid) {
@@ -1028,7 +1145,7 @@ export default function CanvasStage() {
    * スパン描画モード時のプレビュー更新
    * マウス座標も更新してアンダーバーに表示
    */
-  const handleMouseMove = (e: any) => {
+  const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
     const stage = stageRef.current;
     if (!stage) return;
 
@@ -1336,10 +1453,10 @@ export default function CanvasStage() {
       if (editTargetType === 'アンチ' && lassoGlowColor === 'green') {
         // ブラケットにアンチが接していないかを検出（ScaffoldRendererと同等ロジック）
         const findNoAntiBrackets = () => {
-          const result: { groupId: string; bracket: any }[] = [];
+          const result: { groupId: string; bracket: BracketPart }[] = [];
           for (const group of scaffoldGroups) {
-            const antiParts = group.parts.filter((p) => p.type === 'アンチ');
-            const bracketParts = group.parts.filter((p) => p.type === 'ブラケット');
+            const antiParts = group.parts.filter(isAntiPart);
+            const bracketParts = group.parts.filter(isBracketPart);
             for (const b of bracketParts) {
               const bOff = Number(b.meta?.offsetMm);
               if (!isFinite(bOff)) continue;
@@ -1398,6 +1515,9 @@ export default function CanvasStage() {
 
       for (const group of scaffoldGroups) {
         for (const part of group.parts) {
+          if (!isPartWithinViewport(part)) {
+            continue;
+          }
           // 部材の種類に応じて発光色を判定
           let partGlowColor: string | null = null;
           
@@ -1757,7 +1877,7 @@ export default function CanvasStage() {
 
                 // クリック対象が本当に「緑発光（階段の矢印と反対側）」だったかを再判定
                 // 判定: 階段中心C、布材中点M、矢印ベクトルv に対して (M - C)・v < 0
-                const stairs = group.parts.filter((p) => p.type === '階段');
+                const stairs = group.parts.filter(isStairPart);
                 if (stairs.length === 0) return;
 
                 // 最寄りの階段を基準に向きを決定（複数ある場合に備える）
@@ -1766,11 +1886,11 @@ export default function CanvasStage() {
                 const dirCloth = { x: Math.cos((dirDegForCloth * Math.PI) / 180), y: Math.sin((dirDegForCloth * Math.PI) / 180) };
                 const mid = { x: part.position.x + dirCloth.x * (lengthPx / 2), y: part.position.y + dirCloth.y * (lengthPx / 2) };
                 // 最寄り階段（中心距離が最小）
-                const nearest = stairs.reduce((best: any, st: any) => {
+                const nearest = stairs.reduce<{ st: StairPart; d2: number } | null>((best, st) => {
                   const d2 = (st.position.x - mid.x) ** 2 + (st.position.y - mid.y) ** 2;
                   if (!best || d2 < best.d2) return { st, d2 };
                   return best;
-                }, null as null | { st: any; d2: number });
+                }, null);
                 const stair = nearest?.st;
                 if (!stair) return;
                 const vStair = { x: Math.cos(((Number(stair.meta?.direction ?? 0)) * Math.PI) / 180), y: Math.sin(((Number(stair.meta?.direction ?? 0)) * Math.PI) / 180) };
@@ -1787,7 +1907,7 @@ export default function CanvasStage() {
                 const p0 = { x: startPos.x + vOpp.x * offPx, y: startPos.y + vOpp.y * offPx };
                 const p1 = { x: endPos.x + vOpp.x * offPx, y: endPos.y + vOpp.y * offPx };
 
-                const newPillars = [p0, p1].map((pos, i) => ({
+                const newPillars = [p0, p1].map((pos) => ({
                   /**
                    * 新規柱（markerは通常のcircle）。
                    * meta.directionは仮に階段の矢印逆側（見た目の整合用）を設定するが、
@@ -1864,7 +1984,7 @@ export default function CanvasStage() {
               const tipEnd = { x: endPos.x + vOut.x * d600, y: endPos.y + vOut.y * d600 };
 
               // 追加部材
-              const addParts: any[] = [];
+              const addParts: ScaffoldPart[] = [];
               // 両端に600ブラケット（W）、方向は反対側
               addParts.push({ id: randomId(), type: 'ブラケット', position: { x: startPos.x, y: startPos.y }, color: part.color, meta: { bracketSize: 'W', width: 600, direction: outwardDegOpp, offsetMm } });
               addParts.push({ id: randomId(), type: 'ブラケット', position: { x: endPos.x, y: endPos.y }, color: part.color, meta: { bracketSize: 'W', width: 600, direction: outwardDegOpp, offsetMm: offsetMm + lengthMm } });
@@ -2308,10 +2428,10 @@ export default function CanvasStage() {
         if (bulkAntiAction === 'add') {
           // 緑発光（アンチ未接ブラケット）対象の抽出
           const noAntiKeys = new Set<string>();
-          const bracketMap = new Map<string, { groupId: string; part: any }>();
+          const bracketMap = new Map<string, { groupId: string; part: BracketPart }>();
           for (const gg of scaffoldGroups) {
-            const antiParts = gg.parts.filter((pp) => pp.type === 'アンチ');
-            const bracketParts = gg.parts.filter((pp) => pp.type === 'ブラケット');
+            const antiParts = gg.parts.filter(isAntiPart);
+            const bracketParts = gg.parts.filter(isBracketPart);
             for (const b of bracketParts) {
               const bOff = Number(b.meta?.offsetMm);
               if (!isFinite(bOff)) continue;
@@ -2468,7 +2588,6 @@ export default function CanvasStage() {
           <ViewModeInfoCard
             screenPosition={hoveredViewPart.screenPosition}
             part={part}
-            groupId={group.id}
           />
         );
       })()}

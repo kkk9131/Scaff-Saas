@@ -9,6 +9,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Minus, Plus, Table, Layers, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export type AntiQuantityCardUnifiedProps =
   | {
@@ -27,21 +28,27 @@ export type AntiQuantityCardUnifiedProps =
 
 export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedProps) {
   const { scaffoldGroups, updateScaffoldGroup, selectedScaffoldPartKeys, clearScaffoldSelection } = useDrawingStore();
-  const isBulk = props.kind === 'bulk';
+  const { kind, onClose, screenPosition } = props;
+  const isBulk = kind === 'bulk';
   const headerTitle = isBulk ? 'アンチの一括数量調整' : 'アンチの数量調整';
 
+  const singleGroupId = kind === 'single' ? props.groupId : null;
+  const singlePartId = kind === 'single' ? props.partId : null;
+  const bulkScope = kind === 'bulk' ? props.scope : null;
+
   const initial = React.useMemo(() => {
-    if (props.kind === 'single') {
-      const g = scaffoldGroups.find((gg) => gg.id === props.groupId);
-      const p = g?.parts.find((pp) => pp.id === props.partId);
+    if (singleGroupId && singlePartId) {
+      const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+      const part = group?.parts.find((candidate) => candidate.id === singlePartId);
+      const target = part && part.type === 'アンチ' ? part : null;
       return {
-        w: Number(p?.meta?.antiW ?? p?.meta?.quantity ?? 0),
-        s: Number(p?.meta?.antiS ?? 0),
-        length: Number(p?.meta?.length ?? 0),
+        w: Number(target?.meta?.antiW ?? target?.meta?.quantity ?? 0),
+        s: Number(target?.meta?.antiS ?? 0),
+        length: Number(target?.meta?.length ?? 0),
       };
     }
     return { w: 0, s: 0, length: 0 };
-  }, [props, scaffoldGroups]);
+  }, [scaffoldGroups, singleGroupId, singlePartId]);
 
   const [wQty, setWQty] = React.useState<number>(isNaN(initial.w) ? 0 : initial.w);
   const [sQty, setSQty] = React.useState<number>(isNaN(initial.s) ? 0 : initial.s);
@@ -49,8 +56,8 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
 
   const style: React.CSSProperties = {
     position: 'absolute',
-    left: `${props.screenPosition.left}px`,
-    top: `${props.screenPosition.top}px`,
+    left: `${screenPosition.left}px`,
+    top: `${screenPosition.top}px`,
     zIndex: 40,
     width: 360,
   };
@@ -62,73 +69,92 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
     return p?.type === 'アンチ';
   }).length;
 
-  const applySingle = () => {
-    const g = scaffoldGroups.find((gg) => gg.id === (props as any).groupId);
-    if (!g) return;
-    const pid = (props as any).partId as string;
-    const next = g.parts.map((p) =>
-      p.id === pid
-        ? ({
-            ...p,
-            meta: {
-              ...(p.meta || {}),
-              antiW: Math.max(0, wQty),
-              antiS: Math.max(0, sQty),
-              quantityConfirmed: true,
-              quantity: undefined,
-            },
-          } as any)
-        : p
-    );
-    updateScaffoldGroup(g.id, { parts: next });
-    props.onClose();
-  };
+  const applySingle = React.useCallback(() => {
+    if (!singleGroupId || !singlePartId) return;
+    const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+    if (!group) return;
+    const next = group.parts.map((part) => {
+      if (part.id !== singlePartId || part.type !== 'アンチ') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          antiW: Math.max(0, wQty),
+          antiS: Math.max(0, sQty),
+          quantityConfirmed: true,
+          quantity: undefined,
+        },
+      };
+    });
+    updateScaffoldGroup(group.id, { parts: next });
+    onClose();
+  }, [singleGroupId, singlePartId, scaffoldGroups, sQty, updateScaffoldGroup, wQty, onClose]);
 
-  const applyBulk = () => {
-    const applyTo = (p: any) => {
-      if (p.type !== 'アンチ') return p;
-      const baseW = Number(p.meta?.antiW ?? p.meta?.quantity ?? 0);
-      const baseS = Number(p.meta?.antiS ?? 0);
+  const applyBulk = React.useCallback(() => {
+    if (kind !== 'bulk' || !bulkScope) return;
+    const applyTo = (part: ScaffoldPart): ScaffoldPart => {
+      if (part.type !== 'アンチ') return part;
+      const baseW = Number(part.meta?.antiW ?? part.meta?.quantity ?? 0);
+      const baseS = Number(part.meta?.antiS ?? 0);
       const nextW = mode === 'add' ? Math.max(0, baseW + Math.max(0, wQty)) : Math.max(0, wQty);
       const nextS = mode === 'add' ? Math.max(0, baseS + Math.max(0, sQty)) : Math.max(0, sQty);
-      return { ...p, meta: { ...(p.meta || {}), antiW: nextW, antiS: nextS, quantityConfirmed: true, quantity: undefined } };
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          antiW: nextW,
+          antiS: nextS,
+          quantityConfirmed: true,
+          quantity: undefined,
+        },
+      };
     };
 
-    if ((props as any).scope === 'selected') {
-      const grouped: Record<string, string[]> = {};
-      for (const key of selectedScaffoldPartKeys) {
+    if (bulkScope === 'selected') {
+      const grouped = selectedScaffoldPartKeys.reduce<Record<string, Set<string>>>((acc, key) => {
         const [gid, pid] = key.split(':');
-        if (!grouped[gid]) grouped[gid] = [];
-        grouped[gid].push(pid);
-      }
-      for (const gid of Object.keys(grouped)) {
-        const g = scaffoldGroups.find((gg) => gg.id === gid);
-        if (!g) continue;
-        const target = new Set(grouped[gid]);
-        const nextParts = g.parts.map((p) => (target.has(p.id) ? applyTo(p) : p));
+        if (!acc[gid]) acc[gid] = new Set();
+        acc[gid]!.add(pid);
+        return acc;
+      }, {});
+
+      Object.entries(grouped).forEach(([gid, ids]) => {
+        const group = scaffoldGroups.find((candidate) => candidate.id === gid);
+        if (!group) return;
+        const nextParts = group.parts.map((part) => (ids.has(part.id) ? applyTo(part) : part));
         updateScaffoldGroup(gid, { parts: nextParts });
-      }
+      });
       clearScaffoldSelection();
-      props.onClose();
+      onClose();
       return;
     }
 
-    // all
-    for (const g of scaffoldGroups) {
-      const nextParts = g.parts.map((p) => applyTo(p));
-      updateScaffoldGroup(g.id, { parts: nextParts });
-    }
+    scaffoldGroups.forEach((group) => {
+      const nextParts = group.parts.map((part) => applyTo(part));
+      updateScaffoldGroup(group.id, { parts: nextParts });
+    });
     clearScaffoldSelection();
-    props.onClose();
-  };
+    onClose();
+  }, [
+    bulkScope,
+    clearScaffoldSelection,
+    mode,
+    kind,
+    onClose,
+    scaffoldGroups,
+    selectedScaffoldPartKeys,
+    sQty,
+    updateScaffoldGroup,
+    wQty,
+  ]);
 
-  const handleSave = () => {
-    if (props.kind === 'single') {
+  const handleSave = React.useCallback(() => {
+    if (kind === 'single') {
       applySingle();
     } else {
       applyBulk();
     }
-  };
+  }, [applyBulk, applySingle, kind]);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -154,7 +180,7 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{headerTitle}</h3>
           {isBulk ? (
             <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
-              {(props as any).scope === 'all' ? '対象 全アンチ' : `対象 ${selectedCount} 箇所`}
+              {bulkScope === 'all' ? '対象 全アンチ' : `対象 ${selectedCount} 箇所`}
             </span>
           ) : (
             <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
@@ -167,7 +193,7 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
             <button
               onClick={() => {
                 clearScaffoldSelection();
-                props.onClose();
+                onClose();
               }}
               className="flex h-8 items-center justify-center rounded-lg px-2 text-[11px] text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
               title="選択解除"
@@ -177,7 +203,7 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
             </button>
           )}
           <button
-            onClick={props.onClose}
+            onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
             aria-label="閉じる"
           >
@@ -261,7 +287,7 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
 
         {/* 操作 */}
         <div className="mt-3 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={props.onClose} className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20">
+          <Button variant="outline" size="sm" onClick={onClose} className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20">
             キャンセル
           </Button>
           <Button size="sm" onClick={handleSave} className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 !text-white shadow-[0_12px_32px_-16px_rgba(16,185,129,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(16,185,129,0.55)] hover:from-emerald-600 hover:via-emerald-500 hover:to-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700">
@@ -272,4 +298,3 @@ export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedPr
     </div>
   );
 }
-

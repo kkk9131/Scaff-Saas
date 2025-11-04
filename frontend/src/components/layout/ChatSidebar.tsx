@@ -90,8 +90,6 @@ const ChatSidebar = React.forwardRef<HTMLElement, ChatSidebarProps>(
       className,
       isOpen = false,
       onClose,
-      onOpen,
-      onToggle,
       messages = [],
       onSendMessage,
       ...props

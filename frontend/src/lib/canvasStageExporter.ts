@@ -7,14 +7,36 @@
  * - 出力後は可視状態を元に戻す
  */
 
-export type KonvaStageLike = any;
-export type ScaffoldGroup = any; // 型定義は後で正確に
-export type Memo = any; // メモの型定義
+import type { Stage } from 'konva/lib/Stage';
+import type { Layer } from 'konva/lib/Layer';
+import type { Node as KonvaNode } from 'konva/lib/Node';
+import type { Text as KonvaText } from 'konva/lib/shapes/Text';
+import type { Rect as KonvaRect } from 'konva/lib/shapes/Rect';
+import type { ScaffoldGroup } from '@/types/scaffold';
+import type { Memo } from '@/stores/drawingStore';
 
-let stageRef: KonvaStageLike | null = null;
+type KonvaModule = typeof import('konva');
+
+export type KonvaStageLike = Stage;
+export type ScaffoldGroupForExport = ScaffoldGroup;
+export type MemoForExport = Memo;
+
+let stageRef: Stage | null = null;
+
+const toError = (error: unknown): Error =>
+  error instanceof Error ? error : new Error(String(error));
+
+const getKonvaModule = (): KonvaModule | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  const globalWindow = window as typeof window & { Konva?: KonvaModule };
+  return globalWindow.Konva;
+};
+
+const isLayer = (node: KonvaNode | null): node is Layer =>
+  Boolean(node && typeof (node as Layer).add === 'function');
 
 /** Stage を登録/解除 */
-export function registerStage(stage: KonvaStageLike | null) {
+export function registerStage(stage: Stage | null) {
   stageRef = stage;
 }
 
@@ -34,11 +56,11 @@ export async function exportStageToDataURL(options?: {
     return null;
   }
 
-  const stage: any = stageRef as any;
+  const stage = stageRef;
 
   // Stageの基本情報をチェック
-  const stageWidth = stage.width?.() || 0;
-  const stageHeight = stage.height?.() || 0;
+  const stageWidth = stage.width();
+  const stageHeight = stage.height();
 
   if (stageWidth === 0 || stageHeight === 0) {
     console.error('❌ Stageのサイズが0です');
@@ -46,26 +68,23 @@ export async function exportStageToDataURL(options?: {
     return null;
   }
 
-  if (!stage.toDataURL) {
-    console.error('❌ toDataURLメソッドが存在しません');
-    alert('エラー: PNG生成機能が利用できません');
-    return null;
-  }
-
   const { pixelRatio = 2, mimeType = 'image/png', quality = 1, whiteBg = true, hideGrid = true, scaffoldGroups = [], memos = [] } = options || {};
 
   // 切り取り範囲の変数（後で白背景合成で使用）
-  let cropX = 0, cropY = 0, cropWidth = stageWidth, cropHeight = stageHeight;
+  let cropX = 0;
+  let cropY = 0;
+  let cropWidth = stageWidth;
+  let cropHeight = stageHeight;
 
   // グリッドとハンドルの復元用（エラー時にも使えるようにスコープを外に出す）
-  let gridLayer: any = null;
+  let gridLayer: Layer | null = null;
   let origGridVisible: boolean | undefined;
-  const handleNodes: Array<{ node: any; visible: boolean }> = [];
-  const addedTextNodes: any[] = []; // 追加したテキストノードを記録（後で削除するため）
+  const handleNodes: Array<{ node: KonvaNode; visible: boolean }> = [];
+  const addedTextNodes: KonvaNode[] = []; // 追加したテキストノードを記録（後で削除するため）
 
   try {
     // グリッドレイヤーを一時非表示
-    gridLayer = stage.findOne?.('.grid-layer');
+    gridLayer = stage.findOne('.grid-layer') as Layer | null;
     if (hideGrid && gridLayer) {
       origGridVisible = gridLayer.visible();
       gridLayer.visible(false);
@@ -73,78 +92,78 @@ export async function exportStageToDataURL(options?: {
 
     // スパン入れ替えハンドルを一時非表示（複数手法で確実に検索）
     // 方法1: Konvaのfindメソッド（セレクタ形式）
-    const handlesByFindSelector = stage.find?.('.span-reorder-handle') || [];
+    const handlesByFindSelector = stage.find('.span-reorder-handle');
 
     // 方法2: Konvaのfindメソッド（関数形式）- より確実
-    const handlesByFindFunc = stage.find ? stage.find((node: any) => {
-      const nodeName = node.name?.();
-      return nodeName === 'span-reorder-handle';
-    }) : [];
+    const handlesByFindFunc = stage.find((node) => node.name?.() === 'span-reorder-handle');
 
     // 方法3: 再帰的に全ノードを走査（最も確実）
-    const recursiveFind = (node: any, depth = 0): any[] => {
-      const results: any[] = [];
+    const recursiveFind = (node: KonvaNode): KonvaNode[] => {
+      const results: KonvaNode[] = [];
       const nodeName = node.name?.() || node.getAttr?.('name') || '';
 
       if (nodeName === 'span-reorder-handle') {
         results.push(node);
       }
 
-      // 子要素も再帰的に探索
-      const children = node.children || node.getChildren?.() || [];
-      children.forEach((child: any) => {
-        results.push(...recursiveFind(child, depth + 1));
+      const children = node.getChildren?.() ?? [];
+      children.forEach((child) => {
+        results.push(...recursiveFind(child));
       });
 
       return results;
     };
 
-    const layers = stage.getLayers?.() || [];
-    let handlesByRecursive: any[] = [];
-    layers.forEach((layer: any) => {
-      const found = recursiveFind(layer);
-      handlesByRecursive.push(...found);
+    const layers = stage.getLayers();
+    const handlesByRecursive: KonvaNode[] = [];
+    layers.forEach((layer) => {
+      handlesByRecursive.push(...recursiveFind(layer));
     });
 
     // 全手法の結果を統合（重複排除）
-    const allHandles = new Set([...handlesByFindSelector, ...handlesByFindFunc, ...handlesByRecursive]);
+    const allHandles = new Set<KonvaNode>([
+      ...handlesByFindSelector,
+      ...handlesByFindFunc,
+      ...handlesByRecursive,
+    ]);
     const foundHandles = Array.from(allHandles);
 
     if (foundHandles.length === 0) {
       console.warn('[6-2] ⚠️ ハンドルが見つかりませんでした');
     } else {
-      foundHandles.forEach((h: any) => {
-        const currentVisible = h.visible();
-        handleNodes.push({ node: h, visible: currentVisible });
-        h.visible(false);
+      foundHandles.forEach((handle) => {
+        const currentVisible = handle.visible();
+        handleNodes.push({ node: handle, visible: currentVisible });
+        handle.visible(false);
       });
     }
 
     // 柱情報とアンチ枚数を図面内に描画
     if (scaffoldGroups.length > 0) {
       // scaffold-layerを取得
-      const scaffoldLayer = stage.findOne?.('.scaffold-layer');
-      if (!scaffoldLayer) {
+      const scaffoldLayerNode = stage.findOne('.scaffold-layer');
+      if (!isLayer(scaffoldLayerNode)) {
         console.warn('[6-3] ⚠️ scaffold-layerが見つかりませんでした');
       } else {
         // Konva Textクラスを取得（動的import）
-        const Konva = (window as any).Konva;
-        if (!Konva || !Konva.Text) {
+        const konvaModule = getKonvaModule();
+        if (!konvaModule || !konvaModule.Text) {
           console.warn('[6-3] ⚠️ Konva.Textが利用できません');
         } else {
+          const { Text } = konvaModule;
           // カード位置の重なりを防ぐための記録
           const usedPositions: Array<{ x: number; y: number; width: number; height: number }> = [];
 
-          scaffoldGroups.forEach((group: any) => {
-            group.parts.forEach((part: any) => {
+          scaffoldGroups.forEach((group) => {
+            group.parts.forEach((part) => {
               let textContent = '';
-              let textX = part.position.x;
-              let textY = part.position.y;
+              const textX = part.position.x;
+              const textY = part.position.y;
 
               // 柱の場合
               if (part.type === '柱') {
                 const meta = part.meta || {};
-                const counts = meta.pillarCounts as Record<string, number> | undefined;
+                const counts = meta.pillarCounts;
 
                 if (counts) {
                   // pillarCountsから情報を生成（例: A×2 → AA）
@@ -182,11 +201,11 @@ export async function exportStageToDataURL(options?: {
 
               // テキストを描画（背景ボックス付き）
               if (textContent) {
-                let finalX = textX + 5;
+                const finalX = textX + 5;
                 let finalY = textY - 30;
 
                 // 仮のテキストノードを作成してサイズを計算
-                const tempTextNode = new Konva.Text({
+                const tempTextNode: KonvaText = new Text({
                   text: textContent,
                   fontSize: 18,
                   fontFamily: 'Arial, sans-serif',
@@ -228,7 +247,7 @@ export async function exportStageToDataURL(options?: {
                 }
 
                 // テキストノードを作成
-                const textNode = new Konva.Text({
+                const textNode: KonvaText = new Text({
                   x: finalX,
                   y: finalY,
                   text: textContent,
@@ -242,7 +261,7 @@ export async function exportStageToDataURL(options?: {
                 });
 
                 // 背景ボックスを作成
-                const bgRect = new Konva.Rect({
+                const bgRect: KonvaRect = new Rect({
                   x: finalX - 4,
                   y: finalY - 2,
                   width: boxWidth,
@@ -263,15 +282,15 @@ export async function exportStageToDataURL(options?: {
                 });
 
                 // 背景 → テキストの順で追加
-                scaffoldLayer.add(bgRect);
-                scaffoldLayer.add(textNode);
+                scaffoldLayerNode.add(bgRect);
+                scaffoldLayerNode.add(textNode);
                 addedTextNodes.push(bgRect);
                 addedTextNodes.push(textNode);
               }
             });
           });
 
-          scaffoldLayer.batchDraw(); // レイヤーを再描画
+          scaffoldLayerNode.batchDraw(); // レイヤーを再描画
         }
       }
     }
@@ -279,20 +298,23 @@ export async function exportStageToDataURL(options?: {
     // メモを図面内に描画
     if (memos.length > 0) {
       // scaffold-layerを取得
-      const scaffoldLayer = stage.findOne?.('.scaffold-layer');
-      if (!scaffoldLayer) {
+      const scaffoldLayerNode = stage.findOne('.scaffold-layer');
+      if (!isLayer(scaffoldLayerNode)) {
         console.warn('[6-4] ⚠️ scaffold-layerが見つかりませんでした');
       } else {
         // Konva TextとRectクラスを取得
-        const Konva = (window as any).Konva;
-        if (!Konva || !Konva.Text || !Konva.Rect) {
+        const konvaModule = getKonvaModule();
+        if (!konvaModule || !konvaModule.Text || !konvaModule.Rect) {
           console.warn('[6-4] ⚠️ Konva.TextまたはKonva.Rectが利用できません');
         } else {
-          memos.forEach((memo: any) => {
+          const { Text, Rect } = konvaModule;
+          memos.forEach((memo) => {
             const { position, size, text } = memo;
 
             // テキストを改行で分割
-            const lines = text.split('\n').filter((line: string) => line.trim().length > 0 || text.includes('\n'));
+            const lines = text
+              .split('\n')
+              .filter((line: string) => line.trim().length > 0 || text.includes('\n'));
 
             // フォントサイズとパディング（MemoRendererと同じ計算）
             const fontSize = 14; // 固定サイズ（スケール非依存）
@@ -304,7 +326,7 @@ export async function exportStageToDataURL(options?: {
             const rectHeight = Math.max(size.height, textHeight + padding * 2);
 
             // 背景矩形を作成（黄色半透明）
-            const bgRect = new Konva.Rect({
+            const bgRect: KonvaRect = new Rect({
               x: position.x,
               y: position.y,
               width: size.width,
@@ -317,13 +339,13 @@ export async function exportStageToDataURL(options?: {
               name: 'export-memo'
             });
 
-            scaffoldLayer.add(bgRect);
+            scaffoldLayerNode.add(bgRect);
             addedTextNodes.push(bgRect);
 
             // テキストを行ごとに描画
             if (lines.length > 0) {
               lines.forEach((line: string, index: number) => {
-                const textNode = new Konva.Text({
+                const textNode: KonvaText = new Text({
                   x: position.x + padding,
                   y: position.y + padding + index * lineHeight,
                   text: line,
@@ -337,12 +359,12 @@ export async function exportStageToDataURL(options?: {
                   name: 'export-memo'
                 });
 
-                scaffoldLayer.add(textNode);
+                scaffoldLayerNode.add(textNode);
                 addedTextNodes.push(textNode);
               });
             } else {
               // メモが空の場合はプレースホルダーを表示
-              const placeholderNode = new Konva.Text({
+              const placeholderNode: KonvaText = new Text({
                 x: position.x + padding,
                 y: position.y + padding,
                 text: 'メモを入力...',
@@ -356,32 +378,39 @@ export async function exportStageToDataURL(options?: {
                 name: 'export-memo'
               });
 
-              scaffoldLayer.add(placeholderNode);
+              scaffoldLayerNode.add(placeholderNode);
               addedTextNodes.push(placeholderNode);
             }
           });
 
-          scaffoldLayer.batchDraw(); // レイヤーを再描画
+          scaffoldLayerNode.batchDraw(); // レイヤーを再描画
         }
       }
     }
 
     // 図形のバウンディングボックスを計算（グリッド以外）
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
     let hasContent = false;
 
-    const stageLayers = stage.getLayers?.() || [];
-    stageLayers.forEach((layer: any) => {
+    const stageLayers = stage.getLayers();
+    stageLayers.forEach((layer) => {
       const layerName = layer.name?.() || layer.getAttr?.('name') || '';
       // グリッドレイヤーは除外
       if (layerName === 'grid-layer' || !layer.visible()) return;
 
-      const children = layer.children || [];
-      children.forEach((node: any) => {
+      const children = layer.getChildren();
+      children.forEach((node) => {
         try {
-          if (!node.visible || !node.visible()) return;
+          if (!node.visible()) return;
 
-          const rect = node.getClientRect?.({ skipTransform: false, skipShadow: true, skipStroke: false });
+          const rect = node.getClientRect?.({
+            skipTransform: false,
+            skipShadow: true,
+            skipStroke: false,
+          });
           if (rect && rect.width > 0 && rect.height > 0) {
             minX = Math.min(minX, rect.x);
             minY = Math.min(minY, rect.y);
@@ -389,8 +418,8 @@ export async function exportStageToDataURL(options?: {
             maxY = Math.max(maxY, rect.y + rect.height);
             hasContent = true;
           }
-        } catch (e) {
-          // getClientRectが使えないノードはスキップ
+        } catch (error) {
+          console.warn('⚠️ getClientRectが取得できませんでした', error);
         }
       });
     });
@@ -411,7 +440,7 @@ export async function exportStageToDataURL(options?: {
     cropHeight = Math.min(stageHeight - cropY, maxY - minY + padding * 2);
 
     // 描画を更新
-    stage.draw?.();
+    stage.draw();
 
     // 図形部分だけを切り取ってPNG生成
     const dataUrl = stage.toDataURL({
@@ -429,18 +458,18 @@ export async function exportStageToDataURL(options?: {
     handleNodes.forEach(({ node, visible }) => {
       try {
         node.visible(visible);
-      } catch (e) {
-        console.warn('ハンドル復元エラー:', e);
+      } catch (error) {
+        console.warn('ハンドル復元エラー:', error);
       }
     });
     addedTextNodes.forEach((textNode) => {
       try {
         textNode.destroy(); // テキストノードを削除
-      } catch (e) {
-        console.warn('テキストノード削除エラー:', e);
+      } catch (error) {
+        console.warn('テキストノード削除エラー:', error);
       }
     });
-    stage.draw?.();
+    stage.draw();
 
     if (!dataUrl) {
       console.error('❌ toDataURLがnullを返しました');
@@ -481,8 +510,8 @@ export async function exportStageToDataURL(options?: {
             // 最終的なdataURLを取得
             const finalUrl = canvas.toDataURL(mimeType, quality);
             resolve(finalUrl);
-          } catch (e) {
-            console.error('❌ 白背景合成エラー:', e);
+          } catch (error) {
+            console.error('❌ 白背景合成エラー:', error);
             resolve(dataUrl);
           }
         };
@@ -497,11 +526,12 @@ export async function exportStageToDataURL(options?: {
     // 透過背景の場合はそのまま返す
     return dataUrl;
 
-  } catch (e: any) {
-    console.error('❌ PNG生成エラー:', e);
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('❌ PNG生成エラー:', err);
     console.error('エラー詳細:', {
-      message: e.message,
-      stack: e.stack
+      message: err.message,
+      stack: err.stack
     });
 
     // エラー時もグリッド、ハンドル、テキストを復元
@@ -512,19 +542,23 @@ export async function exportStageToDataURL(options?: {
       handleNodes.forEach(({ node, visible }) => {
         try {
           node.visible(visible);
-        } catch {}
+        } catch (handleError) {
+          console.warn('⚠️ ハンドル復元失敗', handleError);
+        }
       });
       addedTextNodes.forEach((textNode) => {
         try {
           textNode.destroy();
-        } catch {}
+        } catch (destroyError) {
+          console.warn('⚠️ ノード削除失敗', destroyError);
+        }
       });
-      stage.draw?.();
+      stage.draw();
     } catch (restoreError) {
       console.error('復元処理でもエラー:', restoreError);
     }
 
-    alert(`エラー: PNG生成中に問題が発生しました\n${e.message}`);
+    alert(`エラー: PNG生成中に問題が発生しました\n${err.message}`);
     return null;
   }
 }

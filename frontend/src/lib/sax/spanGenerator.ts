@@ -411,12 +411,12 @@ function splitSpanIntoSegments(totalMm: number): number[] {
   }
 
   // 300mm回避: 末尾に300がある場合、可能なら直前の大きいセグメントを-300し、300→600へ
-  let idx300 = segments.lastIndexOf(300);
+  const idx300 = segments.lastIndexOf(300);
   if (idx300 !== -1) {
     // 後ろから直前のセグメントで900以上のものを探す（600→300は避けたい）
     for (let j = idx300 - 1; j >= 0; j--) {
       const s = segments[j];
-      if (s >= 900 && ALLOWED_SPANS_DESC.includes((s - 300) as any)) {
+      if (s >= 900 && ALLOWED_SPANS_DESC.includes(s - 300)) {
         segments[j] = s - 300; // 例: 1800→1500, 1500→1200 等
         segments[idx300] = 600; // 300を600へ置換
         break;

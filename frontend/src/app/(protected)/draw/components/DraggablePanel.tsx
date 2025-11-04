@@ -14,7 +14,7 @@ import { useState, useRef, useEffect } from 'react';
 import { GripVertical, Table, Minimize2, Maximize2 } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { mmToPx, DEFAULT_SCALE } from '@/lib/utils/scale';
-import type { PillarType } from '@/types/scaffold';
+import type { PillarType, ScaffoldGroup, ScaffoldPart } from '@/types/scaffold';
 
 /**
  * DraggablePanelコンポーネント
@@ -412,13 +412,13 @@ function QuantityGrid() {
     );
 
     // ヘルパー: 対象布材スパンに階段があるかどうか
-    const hasStairOnSpan = (g: any, cloth: any) => {
+    const hasStairOnSpan = (g: ScaffoldGroup, cloth: ScaffoldPart) => {
       const len = Number(cloth.meta?.length ?? 0);
       const off = Number(cloth.meta?.offsetMm ?? 0);
       if (!Number.isFinite(len) || !Number.isFinite(off)) return false;
       const centerMm = off + len / 2;
       return g.parts.some(
-        (q: any) =>
+        (q) =>
           q.type === '階段' &&
           Number(q.meta?.length ?? -1) === len &&
           Math.round(Number(q.meta?.offsetMm ?? NaN)) === Math.round(centerMm)

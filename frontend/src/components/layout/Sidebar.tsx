@@ -226,7 +226,7 @@ const defaultNavItems: NavItem[] = [
  */
 const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
   (
-    { className, navItems = defaultNavItems, isOpen = true, onClose, onOpen, onToggle, ...props },
+    { className, navItems = defaultNavItems, isOpen = true, onClose, ...props },
     ref
   ) => {
     const pathname = usePathname();

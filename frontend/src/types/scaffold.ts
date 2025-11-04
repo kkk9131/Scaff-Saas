@@ -92,7 +92,7 @@ export interface ScaffoldPart {
     direction?: number;
 
     /** その他の追加情報 */
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -129,7 +129,7 @@ export interface ScaffoldGroup {
     };
 
     /** その他の追加情報 */
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

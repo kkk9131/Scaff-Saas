@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Fuse from 'fuse.js'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -19,7 +19,7 @@ import { ProjectCreateModal } from '@/components/projects/ProjectCreateModal'
 import { ConfirmModal, Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { GradientText, Muted, Eyebrow } from '@/components/ui'
+import { GradientText, Muted } from '@/components/ui'
 import { Project, ProjectStatus } from '@/types/project'
 import { getProjects, deleteProject, duplicateProject, updateProjectStatus } from '@/lib/api/projects'
 import {
@@ -120,6 +120,87 @@ function SortableProjectCard({ project, onEdit, onDelete, onDuplicate }: Sortabl
   )
 }
 
+const MOCK_PROJECTS: Project[] = [
+  {
+    id: 'mock-1',
+    user_id: 'mock-user',
+    name: '〇〇マンション建設プロジェクト',
+    description: '5階建てマンションの足場設計',
+    status: 'draft',
+    customer_name: '山田建設株式会社',
+    site_address: '東京都渋谷区道玄坂1-2-3',
+    start_date: '2025-11-01',
+    end_date: '2025-12-31',
+    created_at: '2025-10-20T09:00:00Z',
+    updated_at: '2025-10-23T15:30:00Z',
+  },
+  {
+    id: 'mock-2',
+    user_id: 'mock-user',
+    name: '△△ビル改修工事',
+    description: '外壁改修に伴う足場設計',
+    status: 'active',
+    customer_name: '田中工務店',
+    site_address: '大阪府大阪市北区梅田2-5-10',
+    start_date: '2025-10-15',
+    end_date: '2025-11-30',
+    created_at: '2025-10-15T10:00:00Z',
+    updated_at: '2025-10-24T08:15:00Z',
+  },
+  {
+    id: 'mock-3',
+    user_id: 'mock-user',
+    name: '□□住宅新築案件',
+    description: '2階建て住宅の足場',
+    status: 'active',
+    customer_name: '佐藤建築',
+    site_address: '福岡県福岡市博多区博多駅前3-1-1',
+    start_date: '2025-10-10',
+    end_date: '2025-11-20',
+    created_at: '2025-10-10T14:00:00Z',
+    updated_at: '2025-10-22T16:45:00Z',
+  },
+  {
+    id: 'mock-4',
+    user_id: 'mock-user',
+    name: '◇◇商業施設建設',
+    description: '大型商業施設の足場計画',
+    status: 'active',
+    customer_name: '鈴木組',
+    site_address: '神奈川県横浜市西区みなとみらい4-3-1',
+    start_date: '2025-09-01',
+    end_date: '2026-03-31',
+    created_at: '2025-09-01T09:00:00Z',
+    updated_at: '2025-10-24T10:00:00Z',
+  },
+  {
+    id: 'mock-5',
+    user_id: 'mock-user',
+    name: '☆☆倉庫増築プロジェクト',
+    description: '既存倉庫の増築工事',
+    status: 'completed',
+    customer_name: '高橋建設',
+    site_address: '愛知県名古屋市中区栄3-2-5',
+    start_date: '2025-08-01',
+    end_date: '2025-10-15',
+    created_at: '2025-08-01T08:00:00Z',
+    updated_at: '2025-10-16T17:00:00Z',
+  },
+  {
+    id: 'mock-6',
+    user_id: 'mock-user',
+    name: '★★学校校舎改修',
+    description: '小学校校舎の外壁改修',
+    status: 'completed',
+    customer_name: '伊藤工業',
+    site_address: '京都府京都市左京区銀閣寺町2',
+    start_date: '2025-07-01',
+    end_date: '2025-09-30',
+    created_at: '2025-07-01T09:00:00Z',
+    updated_at: '2025-10-01T12:00:00Z',
+  },
+]
+
 export default function ProjectsPage() {
   const { user, loading: authLoading } = useAuth()
   const { isDark } = useTheme()
@@ -188,88 +269,6 @@ export default function ProjectsPage() {
     const timer = setTimeout(() => setNotification(null), 4000)
     return () => clearTimeout(timer)
   }, [notification])
-
-  // モックデータ（バックエンドエラー時に使用）
-  const mockProjects: Project[] = [
-    {
-      id: 'mock-1',
-      user_id: 'mock-user',
-      name: '〇〇マンション建設プロジェクト',
-      description: '5階建てマンションの足場設計',
-      status: 'draft',
-      customer_name: '山田建設株式会社',
-      site_address: '東京都渋谷区道玄坂1-2-3',
-      start_date: '2025-11-01',
-      end_date: '2025-12-31',
-      created_at: '2025-10-20T09:00:00Z',
-      updated_at: '2025-10-23T15:30:00Z',
-    },
-    {
-      id: 'mock-2',
-      user_id: 'mock-user',
-      name: '△△ビル改修工事',
-      description: '外壁改修に伴う足場設計',
-      status: 'active',
-      customer_name: '田中工務店',
-      site_address: '大阪府大阪市北区梅田2-5-10',
-      start_date: '2025-10-15',
-      end_date: '2025-11-30',
-      created_at: '2025-10-15T10:00:00Z',
-      updated_at: '2025-10-24T08:15:00Z',
-    },
-    {
-      id: 'mock-3',
-      user_id: 'mock-user',
-      name: '□□住宅新築案件',
-      description: '2階建て住宅の足場',
-      status: 'active',
-      customer_name: '佐藤建築',
-      site_address: '福岡県福岡市博多区博多駅前3-1-1',
-      start_date: '2025-10-10',
-      end_date: '2025-11-20',
-      created_at: '2025-10-10T14:00:00Z',
-      updated_at: '2025-10-22T16:45:00Z',
-    },
-    {
-      id: 'mock-4',
-      user_id: 'mock-user',
-      name: '◇◇商業施設建設',
-      description: '大型商業施設の足場計画',
-      status: 'active',
-      customer_name: '鈴木組',
-      site_address: '神奈川県横浜市西区みなとみらい4-3-1',
-      start_date: '2025-09-01',
-      end_date: '2026-03-31',
-      created_at: '2025-09-01T09:00:00Z',
-      updated_at: '2025-10-24T10:00:00Z',
-    },
-    {
-      id: 'mock-5',
-      user_id: 'mock-user',
-      name: '☆☆倉庫増築プロジェクト',
-      description: '既存倉庫の増築工事',
-      status: 'completed',
-      customer_name: '高橋建設',
-      site_address: '愛知県名古屋市中区栄3-2-5',
-      start_date: '2025-08-01',
-      end_date: '2025-10-15',
-      created_at: '2025-08-01T08:00:00Z',
-      updated_at: '2025-10-16T17:00:00Z',
-    },
-    {
-      id: 'mock-6',
-      user_id: 'mock-user',
-      name: '★★学校校舎改修',
-      description: '小学校校舎の外壁改修',
-      status: 'completed',
-      customer_name: '伊藤工業',
-      site_address: '京都府京都市左京区銀閣寺町2',
-      start_date: '2025-07-01',
-      end_date: '2025-09-30',
-      created_at: '2025-07-01T09:00:00Z',
-      updated_at: '2025-10-01T12:00:00Z',
-    },
-  ]
 
   // フィルター・検索・ソート適用後のプロジェクト一覧
   const filteredProjects = useMemo(() => {
@@ -399,7 +398,7 @@ export default function ProjectsPage() {
   /**
    * プロジェクト一覧を取得
    */
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -408,7 +407,7 @@ export default function ProjectsPage() {
 
       if (response.error) {
         // エラー時はモックデータを使用
-        setProjects(mockProjects)
+        setProjects(MOCK_PROJECTS)
         setUseMockData(true)
         setError(`${response.error.message} (モックデータを表示中)`)
         return
@@ -418,15 +417,16 @@ export default function ProjectsPage() {
         setProjects(response.data.projects)
         setUseMockData(false)
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('プロジェクト取得処理でエラーが発生しました', error);
       // 例外発生時もモックデータを使用
-      setProjects(mockProjects)
+      setProjects(MOCK_PROJECTS)
       setUseMockData(true)
       setError('バックエンドに接続できません (モックデータを表示中)')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   /**
    * プロジェクト削除モーダルを開く
@@ -472,7 +472,8 @@ export default function ProjectsPage() {
       showNotification('success', `「${projectName}」を削除しました`)
       setIsDeleteModalOpen(false)
       setDeleteTarget(null)
-    } catch (err) {
+    } catch (error) {
+      console.error('プロジェクト削除処理でエラーが発生しました', error);
       showNotification('error', 'プロジェクトの削除に失敗しました')
     } finally {
       setDeleteLoading(false)
@@ -531,7 +532,8 @@ export default function ProjectsPage() {
         setDuplicateTarget(null)
         setDuplicateName('')
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('プロジェクト複製処理でエラーが発生しました', error);
       showNotification('error', 'プロジェクトの複製に失敗しました')
     } finally {
       setDuplicateLoading(false)
@@ -655,7 +657,7 @@ export default function ProjectsPage() {
     if (!authLoading && user) {
       fetchProjects()
     }
-  }, [authLoading, user])
+  }, [authLoading, user, fetchProjects])
 
   // ローディング中の表示
   if (authLoading || loading) {

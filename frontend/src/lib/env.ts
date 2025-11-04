@@ -16,19 +16,6 @@ interface Env {
  * Next.jsの環境変数は process.env から直接取得します
  * NEXT_PUBLIC_ プレフィックスのある変数はクライアントサイドでも利用可能です
  */
-function getEnvVar(key: keyof Env): string {
-  const value = process.env[key];
-
-  // 環境変数が見つからない場合はエラーをスロー
-  if (!value) {
-    throw new Error(
-      `環境変数 ${key} が設定されていません。.env.local ファイルを確認してください。`
-    );
-  }
-
-  return value;
-}
-
 /**
  * 環境変数をエクスポート（型安全）
  * Next.jsビルド時にprocess.envから値が注入されます

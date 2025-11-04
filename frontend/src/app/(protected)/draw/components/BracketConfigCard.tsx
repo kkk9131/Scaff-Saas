@@ -16,6 +16,7 @@ import { Navigation, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { v4 as uuidv4 } from 'uuid';
 import { roundToCardinalDirection } from '@/lib/sax/directionRules';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export interface BracketConfigCardProps {
   /** 左上のスクリーン座標（px） */
@@ -124,22 +125,26 @@ export default function BracketConfigCard({ screenPosition, groupId, partId, pil
       // 既存を更新（重複を作らない）
       const next = [...group.parts];
       const target = next[existingIdx];
+      if (target.type !== 'ブラケット') {
+        onClose();
+        return;
+      }
       next[existingIdx] = {
         ...target,
         meta: {
-          ...(target.meta || {}),
+          ...(target.meta ?? {}),
           width: size,
           direction: dirSel,
           ...(bracketSize ? { bracketSize } : {}),
         },
-      } as any;
+      };
       updateScaffoldGroup(group.id, { parts: next });
       onClose();
       return;
     }
 
     // 新規追加
-    const newBracket = {
+    const newBracket: ScaffoldPart = {
       id: uuidv4(),
       type: 'ブラケット' as const,
       position: { x: ax, y: ay },

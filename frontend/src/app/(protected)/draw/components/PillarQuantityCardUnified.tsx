@@ -17,8 +17,10 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Layers, Minus, Plus, Table, X } from 'lucide-react';
-import type { PillarType } from '@/types/scaffold';
+import type { PillarType, ScaffoldPart } from '@/types/scaffold';
 import { useDrawingStore } from '@/stores/drawingStore';
+
+const PILLAR_TYPES: PillarType[] = ['A', 'C', 'D', 'E', 'G', 'DG', 'EG', 'C-47', 'KD'];
 
 /**
  * プロパティ型定義（単体 or 一括）
@@ -58,118 +60,149 @@ export default function PillarQuantityCardUnified(props: PillarQuantityCardUnifi
     clearScaffoldSelection,
   } = useDrawingStore();
 
-  // 共通: 編集対象の柱タイプ一覧
-  const PILLAR_TYPES: PillarType[] = ['A', 'C', 'D', 'E', 'G', 'DG', 'EG', 'C-47', 'KD'];
+  const isSingle = props.kind !== 'bulk';
+  const singleGroupId = isSingle ? props.groupId : undefined;
+  const singlePartId = isSingle ? props.partId : undefined;
+  const scope = !isSingle ? props.scope : undefined;
+  const onClose = props.onClose;
 
   // 初期値（単体時は当該パーツから、 一括時は空）
   const initialCounts: Partial<Record<PillarType, number>> = React.useMemo(() => {
-    if (props.kind === 'single') {
-      const group = scaffoldGroups.find((g) => g.id === props.groupId);
-      const part = group?.parts.find((p) => p.id === props.partId);
-      const base: Partial<Record<PillarType, number>> = { ...(part?.meta?.pillarCounts || {}) };
-      // 旧フィールド（単一）しかない場合はそれを初期値へ反映
-      const legacyType = part?.meta?.pillarType as PillarType | undefined;
-      const legacyQty = part?.meta?.quantity;
-      if (legacyType && (base[legacyType] ?? 0) === 0 && (legacyQty ?? 0) > 0) {
-        base[legacyType] = legacyQty;
-      }
-      return base;
+    if (!isSingle || !singleGroupId || !singlePartId) {
+      return {};
     }
-    return {};
-  }, [props, scaffoldGroups]);
+    const group = scaffoldGroups.find((candidate) => candidate.id === singleGroupId);
+    const part = group?.parts.find((candidate) => candidate.id === singlePartId);
+    if (!part) return {};
+    const base: Partial<Record<PillarType, number>> = { ...(part.meta?.pillarCounts ?? {}) };
+    // 旧フィールド（単一）しかない場合はそれを初期値へ反映
+    const legacyType = part.meta?.pillarType as PillarType | undefined;
+    const legacyQty = part.meta?.quantity;
+    if (legacyType && (base[legacyType] ?? 0) === 0 && (legacyQty ?? 0) > 0) {
+      base[legacyType] = legacyQty;
+    }
+    return base;
+  }, [isSingle, singleGroupId, singlePartId, scaffoldGroups]);
 
   // 入力状態（複数種別の本数）
   const [counts, setCounts] = React.useState<Partial<Record<PillarType, number>>>(initialCounts);
+
+  React.useEffect(() => {
+    setCounts(initialCounts);
+  }, [initialCounts]);
+
   // 一括時の適用モード
   const [mode, setMode] = React.useState<'replace' | 'add'>('replace');
+
+  const mergePillarMeta = React.useCallback(
+    (meta: ScaffoldPart['meta'] | undefined, latestCounts: Partial<Record<PillarType, number>>): ScaffoldPart['meta'] => {
+      const mutableBase = { ...(meta ?? {}) } as Record<string, unknown>;
+      delete mutableBase.pillarType;
+      delete mutableBase.quantity;
+      return {
+        ...(mutableBase as ScaffoldPart['meta']),
+        pillarCounts: latestCounts,
+        quantityConfirmed: true,
+      };
+    },
+    []
+  );
 
   // 保存処理
   const handleSave = React.useCallback(() => {
     // 正規化（0や未指定は除外）
-    const normalized: Partial<Record<PillarType, number>> = {};
-    for (const t of PILLAR_TYPES) {
-      const v = Number(counts[t] ?? 0);
-      if (!isNaN(v) && v > 0) normalized[t] = v;
-    }
+    const normalized = PILLAR_TYPES.reduce<Partial<Record<PillarType, number>>>((acc, type) => {
+      const value = Number(counts[type] ?? 0);
+      if (!Number.isNaN(value) && value > 0) {
+        acc[type] = value;
+      }
+      return acc;
+    }, {});
 
-    if (props.kind === 'single') {
-      const group = scaffoldGroups.find((g) => g.id === props.groupId);
+    if (isSingle) {
+      if (!singleGroupId || !singlePartId) return;
+      const group = scaffoldGroups.find((candidate) => candidate.id === singleGroupId);
       if (!group) return;
-      const nextParts = group.parts.map((p) => {
-        if (!(p.type === '柱' && p.id === props.partId)) return p;
-        const nextMeta: any = { ...(p.meta || {}), pillarCounts: normalized, quantityConfirmed: true };
-        delete nextMeta.pillarType; // 旧フィールドの混在を避ける
-        delete nextMeta.quantity;
-        return { ...p, meta: nextMeta };
+      const nextParts = group.parts.map((part) => {
+        if (!(part.type === '柱' && part.id === singlePartId)) return part;
+        const nextMeta = mergePillarMeta(part.meta, normalized);
+        return { ...part, meta: nextMeta };
       });
       updateScaffoldGroup(group.id, { parts: nextParts });
-      props.onClose();
+      onClose();
       return;
     }
 
-    // 以降は一括: scope に応じて対象を更新
-    if (props.scope === 'selected') {
-      // グループごとに選択IDを束ねる
-      const grouped: Record<string, string[]> = {};
-      for (const key of selectedScaffoldPartKeys) {
+    if (scope === 'selected') {
+      const grouped = selectedScaffoldPartKeys.reduce<Record<string, Set<string>>>((acc, key) => {
         const [gid, pid] = key.split(':');
-        if (!grouped[gid]) grouped[gid] = [];
-        grouped[gid].push(pid);
-      }
-      for (const gid of Object.keys(grouped)) {
-        const group = scaffoldGroups.find((g) => g.id === gid);
-        if (!group) continue;
-        const targetIds = new Set(grouped[gid]);
-        const nextParts = group.parts.map((p) => {
-          if (!(p.type === '柱' && targetIds.has(p.id))) return p;
-          const base = p.meta?.pillarCounts || {};
-          const merged: Partial<Record<PillarType, number>> = mode === 'replace' ? {} : { ...base };
-          for (const t of PILLAR_TYPES) {
-            const add = Number(normalized[t] ?? 0);
-            if (add <= 0) continue;
+        if (!acc[gid]) {
+          acc[gid] = new Set<string>();
+        }
+        acc[gid].add(pid);
+        return acc;
+      }, {});
+      Object.entries(grouped).forEach(([gid, targetIds]) => {
+        const group = scaffoldGroups.find((candidate) => candidate.id === gid);
+        if (!group) return;
+        const nextParts = group.parts.map((part) => {
+          if (!(part.type === '柱' && targetIds.has(part.id))) return part;
+          const baseCounts = part.meta?.pillarCounts ?? {};
+          const mergedCounts: Partial<Record<PillarType, number>> = mode === 'replace' ? {} : { ...baseCounts };
+          PILLAR_TYPES.forEach((type) => {
+            const addValue = Number(normalized[type] ?? 0);
+            if (addValue <= 0) return;
             if (mode === 'add') {
-              merged[t] = Math.max(0, Number(merged[t] ?? 0) + add);
+              mergedCounts[type] = Math.max(0, Number(mergedCounts[type] ?? 0) + addValue);
             } else {
-              merged[t] = add; // 置換
+              mergedCounts[type] = addValue;
             }
-          }
-          const nextMeta: any = { ...(p.meta || {}), pillarCounts: merged, quantityConfirmed: true };
-          delete nextMeta.pillarType;
-          delete nextMeta.quantity;
-          return { ...p, meta: nextMeta };
+          });
+          const nextMeta = mergePillarMeta(part.meta, mergedCounts);
+          return { ...part, meta: nextMeta };
         });
         updateScaffoldGroup(gid, { parts: nextParts });
-      }
+      });
       clearScaffoldSelection();
-      props.onClose();
+      onClose();
       return;
     }
 
-    // scope === 'all'：全グループの柱が対象
-    for (const group of scaffoldGroups) {
-      const nextParts = group.parts.map((p) => {
-        if (p.type !== '柱') return p;
-        const base = p.meta?.pillarCounts || {};
-        const merged: Partial<Record<PillarType, number>> = mode === 'replace' ? {} : { ...base };
-        for (const t of PILLAR_TYPES) {
-          const add = Number(normalized[t] ?? 0);
-          if (add <= 0) continue;
+    scaffoldGroups.forEach((group) => {
+      const nextParts = group.parts.map((part) => {
+        if (part.type !== '柱') return part;
+        const baseCounts = part.meta?.pillarCounts ?? {};
+        const mergedCounts: Partial<Record<PillarType, number>> = mode === 'replace' ? {} : { ...baseCounts };
+        PILLAR_TYPES.forEach((type) => {
+          const addValue = Number(normalized[type] ?? 0);
+          if (addValue <= 0) return;
           if (mode === 'add') {
-            merged[t] = Math.max(0, Number(merged[t] ?? 0) + add);
+            mergedCounts[type] = Math.max(0, Number(mergedCounts[type] ?? 0) + addValue);
           } else {
-            merged[t] = add; // 置換
+            mergedCounts[type] = addValue;
           }
-        }
-        const nextMeta: any = { ...(p.meta || {}), pillarCounts: merged, quantityConfirmed: true };
-        delete nextMeta.pillarType;
-        delete nextMeta.quantity;
-        return { ...p, meta: nextMeta };
+        });
+        const nextMeta = mergePillarMeta(part.meta, mergedCounts);
+        return { ...part, meta: nextMeta };
       });
       updateScaffoldGroup(group.id, { parts: nextParts });
-    }
+    });
     clearScaffoldSelection();
-    props.onClose();
-  }, [PILLAR_TYPES, counts, props, scaffoldGroups, selectedScaffoldPartKeys, updateScaffoldGroup, clearScaffoldSelection, mode]);
+    onClose();
+  }, [
+    counts,
+    isSingle,
+    singleGroupId,
+    singlePartId,
+    scaffoldGroups,
+    mergePillarMeta,
+    updateScaffoldGroup,
+    onClose,
+    scope,
+    selectedScaffoldPartKeys,
+    clearScaffoldSelection,
+    mode,
+  ]);
 
   // Enterキーで保存
   React.useEffect(() => {
@@ -192,14 +225,14 @@ export default function PillarQuantityCardUnified(props: PillarQuantityCardUnifi
     width: 380,
   };
 
-  const isBulk = props.kind === 'bulk';
+  const isBulk = !isSingle;
   const headerTitle = isBulk ? '柱の一括数量調整' : '柱の数量調整';
 
   // 一括対象の表示テキスト
   const selectedCount = selectedScaffoldPartKeys.length;
   const scopeChip = isBulk && (
     <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
-      {props.kind === 'bulk' && props.scope === 'all' ? '対象 全柱' : `対象 ${selectedCount} 箇所`}
+      {scope === 'all' ? '対象 全柱' : `対象 ${selectedCount} 箇所`}
     </span>
   );
 
@@ -227,7 +260,7 @@ export default function PillarQuantityCardUnified(props: PillarQuantityCardUnifi
               onClick={() => {
                 // 一括時は選択解除ボタンを表示
                 clearScaffoldSelection();
-                props.onClose();
+                onClose();
               }}
               className="flex h-8 items-center justify-center rounded-lg px-2 text-[11px] text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
               title="選択解除"
@@ -237,7 +270,7 @@ export default function PillarQuantityCardUnified(props: PillarQuantityCardUnifi
             </button>
           )}
           <button
-            onClick={props.onClose}
+            onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
             title="閉じる"
             aria-label="閉じる"
@@ -331,7 +364,7 @@ export default function PillarQuantityCardUnified(props: PillarQuantityCardUnifi
           <Button
             variant="outline"
             size="sm"
-            onClick={props.onClose}
+            onClick={onClose}
             className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20"
           >
             キャンセル

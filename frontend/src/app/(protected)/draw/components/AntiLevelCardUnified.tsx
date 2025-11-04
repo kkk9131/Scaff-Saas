@@ -9,6 +9,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Minus, Plus, Layers, X } from 'lucide-react';
 import { useDrawingStore } from '@/stores/drawingStore';
+import type { ScaffoldPart } from '@/types/scaffold';
 
 export type AntiLevelCardUnifiedProps =
   | {
@@ -27,20 +28,26 @@ export type AntiLevelCardUnifiedProps =
 
 export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
   const { scaffoldGroups, updateScaffoldGroup, selectedScaffoldPartKeys, clearScaffoldSelection } = useDrawingStore();
-  const isBulk = props.kind === 'bulk';
+  const { kind, onClose } = props;
+  const isBulk = kind === 'bulk';
   const headerTitle = isBulk ? 'アンチの一括段数調整' : 'アンチの段数調整';
 
+  const singleGroupId = kind === 'single' ? props.groupId : null;
+  const singlePartId = kind === 'single' ? props.partId : null;
+  const bulkScope = kind === 'bulk' ? props.scope : null;
+
   const initial = React.useMemo(() => {
-    if (props.kind === 'single') {
-      const g = scaffoldGroups.find((gg) => gg.id === props.groupId);
-      const p = g?.parts.find((pp) => pp.id === props.partId);
+    if (singleGroupId && singlePartId) {
+      const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+      const part = group?.parts.find((candidate) => candidate.id === singlePartId);
+      const target = part && part.type === 'アンチ' ? part : null;
       return {
-        levels: Math.max(1, Number(p?.meta?.levels ?? 1)),
-        length: Number(p?.meta?.length ?? 0),
+        levels: Math.max(1, Number(target?.meta?.levels ?? 1)),
+        length: Number(target?.meta?.length ?? 0),
       };
     }
     return { levels: 1, length: 0 };
-  }, [props, scaffoldGroups]);
+  }, [scaffoldGroups, singleGroupId, singlePartId]);
 
   const [level, setLevel] = React.useState<number>(isNaN(initial.levels) || initial.levels < 1 ? 1 : initial.levels);
 
@@ -59,54 +66,80 @@ export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
     return p?.type === 'アンチ';
   }).length;
 
-  const applySingle = () => {
-    const g = scaffoldGroups.find((gg) => gg.id === (props as any).groupId);
-    if (!g) return;
-    const pid = (props as any).partId as string;
-    const next = g.parts.map((p) =>
-      p.id === pid ? ({ ...p, meta: { ...(p.meta || {}), levels: Math.max(1, level) } } as any) : p
-    );
-    updateScaffoldGroup(g.id, { parts: next });
-    props.onClose();
-  };
+  const applySingle = React.useCallback(() => {
+    if (!singleGroupId || !singlePartId) return;
+    const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+    if (!group) return;
+    const next = group.parts.map((part) => {
+      if (part.id !== singlePartId || part.type !== 'アンチ') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          levels: Math.max(1, level),
+        },
+      };
+    });
+    updateScaffoldGroup(group.id, { parts: next });
+    onClose();
+  }, [singleGroupId, singlePartId, scaffoldGroups, level, updateScaffoldGroup, onClose]);
 
-  const applyBulk = () => {
-    const applyTo = (p: any) => {
-      if (p.type !== 'アンチ') return p;
-      return { ...p, meta: { ...(p.meta || {}), levels: Math.max(1, level) } };
+  const applyBulk = React.useCallback(() => {
+    if (kind !== 'bulk' || !bulkScope) return;
+    const applyTo = (part: ScaffoldPart): ScaffoldPart => {
+      if (part.type !== 'アンチ') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          levels: Math.max(1, level),
+        },
+      };
     };
 
-    if ((props as any).scope === 'selected') {
-      const grouped: Record<string, string[]> = {};
-      for (const key of selectedScaffoldPartKeys) {
+    if (bulkScope === 'selected') {
+      const grouped = selectedScaffoldPartKeys.reduce<Record<string, Set<string>>>((acc, key) => {
         const [gid, pid] = key.split(':');
-        if (!grouped[gid]) grouped[gid] = [];
-        grouped[gid].push(pid);
-      }
-      for (const gid of Object.keys(grouped)) {
-        const g = scaffoldGroups.find((gg) => gg.id === gid);
-        if (!g) continue;
-        const target = new Set(grouped[gid]);
-        const nextParts = g.parts.map((p) => (target.has(p.id) ? applyTo(p) : p));
+        if (!acc[gid]) acc[gid] = new Set();
+        acc[gid]!.add(pid);
+        return acc;
+      }, {});
+
+      Object.entries(grouped).forEach(([gid, ids]) => {
+        const group = scaffoldGroups.find((candidate) => candidate.id === gid);
+        if (!group) return;
+        const nextParts = group.parts.map((part) => (ids.has(part.id) ? applyTo(part) : part));
         updateScaffoldGroup(gid, { parts: nextParts });
-      }
+      });
       clearScaffoldSelection();
-      props.onClose();
+      onClose();
       return;
     }
 
-    // all
-    for (const g of scaffoldGroups) {
-      const nextParts = g.parts.map((p) => applyTo(p));
-      updateScaffoldGroup(g.id, { parts: nextParts });
-    }
+    scaffoldGroups.forEach((group) => {
+      const nextParts = group.parts.map((part) => applyTo(part));
+      updateScaffoldGroup(group.id, { parts: nextParts });
+    });
     clearScaffoldSelection();
-    props.onClose();
-  };
+    onClose();
+  }, [
+    bulkScope,
+    clearScaffoldSelection,
+    level,
+    kind,
+    onClose,
+    scaffoldGroups,
+    selectedScaffoldPartKeys,
+    updateScaffoldGroup,
+  ]);
 
-  const handleSave = () => {
-    if (props.kind === 'single') applySingle(); else applyBulk();
-  };
+  const handleSave = React.useCallback(() => {
+    if (kind === 'single') {
+      applySingle();
+    } else {
+      applyBulk();
+    }
+  }, [applyBulk, applySingle, kind]);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -133,7 +166,7 @@ export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{headerTitle}</h3>
           {isBulk ? (
             <span className="ml-1 inline-flex items-center rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-300">
-              {(props as any).scope === 'all' ? '対象 全アンチ' : `対象 ${selectedCount} 箇所`}
+              {bulkScope === 'all' ? '対象 全アンチ' : `対象 ${selectedCount} 箇所`}
             </span>
           ) : (
             <span className="ml-1 inline-flex items-center rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-300">
@@ -146,7 +179,7 @@ export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
             <button
               onClick={() => {
                 clearScaffoldSelection();
-                props.onClose();
+                onClose();
               }}
               className="flex h-8 items-center justify-center rounded-lg px-2 text-[11px] text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
               title="選択解除"
@@ -156,7 +189,7 @@ export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
             </button>
           )}
           <button
-            onClick={props.onClose}
+            onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
             aria-label="閉じる"
           >
@@ -190,7 +223,7 @@ export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
 
         {/* 操作 */}
         <div className="mt-3 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={props.onClose} className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20">
+          <Button variant="outline" size="sm" onClick={onClose} className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20">
             キャンセル
           </Button>
           <Button size="sm" onClick={handleSave} className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 !text-white shadow-[0_12px_32px_-16px_rgba(16,185,129,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(16,185,129,0.55)] hover:from-emerald-600 hover:via-emerald-500 hover:to-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700">
@@ -201,4 +234,3 @@ export default function AntiLevelCardUnified(props: AntiLevelCardUnifiedProps) {
     </div>
   );
 }
-
