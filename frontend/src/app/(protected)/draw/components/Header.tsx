@@ -82,32 +82,18 @@ export default function Header() {
 
   // PNGプレビューを開く: StageからPNGを生成してプレビュー表示
   const handleOpenPngPreview = useCallback(async () => {
-    console.log('========================================');
-    console.log('【Header】PNG保存ボタンクリック');
-    console.log('========================================');
-
     try {
       // 保存モーダルを閉じる
       setIsSaveModalOpen(false);
 
       const { exportStageToDataURL } = require('@/lib/canvasStageExporter');
-      console.log('【Header】exportStageToDataURL関数取得成功');
 
-      // exportStageToDataURLは非同期処理なのでawaitする
-      console.log('【Header】PNG生成開始...');
       const url = await exportStageToDataURL({
         pixelRatio: 2,
         whiteBg: true,
         hideGrid: true,
         scaffoldGroups: scaffoldGroups, // 柱情報とアンチ枚数を描画するために渡す
         memos: memos // メモを描画するために渡す
-      });
-
-      console.log('【Header】PNG生成完了:', {
-        hasUrl: !!url,
-        urlLength: url?.length || 0,
-        urlType: typeof url,
-        urlPrefix: url?.substring(0, 100)
       });
 
       if (!url) {
@@ -121,12 +107,8 @@ export default function Header() {
         return;
       }
 
-      console.log('【Header】プレビュー状態を設定...');
       setPreviewImageUrl(url);
       setIsPngPreviewOpen(true);
-
-      console.log('【Header】✅ プレビューモーダルを開きました');
-      console.log('========================================');
     } catch (e: any) {
       console.error('【Header】❌ PNG生成エラー:', e);
       console.error('エラー詳細:', {
@@ -266,12 +248,6 @@ export default function Header() {
   }, [exportToJSON, selectedProjectId]);
 
   // PNGエクスポート完了処理（未使用）
-
-  // デバッグ: 状態変化を追跡
-  useEffect(() => {
-    console.log('【Header State】isPngPreviewOpen:', isPngPreviewOpen);
-    console.log('【Header State】previewImageUrl:', previewImageUrl ? `有 (${previewImageUrl.length}文字)` : '無');
-  }, [isPngPreviewOpen, previewImageUrl]);
 
   // Ctrl+S キーボードショートカット
   useEffect(() => {
@@ -474,11 +450,6 @@ export default function Header() {
               src={previewImageUrl}
               alt="PNG保存プレビュー"
               className="max-w-full max-h-full object-contain shadow-2xl border-4 border-white/20"
-              onLoad={() => console.log('✅ 画像の読み込み成功')}
-              onError={(e) => {
-                console.error('❌ 画像の読み込み失敗:', e);
-                console.error('画像URL:', previewImageUrl?.substring(0, 100));
-              }}
             />
           ) : (
             <div className="text-white text-center">

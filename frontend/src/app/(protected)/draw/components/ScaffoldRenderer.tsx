@@ -1923,7 +1923,7 @@ export default function ScaffoldRenderer({
                       })()}
                       {/* サックスモード時のスパン入れ替えハンドル */}
                       {showReorderHandle && (
-                        <Group>
+                        <Group name="span-reorder-handle">
                           {/* 視認用の小さなハンドル（白縁の丸） */}
                           <Circle
                             x={midX}

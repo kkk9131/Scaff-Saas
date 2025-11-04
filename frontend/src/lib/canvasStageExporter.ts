@@ -18,7 +18,7 @@ export function registerStage(stage: KonvaStageLike | null) {
   stageRef = stage;
 }
 
-/** Stage から PNG dataURL を取得（デバッグ強化版） */
+/** Stage から PNG dataURL を取得 */
 export async function exportStageToDataURL(options?: {
   pixelRatio?: number;
   mimeType?: string;
@@ -28,10 +28,6 @@ export async function exportStageToDataURL(options?: {
   scaffoldGroups?: ScaffoldGroup[]; // 柱情報とアンチ枚数を描画するために追加
   memos?: Memo[]; // メモを描画するために追加
 }): Promise<string | null> {
-  console.log('=== PNG生成開始 ===');
-  console.log('[1] オプション:', options);
-  console.log('[2] stageRef存在:', !!stageRef);
-
   if (!stageRef) {
     console.error('❌ Stage参照が未登録');
     alert('エラー: Stageが登録されていません。ページをリロードしてください。');
@@ -39,21 +35,10 @@ export async function exportStageToDataURL(options?: {
   }
 
   const stage: any = stageRef as any;
-  console.log('[3] Stage取得成功');
 
   // Stageの基本情報をチェック
   const stageWidth = stage.width?.() || 0;
   const stageHeight = stage.height?.() || 0;
-  const layers = stage.getLayers?.() || [];
-  const layerCount = layers.length;
-
-  console.log('[4] Stage情報:', {
-    width: stageWidth,
-    height: stageHeight,
-    layerCount: layerCount,
-    hasToDataURL: typeof stage.toDataURL === 'function',
-    hasDraw: typeof stage.draw === 'function'
-  });
 
   if (stageWidth === 0 || stageHeight === 0) {
     console.error('❌ Stageのサイズが0です');
@@ -79,42 +64,29 @@ export async function exportStageToDataURL(options?: {
   const addedTextNodes: any[] = []; // 追加したテキストノードを記録（後で削除するため）
 
   try {
-    console.log('[5] PNG生成前の準備開始');
-
     // グリッドレイヤーを一時非表示
     gridLayer = stage.findOne?.('.grid-layer');
     if (hideGrid && gridLayer) {
       origGridVisible = gridLayer.visible();
       gridLayer.visible(false);
-      console.log('[6] グリッドレイヤーを非表示にしました');
     }
 
     // スパン入れ替えハンドルを一時非表示（複数手法で確実に検索）
-    console.log('[6-2] スパン入れ替えハンドル検索開始...');
-
     // 方法1: Konvaのfindメソッド（セレクタ形式）
     const handlesByFindSelector = stage.find?.('.span-reorder-handle') || [];
-    console.log(`[6-2-1] find(セレクタ)での検索: ${handlesByFindSelector.length}個`);
 
     // 方法2: Konvaのfindメソッド（関数形式）- より確実
     const handlesByFindFunc = stage.find ? stage.find((node: any) => {
       const nodeName = node.name?.();
-      const matched = nodeName === 'span-reorder-handle';
-      if (matched) {
-        console.log(`  → 検出: name="${nodeName}", type=${node.className}`);
-      }
-      return matched;
+      return nodeName === 'span-reorder-handle';
     }) : [];
-    console.log(`[6-2-2] find(関数)での検索: ${handlesByFindFunc.length}個`);
 
     // 方法3: 再帰的に全ノードを走査（最も確実）
     const recursiveFind = (node: any, depth = 0): any[] => {
       const results: any[] = [];
       const nodeName = node.name?.() || node.getAttr?.('name') || '';
-      const nodeType = node.className || node.nodeType || 'Unknown';
 
       if (nodeName === 'span-reorder-handle') {
-        console.log(`  → 再帰検出: depth=${depth}, name="${nodeName}", type=${nodeType}`);
         results.push(node);
       }
 
@@ -128,20 +100,15 @@ export async function exportStageToDataURL(options?: {
     };
 
     const layers = stage.getLayers?.() || [];
-    console.log(`[6-2-3] レイヤー数: ${layers.length}個`);
     let handlesByRecursive: any[] = [];
-    layers.forEach((layer: any, idx: number) => {
-      const layerName = layer.name?.() || `layer-${idx}`;
-      console.log(`  → レイヤー "${layerName}" を走査中...`);
+    layers.forEach((layer: any) => {
       const found = recursiveFind(layer);
       handlesByRecursive.push(...found);
     });
-    console.log(`[6-2-4] 再帰検索の合計: ${handlesByRecursive.length}個`);
 
     // 全手法の結果を統合（重複排除）
     const allHandles = new Set([...handlesByFindSelector, ...handlesByFindFunc, ...handlesByRecursive]);
     const foundHandles = Array.from(allHandles);
-    console.log(`[6-2-5] 統合結果（重複排除後）: ${foundHandles.length}個`);
 
     if (foundHandles.length === 0) {
       console.warn('[6-2] ⚠️ ハンドルが見つかりませんでした');
@@ -151,21 +118,15 @@ export async function exportStageToDataURL(options?: {
         handleNodes.push({ node: h, visible: currentVisible });
         h.visible(false);
       });
-      console.log(`[6-2] ✅ ${foundHandles.length}個のハンドルを非表示にしました`);
     }
 
     // 柱情報とアンチ枚数を図面内に描画
-    console.log('[6-3] 柱情報とアンチ枚数を図面内に描画開始...');
-    console.log(`[6-3-1] scaffoldGroups数: ${scaffoldGroups.length}`);
-
     if (scaffoldGroups.length > 0) {
       // scaffold-layerを取得
       const scaffoldLayer = stage.findOne?.('.scaffold-layer');
       if (!scaffoldLayer) {
         console.warn('[6-3] ⚠️ scaffold-layerが見つかりませんでした');
       } else {
-        console.log('[6-3-2] scaffold-layer取得成功');
-
         // Konva Textクラスを取得（動的import）
         const Konva = (window as any).Konva;
         if (!Konva || !Konva.Text) {
@@ -174,8 +135,8 @@ export async function exportStageToDataURL(options?: {
           // カード位置の重なりを防ぐための記録
           const usedPositions: Array<{ x: number; y: number; width: number; height: number }> = [];
 
-          scaffoldGroups.forEach((group: any, groupIdx: number) => {
-            group.parts.forEach((part: any, partIdx: number) => {
+          scaffoldGroups.forEach((group: any) => {
+            group.parts.forEach((part: any) => {
               let textContent = '';
               let textX = part.position.x;
               let textY = part.position.y;
@@ -266,14 +227,6 @@ export async function exportStageToDataURL(options?: {
                   }
                 }
 
-                console.log(`[6-3-3-DEBUG] 部材情報:`, {
-                  type: part.type,
-                  text: textContent,
-                  position: { x: textX, y: textY },
-                  finalPosition: { x: finalX, y: finalY },
-                  adjustments: attempts
-                });
-
                 // テキストノードを作成
                 const textNode = new Konva.Text({
                   x: finalX,
@@ -314,35 +267,28 @@ export async function exportStageToDataURL(options?: {
                 scaffoldLayer.add(textNode);
                 addedTextNodes.push(bgRect);
                 addedTextNodes.push(textNode);
-                console.log(`[6-3-3-OK] テキストノード追加完了: "${textContent}" (背景付き, ${attempts}回調整)`);
               }
             });
           });
 
           scaffoldLayer.batchDraw(); // レイヤーを再描画
-          console.log(`[6-3] ✅ ${addedTextNodes.length}個の情報テキストを追加しました`);
         }
       }
     }
 
     // メモを図面内に描画
-    console.log('[6-4] メモを図面内に描画開始...');
-    console.log(`[6-4-1] memos数: ${memos.length}`);
-
     if (memos.length > 0) {
       // scaffold-layerを取得
       const scaffoldLayer = stage.findOne?.('.scaffold-layer');
       if (!scaffoldLayer) {
         console.warn('[6-4] ⚠️ scaffold-layerが見つかりませんでした');
       } else {
-        console.log('[6-4-2] scaffold-layer取得成功');
-
         // Konva TextとRectクラスを取得
         const Konva = (window as any).Konva;
         if (!Konva || !Konva.Text || !Konva.Rect) {
           console.warn('[6-4] ⚠️ Konva.TextまたはKonva.Rectが利用できません');
         } else {
-          memos.forEach((memo: any, memoIdx: number) => {
+          memos.forEach((memo: any) => {
             const { position, size, text } = memo;
 
             // テキストを改行で分割
@@ -413,18 +359,14 @@ export async function exportStageToDataURL(options?: {
               scaffoldLayer.add(placeholderNode);
               addedTextNodes.push(placeholderNode);
             }
-
-            console.log(`[6-4-3] メモ追加完了: "${text.substring(0, 20)}..."`);
           });
 
           scaffoldLayer.batchDraw(); // レイヤーを再描画
-          console.log(`[6-4] ✅ ${memos.length}個のメモを追加しました`);
         }
       }
     }
 
     // 図形のバウンディングボックスを計算（グリッド以外）
-    console.log('[7] 図形のバウンディングボックスを計算中...');
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let hasContent = false;
 
@@ -459,15 +401,6 @@ export async function exportStageToDataURL(options?: {
       minY = 0;
       maxX = stageWidth;
       maxY = stageHeight;
-    } else {
-      console.log('[8] バウンディングボックス計算完了:', {
-        minX: minX.toFixed(1),
-        minY: minY.toFixed(1),
-        maxX: maxX.toFixed(1),
-        maxY: maxY.toFixed(1),
-        width: (maxX - minX).toFixed(1),
-        height: (maxY - minY).toFixed(1)
-      });
     }
 
     // 余白を追加（50px）
@@ -477,19 +410,10 @@ export async function exportStageToDataURL(options?: {
     cropWidth = Math.min(stageWidth - cropX, maxX - minX + padding * 2);
     cropHeight = Math.min(stageHeight - cropY, maxY - minY + padding * 2);
 
-    console.log('[9] 切り取り範囲（余白付き）:', {
-      x: cropX.toFixed(1),
-      y: cropY.toFixed(1),
-      width: cropWidth.toFixed(1),
-      height: cropHeight.toFixed(1)
-    });
-
     // 描画を更新
-    console.log('[10] Stageを再描画...');
     stage.draw?.();
 
     // 図形部分だけを切り取ってPNG生成
-    console.log('[11] toDataURL実行（図形部分のみ）...');
     const dataUrl = stage.toDataURL({
       x: cropX,
       y: cropY,
@@ -517,13 +441,6 @@ export async function exportStageToDataURL(options?: {
       }
     });
     stage.draw?.();
-    console.log('[11-2] グリッド、ハンドル、追加テキストを復元/削除しました');
-
-    console.log('[12] toDataURL完了:', {
-      hasDataUrl: !!dataUrl,
-      length: dataUrl?.length || 0,
-      prefix: dataUrl?.substring(0, 50)
-    });
 
     if (!dataUrl) {
       console.error('❌ toDataURLがnullを返しました');
@@ -531,12 +448,8 @@ export async function exportStageToDataURL(options?: {
       return null;
     }
 
-    console.log('[13] PNG生成成功！');
-    console.log('=== PNG生成完了 ===');
-
     // 白背景が必要な場合は、canvasで合成（図面を中央配置）
     if (whiteBg) {
-      console.log('[14] 白背景合成開始（中央配置）...');
       return new Promise<string>((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -567,12 +480,6 @@ export async function exportStageToDataURL(options?: {
 
             // 最終的なdataURLを取得
             const finalUrl = canvas.toDataURL(mimeType, quality);
-            console.log('[15] 白背景合成完了（中央配置）:', {
-              finalLength: finalUrl.length,
-              canvasSize: `${canvas.width}x${canvas.height}`,
-              imageSize: `${imgWidth}x${imgHeight}`,
-              padding: finalPadding
-            });
             resolve(finalUrl);
           } catch (e) {
             console.error('❌ 白背景合成エラー:', e);
@@ -588,7 +495,6 @@ export async function exportStageToDataURL(options?: {
     }
 
     // 透過背景の場合はそのまま返す
-    console.log('[14] 透過PNGをそのまま返します');
     return dataUrl;
 
   } catch (e: any) {
@@ -614,7 +520,6 @@ export async function exportStageToDataURL(options?: {
         } catch {}
       });
       stage.draw?.();
-      console.log('[ERROR] グリッド、ハンドル、追加テキストを復元/削除しました');
     } catch (restoreError) {
       console.error('復元処理でもエラー:', restoreError);
     }
@@ -623,4 +528,3 @@ export async function exportStageToDataURL(options?: {
     return null;
   }
 }
-
