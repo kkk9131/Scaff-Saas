@@ -15,18 +15,44 @@
 """
 
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from datetime import datetime
 import logging
 
 from utils.supabase_client import get_supabase_client
+from utils.middleware import get_current_user
 
 
 logger = logging.getLogger(__name__)
 
 # ルーター定義
 router = APIRouter(prefix="/api", tags=["drawings"])
+
+
+def _assert_project_access(supabase, project_id: str, user_id: str) -> None:
+    """指定プロジェクトへのアクセス権を検証するユーティリティ
+
+    SupabaseのサービスロールクライアントはRLSをバイパスするため、
+    API層でユーザーとプロジェクトの紐付きをチェックする。
+    アクセス権が確認できなければ403を送出する。
+    """
+
+    try:
+        resp = (
+            supabase.table("projects")
+            .select("id")
+            .eq("id", project_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:  # Supabase SDKの予期しない失敗を捕捉
+        logger.exception("プロジェクトアクセス検証中にエラーが発生しました")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not resp.data:
+        raise HTTPException(status_code=403, detail="指定プロジェクトにアクセス権がありません")
 
 
 class DrawingSaveRequest(BaseModel):
@@ -55,7 +81,10 @@ class DrawingResponse(BaseModel):
 
 
 @router.get("/drawings/{project_id}", response_model=DrawingResponse)
-def get_latest_drawing(project_id: str) -> DrawingResponse:
+def get_latest_drawing(
+    project_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> DrawingResponse:
     """
     指定プロジェクトの最新作図JSONを取得する
 
@@ -64,6 +93,7 @@ def get_latest_drawing(project_id: str) -> DrawingResponse:
     """
     try:
         supabase = get_supabase_client()
+        _assert_project_access(supabase, project_id, current_user["id"])
         resp = (
             supabase.table("scaffold_designs")
             .select("id, project_id, design_json, created_at, updated_at")
@@ -87,7 +117,10 @@ def get_latest_drawing(project_id: str) -> DrawingResponse:
 
 
 @router.post("/drawings", response_model=DrawingResponse)
-def save_drawing(payload: DrawingSaveRequest) -> DrawingResponse:
+def save_drawing(
+    payload: DrawingSaveRequest,
+    current_user: dict = Depends(get_current_user),
+) -> DrawingResponse:
     """
     作図JSONを保存する（新規行として挿入）
 
@@ -96,6 +129,7 @@ def save_drawing(payload: DrawingSaveRequest) -> DrawingResponse:
     """
     try:
         supabase = get_supabase_client()
+        _assert_project_access(supabase, payload.project_id, current_user["id"])
 
         data = {
             "project_id": payload.project_id,
@@ -121,4 +155,3 @@ def save_drawing(payload: DrawingSaveRequest) -> DrawingResponse:
     except Exception as e:
         logger.exception("作図データ保存時にエラーが発生しました")
         raise HTTPException(status_code=500, detail=str(e))
-
