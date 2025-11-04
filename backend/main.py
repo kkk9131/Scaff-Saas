@@ -12,6 +12,7 @@ import os
 from dotenv import load_dotenv
 
 from routers import health, subscriptions, projects
+from routers import drawings
 from utils.middleware import RequestLoggingMiddleware
 from config import (
     APP_NAME,
@@ -110,6 +111,11 @@ app.include_router(
     projects.router,
     prefix="/api",
     tags=["projects"]
+)
+
+app.include_router(
+    drawings.router,
+    tags=["drawings"]
 )
 
 

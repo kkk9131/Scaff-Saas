@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { type ChatMessage, Button, LoadingSpinner, useToast, GradientText, Muted } from '@/components';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { getProject } from '@/lib/api/projects';
+import { getLatestDrawing, type DrawingRecord } from '@/lib/api/drawings';
 import type { Project } from '@/types/project';
 import { ProjectInfo } from './components/ProjectInfo';
 import { ActionButtons } from './components/ActionButtons';
@@ -56,8 +56,7 @@ export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
-  const { isDark } = useTheme();
+  const { loading: authLoading } = useAuth();
 
   const projectId = React.useMemo(() => {
     const rawId = params?.id;
@@ -81,6 +80,22 @@ export default function ProjectDetailPage() {
   });
 
   const projectFiles = React.useMemo(() => extractProjectFiles(project), [project]);
+
+  // 最新の図面（存在しない場合は null）
+  const { data: latestDrawingResp } = useQuery({
+    queryKey: ['project-latest-drawing', projectId],
+    enabled: Boolean(projectId) && !authLoading,
+    queryFn: async () => {
+      if (!projectId) throw new Error('プロジェクトIDが見つかりませんでした');
+      return getLatestDrawing(projectId);
+    },
+  });
+
+  const latestDrawing: DrawingRecord | null = React.useMemo(
+    () => latestDrawingResp?.data ?? null,
+    [latestDrawingResp]
+  );
+
 
   const handleSendMessage = React.useCallback((message: string) => {
     const userMessage: ChatMessage = {
@@ -172,8 +187,27 @@ export default function ProjectDetailPage() {
                   <Muted>
                     作図で足場の配置を編集し、見積で費用試算に進めます。
                   </Muted>
-                  <ActionButtons projectId={project.id} disabled={isFetching} />
+                  <ActionButtons
+                    projectId={project.id}
+                    disabled={isFetching}
+                    drawSubLabel={(() => {
+                      const dt = latestDrawing?.updated_at ?? latestDrawing?.created_at
+                      if (!dt) return undefined
+                      const d = new Date(dt)
+                      const formatted = d.toLocaleString('ja-JP', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                      return `最終保存: ${formatted}`
+                    })()}
+                    estimateSubLabel={`最終更新: -`}
+                  />
                 </section>
+
+                {/* 保存済み図面のカードは非表示（ユーザー要望により削除） */}
 
                 <FileList files={projectFiles} onPreview={handlePreviewFile} />
               </div>

@@ -7,6 +7,7 @@
 'use client'
 
 import { Project } from '@/types/project'
+import type { DraggableSyntheticListeners } from '@dnd-kit/core'
 import { ProjectStatusBadge } from './ProjectStatusBadge'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -17,7 +18,7 @@ interface ProjectCardProps {
   onEdit?: (project: Project) => void
   onDelete?: (projectId: string) => void
   onDuplicate?: (project: Project) => void
-  dragListeners?: any // ドラッグ&ドロップのリスナー
+  dragListeners?: DraggableSyntheticListeners // ドラッグ&ドロップのリスナー
 }
 
 export function ProjectCard({
@@ -56,8 +57,7 @@ export function ProjectCard({
   // アクション実行時はバブリングを停止
   const handleActionClick = (
     e: React.MouseEvent,
-    action: () => void,
-    actionName: string
+    action: () => void
   ) => {
     e.stopPropagation()
     action()
@@ -130,7 +130,7 @@ export function ProjectCard({
             {/* 編集ボタン */}
             {onEdit && (
               <button
-                onClick={(e) => handleActionClick(e, () => onEdit(project), '編集')}
+                onClick={(e) => handleActionClick(e, () => onEdit(project))}
                 className="p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-blue-600 dark:text-blue-400"
                 title="編集"
                 aria-label="プロジェクトを編集"
@@ -142,7 +142,7 @@ export function ProjectCard({
             {/* 複製ボタン */}
             {onDuplicate && (
               <button
-                onClick={(e) => handleActionClick(e, () => onDuplicate(project), '複製')}
+                onClick={(e) => handleActionClick(e, () => onDuplicate(project))}
                 className="p-1.5 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-green-600 dark:text-green-400"
                 title="複製"
                 aria-label="プロジェクトを複製"
@@ -154,7 +154,7 @@ export function ProjectCard({
             {/* 削除ボタン */}
             {onDelete && (
               <button
-                onClick={(e) => handleActionClick(e, () => onDelete(project.id), '削除')}
+                onClick={(e) => handleActionClick(e, () => onDelete(project.id))}
                 className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-red-600 dark:text-red-400"
                 title="削除"
                 aria-label="プロジェクトを削除"

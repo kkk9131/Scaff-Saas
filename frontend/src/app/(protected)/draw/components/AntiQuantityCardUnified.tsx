@@ -1,0 +1,300 @@
+/**
+ * AntiQuantityCardUnified.tsx
+ * アンチの数量調整カード（単体/一括対応、W/S両方）
+ */
+
+'use client';
+
+import * as React from 'react';
+import { Button } from '@/components/ui/Button';
+import { Minus, Plus, Table, Layers, X } from 'lucide-react';
+import { useDrawingStore } from '@/stores/drawingStore';
+import type { ScaffoldPart } from '@/types/scaffold';
+
+export type AntiQuantityCardUnifiedProps =
+  | {
+      kind: 'single';
+      screenPosition: { left: number; top: number };
+      groupId: string;
+      partId: string;
+      onClose: () => void;
+    }
+  | {
+      kind: 'bulk';
+      screenPosition: { left: number; top: number };
+      scope: 'selected' | 'all';
+      onClose: () => void;
+    };
+
+export default function AntiQuantityCardUnified(props: AntiQuantityCardUnifiedProps) {
+  const { scaffoldGroups, updateScaffoldGroup, selectedScaffoldPartKeys, clearScaffoldSelection } = useDrawingStore();
+  const { kind, onClose, screenPosition } = props;
+  const isBulk = kind === 'bulk';
+  const headerTitle = isBulk ? 'アンチの一括数量調整' : 'アンチの数量調整';
+
+  const singleGroupId = kind === 'single' ? props.groupId : null;
+  const singlePartId = kind === 'single' ? props.partId : null;
+  const bulkScope = kind === 'bulk' ? props.scope : null;
+
+  const initial = React.useMemo(() => {
+    if (singleGroupId && singlePartId) {
+      const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+      const part = group?.parts.find((candidate) => candidate.id === singlePartId);
+      const target = part && part.type === 'アンチ' ? part : null;
+      return {
+        w: Number(target?.meta?.antiW ?? target?.meta?.quantity ?? 0),
+        s: Number(target?.meta?.antiS ?? 0),
+        length: Number(target?.meta?.length ?? 0),
+      };
+    }
+    return { w: 0, s: 0, length: 0 };
+  }, [scaffoldGroups, singleGroupId, singlePartId]);
+
+  const [wQty, setWQty] = React.useState<number>(isNaN(initial.w) ? 0 : initial.w);
+  const [sQty, setSQty] = React.useState<number>(isNaN(initial.s) ? 0 : initial.s);
+  const [mode, setMode] = React.useState<'replace' | 'add'>('replace');
+
+  const style: React.CSSProperties = {
+    position: 'absolute',
+    left: `${screenPosition.left}px`,
+    top: `${screenPosition.top}px`,
+    zIndex: 40,
+    width: 360,
+  };
+
+  const selectedCount = selectedScaffoldPartKeys.filter((k) => {
+    const [gid, pid] = k.split(':');
+    const g = scaffoldGroups.find((gg) => gg.id === gid);
+    const p = g?.parts.find((pp) => pp.id === pid);
+    return p?.type === 'アンチ';
+  }).length;
+
+  const applySingle = React.useCallback(() => {
+    if (!singleGroupId || !singlePartId) return;
+    const group = scaffoldGroups.find((gg) => gg.id === singleGroupId);
+    if (!group) return;
+    const next = group.parts.map((part) => {
+      if (part.id !== singlePartId || part.type !== 'アンチ') return part;
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          antiW: Math.max(0, wQty),
+          antiS: Math.max(0, sQty),
+          quantityConfirmed: true,
+          quantity: undefined,
+        },
+      };
+    });
+    updateScaffoldGroup(group.id, { parts: next });
+    onClose();
+  }, [singleGroupId, singlePartId, scaffoldGroups, sQty, updateScaffoldGroup, wQty, onClose]);
+
+  const applyBulk = React.useCallback(() => {
+    if (kind !== 'bulk' || !bulkScope) return;
+    const applyTo = (part: ScaffoldPart): ScaffoldPart => {
+      if (part.type !== 'アンチ') return part;
+      const baseW = Number(part.meta?.antiW ?? part.meta?.quantity ?? 0);
+      const baseS = Number(part.meta?.antiS ?? 0);
+      const nextW = mode === 'add' ? Math.max(0, baseW + Math.max(0, wQty)) : Math.max(0, wQty);
+      const nextS = mode === 'add' ? Math.max(0, baseS + Math.max(0, sQty)) : Math.max(0, sQty);
+      return {
+        ...part,
+        meta: {
+          ...(part.meta ?? {}),
+          antiW: nextW,
+          antiS: nextS,
+          quantityConfirmed: true,
+          quantity: undefined,
+        },
+      };
+    };
+
+    if (bulkScope === 'selected') {
+      const grouped = selectedScaffoldPartKeys.reduce<Record<string, Set<string>>>((acc, key) => {
+        const [gid, pid] = key.split(':');
+        if (!acc[gid]) acc[gid] = new Set();
+        acc[gid]!.add(pid);
+        return acc;
+      }, {});
+
+      Object.entries(grouped).forEach(([gid, ids]) => {
+        const group = scaffoldGroups.find((candidate) => candidate.id === gid);
+        if (!group) return;
+        const nextParts = group.parts.map((part) => (ids.has(part.id) ? applyTo(part) : part));
+        updateScaffoldGroup(gid, { parts: nextParts });
+      });
+      clearScaffoldSelection();
+      onClose();
+      return;
+    }
+
+    scaffoldGroups.forEach((group) => {
+      const nextParts = group.parts.map((part) => applyTo(part));
+      updateScaffoldGroup(group.id, { parts: nextParts });
+    });
+    clearScaffoldSelection();
+    onClose();
+  }, [
+    bulkScope,
+    clearScaffoldSelection,
+    mode,
+    kind,
+    onClose,
+    scaffoldGroups,
+    selectedScaffoldPartKeys,
+    sQty,
+    updateScaffoldGroup,
+    wQty,
+  ]);
+
+  const handleSave = React.useCallback(() => {
+    if (kind === 'single') {
+      applySingle();
+    } else {
+      applyBulk();
+    }
+  }, [applyBulk, applySingle, kind]);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.code === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleSave]);
+
+  return (
+    <div
+      style={style}
+      className="glass-scope anti-quantity-card fixed z-30 rounded-2xl border border-white/40 bg-transparent backdrop-blur-xl shadow-lg shadow-emerald-500/10 before:absolute before:inset-0 before:rounded-2xl before:pointer-events-none before:opacity-90 before:bg-gradient-to-br before:from-emerald-400/0 before:via-emerald-300/0 before:to-emerald-400/30 dark:border-slate-700/60 dark:shadow-slate-900/50"
+      aria-live="polite"
+      aria-label={isBulk ? 'アンチの一括数量調整カード' : 'アンチの数量調整カード'}
+    >
+      <div className="relative flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-slate-700/50">
+        <div className="flex items-center gap-2">
+          {isBulk ? <Layers size={18} className="text-cyan-400" /> : <Table size={18} className="text-cyan-400" />}
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{headerTitle}</h3>
+          {isBulk ? (
+            <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
+              {bulkScope === 'all' ? '対象 全アンチ' : `対象 ${selectedCount} 箇所`}
+            </span>
+          ) : (
+            <span className="ml-1 inline-flex items-center rounded-md bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-300">
+              {isNaN(initial.length) ? '-' : `${initial.length}mm`}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {isBulk && (
+            <button
+              onClick={() => {
+                clearScaffoldSelection();
+                onClose();
+              }}
+              className="flex h-8 items-center justify-center rounded-lg px-2 text-[11px] text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
+              title="選択解除"
+              aria-label="選択解除"
+            >
+              選択解除
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white/10 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-all"
+            aria-label="閉じる"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative p-3">
+        {isBulk && (
+          <div className="mb-2 flex items-center gap-2">
+            <button
+              className={`h-7 rounded-md px-2 text-[11px] border ${
+                mode === 'replace'
+                  ? 'border-cyan-400 text-cyan-600 bg-cyan-50/50 dark:bg-cyan-500/10'
+                  : 'bg-white/60 text-slate-700 hover:bg-white/80 dark:bg-slate-800/60 dark:text-slate-200 border-white/40 dark:border-slate-700/50'
+              }`}
+              onClick={() => setMode('replace')}
+              aria-label="上書きモード"
+            >
+              上書き
+            </button>
+            <button
+              className={`h-7 rounded-md px-2 text-[11px] border ${
+                mode === 'add'
+                  ? 'border-cyan-400 text-cyan-600 bg-cyan-50/50 dark:bg-cyan-500/10'
+                  : 'bg-white/60 text-slate-700 hover:bg-white/80 dark:bg-slate-800/60 dark:text-slate-200 border-white/40 dark:border-slate-700/50'
+              }`}
+              onClick={() => setMode('add')}
+              aria-label="加算モード"
+            >
+              加算
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          {/* Wの数量 */}
+          <div className="rounded-xl border border-white/40 bg-white/60 backdrop-blur-sm p-1.5 shadow-sm dark:border-slate-700/50 dark:bg-slate-800/60">
+            <div className="mb-1 text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">W</div>
+            <div className="flex items-center gap-0.5">
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0" aria-label="Wの数量を1減らす" onClick={() => setWQty((v) => Math.max(0, v - 1))}>
+                <Minus size={12} />
+              </Button>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                className="h-7 w-12 flex-1 min-w-0 rounded-md border border-slate-300 bg-white/80 px-1 py-0.5 text-center text-[11px] outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                value={String(wQty)}
+                onChange={(e) => setWQty(Math.max(0, Number(e.target.value || 0)))}
+                aria-label="Wの数量"
+              />
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0" aria-label="Wの数量を1増やす" onClick={() => setWQty((v) => v + 1)}>
+                <Plus size={12} />
+              </Button>
+            </div>
+          </div>
+          {/* Sの数量 */}
+          <div className="rounded-xl border border-white/40 bg-white/60 backdrop-blur-sm p-1.5 shadow-sm dark:border-slate-700/50 dark:bg-slate-800/60">
+            <div className="mb-1 text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">S</div>
+            <div className="flex items-center gap-0.5">
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0" aria-label="Sの数量を1減らす" onClick={() => setSQty((v) => Math.max(0, v - 1))}>
+                <Minus size={12} />
+              </Button>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                className="h-7 w-12 flex-1 min-w-0 rounded-md border border-slate-300 bg-white/80 px-1 py-0.5 text-center text-[11px] outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                value={String(sQty)}
+                onChange={(e) => setSQty(Math.max(0, Number(e.target.value || 0)))}
+                aria-label="Sの数量"
+              />
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0" aria-label="Sの数量を1増やす" onClick={() => setSQty((v) => v + 1)}>
+                <Plus size={12} />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 操作 */}
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose} className="bg-white !text-red-600 !border-red-400 shadow-[0_8px_24px_-12px_rgba(239,68,68,0.25)] hover:bg-red-50 hover:!text-red-700 hover:!border-red-500 dark:bg-transparent dark:!text-red-400 dark:!border-red-500 dark:hover:bg-red-900/20">
+            キャンセル
+          </Button>
+          <Button size="sm" onClick={handleSave} className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 !text-white shadow-[0_12px_32px_-16px_rgba(16,185,129,0.6)] hover:shadow-[0_16px_40px_-16px_rgba(16,185,129,0.55)] hover:from-emerald-600 hover:via-emerald-500 hover:to-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700">
+            保存
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

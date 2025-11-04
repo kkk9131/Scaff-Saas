@@ -44,9 +44,6 @@ export default function DashboardPage() {
   const glassCardClass = isDark
     ? 'group relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50 backdrop-blur-md shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl'
     : 'group relative overflow-hidden rounded-2xl border border-white/30 bg-card backdrop-blur-xl shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl'
-  const glassPanelClass = isDark
-    ? 'relative overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/50 backdrop-blur-md shadow-lg transition-colors duration-300'
-    : 'relative overflow-hidden rounded-2xl border border-white/30 bg-card backdrop-blur-xl shadow-lg transition-colors duration-300'
   const glassHoverOverlayBase =
     'before:absolute before:inset-0 before:rounded-2xl before:opacity-0 before:transition-opacity before:duration-500 group-hover:before:opacity-100'
   const iconWrapperBase =

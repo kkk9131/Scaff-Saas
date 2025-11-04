@@ -7,7 +7,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { PricingCard } from './PricingCard';
 import { useSubscriptionPlans, useMySubscription, useCreateCheckoutSession } from '@/hooks/use-subscriptions';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -15,7 +14,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 export function PricingSection() {
-  const router = useRouter();
   const { toast } = useToast();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 

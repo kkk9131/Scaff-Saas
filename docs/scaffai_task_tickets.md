@@ -640,7 +640,7 @@ app/(protected)/projects/components/
 
 ---
 
-### [TASK-205] 🚀 プロジェクト統合テスト
+### [TASK-205] プロジェクト統合テスト
 ```yaml
 依存: TASK-201, TASK-202, TASK-203
 並列可: なし
@@ -688,7 +688,7 @@ app/(protected)/projects/components/
 
 ---
 
-### [TASK-207] 🚀 Agent Builder連携によるプロジェクト管理エージェント実装
+### [TASK-207]  Agent Builder連携によるプロジェクト管理エージェント実装
 ```yaml
 依存: TASK-201, TASK-202, TASK-203, TASK-205
 並列可: なし
@@ -1563,18 +1563,13 @@ git checkout -b feature/105-api-integration
 #### Phase 3: 作図機能（最大5並列）
 
 **第1波（並列度: 3）**:
-- TASK-301（キャンバス基盤・UI）
-- TASK-302（モード切替）
-- TASK-309（保存・自動保存）
+- TASK-301（Konva基盤）
+- TASK-302（ツールパネル）
+- TASK-303（プロパティ）
 
 **第2波（並列度: 2）**:
-- TASK-303（サックスCore）
-- TASK-304（サックスUI）
-
-**第3波（並列度: 3）**:
-- TASK-305（編集ポップ）
-- TASK-306（柱高さ/集計）
-- TASK-307（メモ）
+- TASK-305（割付ロジック）
+- TASK-307（DXF出力）
 
 ---
 

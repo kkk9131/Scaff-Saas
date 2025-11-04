@@ -11,8 +11,6 @@ import {
   getMySubscription,
   createCheckoutSession,
   cancelMySubscription,
-  SubscriptionPlan,
-  UserSubscription,
 } from '@/lib/api/subscriptions';
 
 /**

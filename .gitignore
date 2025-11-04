@@ -49,3 +49,7 @@ htmlcov/
 
 # YoYo AI version control directory
 .yoyo/
+
+# 誤ってコミットしたファイル
+scaffai/
+package-lock.json

@@ -22,7 +22,7 @@ export interface Project {
   site_address?: string | null
   start_date?: string | null // ISO 8601形式の日付文字列
   end_date?: string | null   // ISO 8601形式の日付文字列
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
   created_at: string // ISO 8601形式のタイムスタンプ
   updated_at: string // ISO 8601形式のタイムスタンプ
 }
@@ -38,7 +38,7 @@ export interface ProjectCreateRequest {
   site_address?: string | null
   start_date?: string | null
   end_date?: string | null
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
   user_id?: string // バックエンドで上書きされるため、フロントエンドからは不要
 }
 
@@ -53,7 +53,7 @@ export interface ProjectUpdateRequest {
   site_address?: string | null
   start_date?: string | null
   end_date?: string | null
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
 }
 
 /**
