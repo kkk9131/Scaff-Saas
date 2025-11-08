@@ -86,31 +86,33 @@ export default function CanvasStage() {
     bulkBracketScope,
     memos,
     selectedMemoId,
-    lassoGlowColor,
-    snapToGrid,
-    gridSize,
-  } = useDrawingStore(
-    useShallow((state) => ({
-      canvasScale: state.canvasScale,
-      canvasPosition: state.canvasPosition,
-      currentTool: state.currentTool,
-      currentColor: state.currentColor,
-      bracketSize: state.bracketSize,
-      directionReversed: state.directionReversed,
-      selectedScaffoldPartKeys: state.selectedScaffoldPartKeys,
-      editSelectionMode: state.editSelectionMode,
-      editTargetType: state.editTargetType,
-      scaffoldGroups: state.scaffoldGroups,
-      bulkPillarScope: state.bulkPillarScope,
-      bulkClothScope: state.bulkClothScope,
-      bulkBracketScope: state.bulkBracketScope,
-      memos: state.memos,
-      selectedMemoId: state.selectedMemoId,
-      lassoGlowColor: state.lassoGlowColor,
-      snapToGrid: state.snapToGrid,
-      gridSize: state.gridSize,
-    }))
-  );
+      lassoGlowColor,
+      snapToGrid,
+      gridSize,
+      snapToRightAngle,
+    } = useDrawingStore(
+      useShallow((state) => ({
+        canvasScale: state.canvasScale,
+        canvasPosition: state.canvasPosition,
+        currentTool: state.currentTool,
+        currentColor: state.currentColor,
+        bracketSize: state.bracketSize,
+        directionReversed: state.directionReversed,
+        selectedScaffoldPartKeys: state.selectedScaffoldPartKeys,
+        editSelectionMode: state.editSelectionMode,
+        editTargetType: state.editTargetType,
+        scaffoldGroups: state.scaffoldGroups,
+        bulkPillarScope: state.bulkPillarScope,
+        bulkClothScope: state.bulkClothScope,
+        bulkBracketScope: state.bulkBracketScope,
+        memos: state.memos,
+        selectedMemoId: state.selectedMemoId,
+        lassoGlowColor: state.lassoGlowColor,
+        snapToGrid: state.snapToGrid,
+        gridSize: state.gridSize,
+        snapToRightAngle: state.snapToRightAngle,
+      }))
+    );
   const setCanvasScale = useDrawingStore((state) => state.setCanvasScale);
   const setCanvasPosition = useDrawingStore((state) => state.setCanvasPosition);
   const setMousePosition = useDrawingStore((state) => state.setMousePosition);
@@ -1198,8 +1200,42 @@ export default function CanvasStage() {
     }
 
     // スパン描画中のプレビュー更新
-    if (isDrawingSpan) {
-      setSpanCurrent({ x: canvasX, y: canvasY });
+    if (isDrawingSpan && spanStart) {
+      let finalX = canvasX;
+      let finalY = canvasY;
+
+      // 直角モードが有効な場合、角度を90度の倍数にスナップ
+      if (snapToRightAngle) {
+        const dx = canvasX - spanStart.x;
+        const dy = canvasY - spanStart.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > 5) { // 最小距離チェック
+          // 角度を計算（度）
+          let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+          
+          // 90度の倍数にスナップ（0, 90, 180, 270度）
+          const snappedAngle = Math.round(angle / 90) * 90;
+          
+          // スナップされた角度で終点を再計算
+          const snappedRad = (snappedAngle * Math.PI) / 180;
+          finalX = spanStart.x + Math.cos(snappedRad) * distance;
+          finalY = spanStart.y + Math.sin(snappedRad) * distance;
+          
+          // 直角モード適用後、グリッドスナップも有効な場合は終点をグリッドにスナップ
+          if (snapToGrid) {
+            const snapped = snapPositionToGrid(
+              { x: finalX, y: finalY },
+              gridSize,
+              DEFAULT_SCALE
+            );
+            finalX = snapped.x;
+            finalY = snapped.y;
+          }
+        }
+      }
+
+      setSpanCurrent({ x: finalX, y: finalY });
       return;
     }
 
@@ -1280,15 +1316,49 @@ export default function CanvasStage() {
     // スパン描画完了時の処理
     if (isDrawingSpan && spanStart && spanCurrent) {
       // 始点と終点の距離を計算（最低10px以上ドラッグした場合のみ生成）
-      const dx = spanCurrent.x - spanStart.x;
-      const dy = spanCurrent.y - spanStart.y;
+      let finalEnd = spanCurrent;
+      
+      // 直角モードが有効な場合、角度を90度の倍数にスナップ
+      if (snapToRightAngle) {
+        const dx = spanCurrent.x - spanStart.x;
+        const dy = spanCurrent.y - spanStart.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > 5) { // 最小距離チェック
+          // 角度を計算（度）
+          let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+          
+          // 90度の倍数にスナップ（0, 90, 180, 270度）
+          const snappedAngle = Math.round(angle / 90) * 90;
+          
+          // スナップされた角度で終点を再計算
+          const snappedRad = (snappedAngle * Math.PI) / 180;
+          finalEnd = {
+            x: spanStart.x + Math.cos(snappedRad) * distance,
+            y: spanStart.y + Math.sin(snappedRad) * distance,
+          };
+          
+          // 直角モード適用後、グリッドスナップも有効な場合は終点をグリッドにスナップ
+          if (snapToGrid) {
+            const snapped = snapPositionToGrid(
+              { x: finalEnd.x, y: finalEnd.y },
+              gridSize,
+              DEFAULT_SCALE
+            );
+            finalEnd = snapped;
+          }
+        }
+      }
+
+      const dx = finalEnd.x - spanStart.x;
+      const dy = finalEnd.y - spanStart.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance > 10) {
         // スパン自動生成エンジンを呼び出し
         const scaffoldGroup = generateScaffoldSpan({
           start: spanStart,
-          end: spanCurrent,
+          end: finalEnd,
           settings: {
             currentColor,
             bracketSize,

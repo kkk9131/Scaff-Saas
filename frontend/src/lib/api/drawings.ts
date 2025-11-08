@@ -39,3 +39,24 @@ export async function getLatestDrawing(
   }
   return resp as ApiResponse<DrawingRecord | null>
 }
+
+/**
+ * 作図データをプロジェクトに保存
+ *
+ * @param projectId プロジェクトID
+ * @param designJson 作図データ（Konva/ストア出力のJSON）
+ * @returns ApiResponse<DrawingRecord>
+ */
+export async function saveDrawing(
+  projectId: string,
+  designJson: unknown
+): Promise<ApiResponse<DrawingRecord>> {
+  return apiClient.post<DrawingRecord>(
+    '/api/drawings',
+    {
+      project_id: projectId,
+      design_json: designJson,
+    },
+    true // requireAuth: true で認証ヘッダーを自動付与
+  )
+}

@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowLeftRight,
+  Square,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { scaffoldPartIconMap } from '@/components/draw/ScaffoldPartIcons';
@@ -38,6 +39,8 @@ function LeftSidebar() {
     toggleSnapToGrid,
     showGrid,
     toggleShowGrid,
+    snapToRightAngle,
+    toggleSnapToRightAngle,
     bracketSize,
     setBracketSize,
     directionReversed,
@@ -181,6 +184,21 @@ function LeftSidebar() {
             >
               {showGrid ? <Eye size={20} /> : <EyeOff size={20} />}
               <div className={tooltipCls} role="tooltip">グリッド表示（ON/OFF）</div>
+            </button>
+
+            {/* 直角モードON/OFF */}
+            <button
+              onClick={toggleSnapToRightAngle}
+              className={`group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
+                snapToRightAngle
+                  ? 'bg-gradient-to-br from-blue-400/20 via-indigo-400/20 to-purple-500/20 text-blue-400'
+                  : 'text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+              }`}
+              aria-label={`直角モード: ${snapToRightAngle ? 'ON' : 'OFF'}`}
+              title={`直角モード: ${snapToRightAngle ? 'ON' : 'OFF'}`}
+            >
+              <Square size={18} />
+              <div className={tooltipCls} role="tooltip">直角モード（90度の倍数にスナップ）</div>
             </button>
 
             {/* 方向反転（Alt連動）インジケータ/トグル */}

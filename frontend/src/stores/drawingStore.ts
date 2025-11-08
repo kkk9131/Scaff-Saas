@@ -84,6 +84,7 @@ interface DrawingState {
   gridSize: 150 | 300;
   snapToGrid: boolean;
   showGrid: boolean;
+  snapToRightAngle: boolean; // 直角モード（90度の倍数にスナップ）
   mousePosition: { x: number; y: number };
 
   // サックスモード設定
@@ -203,6 +204,7 @@ interface DrawingState {
   setGridSize: (size: 150 | 300) => void;
   toggleSnapToGrid: () => void;
   toggleShowGrid: () => void;
+  toggleSnapToRightAngle: () => void;
   setMousePosition: (position: { x: number; y: number }) => void;
 
   // アクション - サックスモード操作
@@ -316,6 +318,7 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   gridSize: 150, // デフォルトは150mm
   snapToGrid: true, // デフォルトでスナップON
   showGrid: true, // デフォルトでグリッド表示ON
+  snapToRightAngle: false, // デフォルトで直角モードOFF
   mousePosition: { x: 0, y: 0 },
 
   // サックスモード設定の初期状態
@@ -446,6 +449,12 @@ export const useDrawingStore = create<DrawingState>()((set, get) => ({
   toggleShowGrid: () =>
     set((state) => ({
       showGrid: !state.showGrid,
+    })),
+
+  // 直角モードのON/OFF切替
+  toggleSnapToRightAngle: () =>
+    set((state) => ({
+      snapToRightAngle: !state.snapToRightAngle,
     })),
 
   // マウス座標を更新

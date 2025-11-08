@@ -50,6 +50,7 @@ export function ProjectCreateModal({
   /**
    * ライトテーマ限定で適用する装飾クラスをメモ化
    * ダークテーマは既存デザインを崩さないように空文字を返す
+   * ライトモード時は他のカード同様に白で統一
    */
   const lightModeEnhancements = useMemo(() => {
     if (isDark) {
@@ -61,11 +62,9 @@ export function ProjectCreateModal({
     }
 
     return {
-      modal:
-        'bg-gradient-to-br from-white via-white to-slate-50 border-white/80 shadow-[0_24px_48px_-20px_rgba(8,145,178,0.35)] backdrop-blur-xl',
-      header:
-        'bg-white/90 border-white/70 shadow-sm shadow-[0_6px_18px_rgba(14,165,233,0.18)] rounded-t-xl',
-      content: 'bg-white/95',
+      modal: 'project-create-modal !bg-white border-white/80 shadow-[0_24px_48px_-20px_rgba(8,145,178,0.35)] backdrop-blur-xl',
+      header: '!bg-white border-white/70 shadow-sm shadow-[0_6px_18px_rgba(14,165,233,0.18)] rounded-t-xl',
+      content: '!bg-white',
     }
   }, [isDark])
 

@@ -388,7 +388,8 @@
   html:not(.dark) .save-modal-card,
   html:not(.dark) .reset-modal-card,
   html:not(.dark) .project-save-card,
-  html:not(.dark) .png-preview-modal {
+  html:not(.dark) .png-preview-modal,
+  html:not(.dark) .project-create-modal {
     background-color: rgba(255, 255, 255, 0.95) !important;
   }
   html:not(.dark) .pillar-quantity-card::before,
@@ -404,7 +405,8 @@
   html:not(.dark) .save-modal-card::before,
   html:not(.dark) .reset-modal-card::before,
   html:not(.dark) .project-save-card::before,
-  html:not(.dark) .png-preview-modal::before {
+  html:not(.dark) .png-preview-modal::before,
+  html:not(.dark) .project-create-modal::before {
     display: none !important;
   }
   /* 保存フォーマットカードのライトモード時の白背景強制 */
@@ -423,29 +425,50 @@
   }
   /* モーダル内のテキスト全般をライトモード時に黒文字に */
   html:not(.dark) .reset-modal-card,
-  html:not(.dark) .save-modal-card {
+  html:not(.dark) .save-modal-card,
+  html:not(.dark) .project-create-modal {
     color: #000 !important;
     background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* プロジェクト作成モーダルの背景を強制的に白に（他のカードと同じ透過度） */
+  html:not(.dark) .project-create-modal,
+  html:not(.dark) .project-create-modal.bg-card,
+  html:not(.dark) .project-create-modal[class*="bg-card"],
+  html:not(.dark) .project-create-modal[class*="bg-white"] {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* プロジェクト作成モーダル本体とヘッダーを白に（他のカードと同じ透過度） */
+  html:not(.dark) .project-create-modal > div,
+  html:not(.dark) .project-create-modal .modal-header {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
   }
   /* モーダル本体のbg-cardクラスをライトモード時に白に */
   html:not(.dark) .save-modal-card.bg-card,
   html:not(.dark) .reset-modal-card.bg-card,
+  html:not(.dark) .project-create-modal.bg-card,
   html:not(.dark) .save-modal-card .bg-card,
   html:not(.dark) .reset-modal-card .bg-card,
+  html:not(.dark) .project-create-modal .bg-card,
   html:not(.dark) .save-modal-card [class*="bg-card"],
   html:not(.dark) .reset-modal-card [class*="bg-card"],
+  html:not(.dark) .project-create-modal [class*="bg-card"],
   html:not(.dark) .save-modal-card div.bg-card,
-  html:not(.dark) .reset-modal-card div.bg-card {
+  html:not(.dark) .reset-modal-card div.bg-card,
+  html:not(.dark) .project-create-modal div.bg-card {
     background-color: rgba(255, 255, 255, 0.95) !important;
   }
   /* モーダル本体の直接の子要素を白に */
   html:not(.dark) .save-modal-card > div,
-  html:not(.dark) .reset-modal-card > div {
+  html:not(.dark) .reset-modal-card > div,
+  html:not(.dark) .project-create-modal > div {
     background-color: rgba(255, 255, 255, 0.95) !important;
   }
   /* モーダル内のすべてのdiv要素を白に（ヘッダー、コンテンツ、フッターを除く） */
   html:not(.dark) .save-modal-card div[class*="rounded-2xl"],
-  html:not(.dark) .reset-modal-card div[class*="rounded-2xl"] {
+  html:not(.dark) .reset-modal-card div[class*="rounded-2xl"],
+  html:not(.dark) .project-create-modal div[class*="rounded-2xl"] {
     background-color: rgba(255, 255, 255, 0.95) !important;
   }
   /* リセットモーダル内のすべての要素も白背景に */
@@ -477,27 +500,63 @@
   /* モーダル内のタイトルと説明文も黒文字に */
   html:not(.dark) .reset-modal-card h2,
   html:not(.dark) .save-modal-card h2,
+  html:not(.dark) .project-create-modal h2,
   html:not(.dark) .reset-modal-card h2 *,
   html:not(.dark) .save-modal-card h2 *,
+  html:not(.dark) .project-create-modal h2 *,
   html:not(.dark) .reset-modal-card p,
   html:not(.dark) .save-modal-card p,
+  html:not(.dark) .project-create-modal p,
   html:not(.dark) .reset-modal-card p *,
-  html:not(.dark) .save-modal-card p * {
+  html:not(.dark) .save-modal-card p *,
+  html:not(.dark) .project-create-modal p * {
     color: #000 !important;
   }
   /* モーダル内のtext-muted-foregroundクラスも黒文字に */
   html:not(.dark) .reset-modal-card .text-muted-foreground,
   html:not(.dark) .save-modal-card .text-muted-foreground,
+  html:not(.dark) .project-create-modal .text-muted-foreground,
   html:not(.dark) .reset-modal-card button .text-muted-foreground,
-  html:not(.dark) .save-modal-card button .text-muted-foreground {
+  html:not(.dark) .save-modal-card button .text-muted-foreground,
+  html:not(.dark) .project-create-modal button .text-muted-foreground {
     color: #1e293b !important;
   }
   /* モーダル内のtext-gray-*クラスも黒文字に */
   html:not(.dark) .reset-modal-card .text-gray-900,
   html:not(.dark) .save-modal-card .text-gray-900,
+  html:not(.dark) .project-create-modal .text-gray-900,
   html:not(.dark) .reset-modal-card button .text-gray-900,
-  html:not(.dark) .save-modal-card button .text-gray-900 {
+  html:not(.dark) .save-modal-card button .text-gray-900,
+  html:not(.dark) .project-create-modal button .text-gray-900 {
     color: #1e293b !important;
+  }
+  /* プロジェクト作成モーダル内のフォーム要素も白背景に（他のカードと同じ透過度） */
+  html:not(.dark) .project-create-modal input,
+  html:not(.dark) .project-create-modal textarea,
+  html:not(.dark) .project-create-modal select {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  /* プロジェクト作成モーダル内のフォーム要素の文字色を黒に */
+  html:not(.dark) .project-create-modal input,
+  html:not(.dark) .project-create-modal textarea,
+  html:not(.dark) .project-create-modal select,
+  html:not(.dark) .project-create-modal input[type="date"],
+  html:not(.dark) .project-create-modal input[type="date"]::-webkit-calendar-picker-indicator,
+  html:not(.dark) .project-create-modal select option {
+    color: #000000 !important;
+  }
+  /* プロジェクト作成モーダル内のラベルも黒文字に */
+  html:not(.dark) .project-create-modal label,
+  html:not(.dark) .project-create-modal .text-foreground,
+  html:not(.dark) .project-create-modal [class*="text-foreground"],
+  html:not(.dark) .project-create-modal [class*="text-sm"][class*="font-medium"] {
+    color: #000000 !important;
+  }
+  /* プロジェクト作成モーダル内のすべてのテキスト要素を黒に */
+  html:not(.dark) .project-create-modal span,
+  html:not(.dark) .project-create-modal div:not([class*="bg-"]):not([class*="border-"]) {
+    color: inherit;
   }
   /* Modalコンポーネント: ライトモード時に透過背景を強制 */
   html:not(.dark) [role="dialog"] > div {

@@ -14,13 +14,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Upload, Image as ImageIcon, FileText } from 'lucide-react';
+import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Upload, Image as ImageIcon, FileText, Plus } from 'lucide-react';
 import { ConfirmModal, Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/projectStore';
 import type { Project } from '@/types/project';
 import { getProjects } from '@/lib/api/projects';
+import { saveDrawing } from '@/lib/api/drawings';
+import { ProjectCreateModal } from '@/components/projects/ProjectCreateModal';
 import Image from 'next/image';
 
 const toError = (error: unknown): Error => (error instanceof Error ? error : new Error(String(error)));
@@ -54,6 +56,8 @@ export default function Header() {
   const [isEstimateModalOpen, setIsEstimateModalOpen] = useState(false);
   const [estimateProjects, setEstimateProjects] = useState<Project[]>([]);
   const [estimateProjectsLoading, setEstimateProjectsLoading] = useState(false);
+  // プロジェクト作成モーダル状態
+  const [isProjectCreateModalOpen, setIsProjectCreateModalOpen] = useState(false);
   const tooltipCls = `pointer-events-none absolute left-full top-1/2 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-50 ${
     isDark ? 'border-slate-700 bg-black text-white' : 'border-slate-300 bg-white text-black'
   }`;
@@ -228,23 +232,12 @@ export default function Header() {
   }, [router]);
 
   /**
-   * APIベースURL解決
-   * - NEXT_PUBLIC_API_URL（推奨）
-   * - NEXT_PUBLIC_API_BASE_URL（互換）
-   * - 未設定時は相対パス
+   * プロジェクト一覧を再取得する共通処理
    */
-  const resolveApiBase = () =>
-    process.env.NEXT_PUBLIC_API_URL || (process.env as Record<string, string | undefined>).NEXT_PUBLIC_API_BASE_URL || '';
-
-  /**
-   * 「プロジェクトに保存」を選択時にプロジェクト一覧を取得してモーダルを開く
-   */
-  const openProjectSave = useCallback(async () => {
+  const refreshProjectList = useCallback(async () => {
+    setProjectLoading(true);
+    setProjectError(null);
     try {
-      setIsSaveModalOpen(false);
-      setProjectLoading(true);
-      setProjectError(null);
-      // 認証付きでプロジェクト一覧を取得
       const resp = await getProjects(1, 100);
       if (resp.error) {
         setProjectError(resp.error.message || 'プロジェクト一覧の取得に失敗しました');
@@ -252,9 +245,7 @@ export default function Header() {
       } else {
         const list = resp.data?.projects || [];
         setProjectList(list);
-        // デフォルト選択は現在のプロジェクト、無ければ先頭
-        const initial = currentProject?.id || (list[0]?.id ?? '');
-        setSelectedProjectId(initial);
+        return list;
       }
     } catch (error: unknown) {
       const err = toError(error);
@@ -262,9 +253,39 @@ export default function Header() {
       setProjectList([]);
     } finally {
       setProjectLoading(false);
+    }
+    return [];
+  }, []);
+
+  /**
+   * 「プロジェクトに保存」を選択時にプロジェクト一覧を取得してモーダルを開く
+   */
+  const openProjectSave = useCallback(async () => {
+    try {
+      setIsSaveModalOpen(false);
+      const list = await refreshProjectList();
+      // デフォルト選択は現在のプロジェクト、無ければ先頭
+      const initial = currentProject?.id || (list[0]?.id ?? '');
+      setSelectedProjectId(initial);
+      setIsProjectSaveOpen(true);
+    } catch (error: unknown) {
+      const err = toError(error);
+      setProjectError(err.message || 'プロジェクト一覧の取得に失敗しました');
       setIsProjectSaveOpen(true);
     }
-  }, [currentProject?.id]);
+  }, [currentProject?.id, refreshProjectList]);
+
+  /**
+   * プロジェクト作成成功時の処理
+   */
+  const handleProjectCreated = useCallback(async (project: Project) => {
+    // プロジェクト一覧を更新
+    const list = await refreshProjectList();
+    // 作成されたプロジェクトを選択状態にする
+    setSelectedProjectId(project.id);
+    // プロジェクト作成モーダルを閉じる
+    setIsProjectCreateModalOpen(false);
+  }, [refreshProjectList]);
 
   /**
    * プロジェクトに保存を実行
@@ -275,17 +296,14 @@ export default function Header() {
       setIsSavingToProject(true);
       const jsonStr = exportToJSON();
       const design_json = JSON.parse(jsonStr);
-      const apiBase = resolveApiBase();
-      const res = await fetch(`${apiBase}/api/drawings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ project_id: selectedProjectId, design_json }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || `HTTP ${res.status}`);
+      
+      // apiClientを使用して認証ヘッダーを自動付与
+      const resp = await saveDrawing(selectedProjectId, design_json);
+      
+      if (resp.error) {
+        throw new Error(resp.error.message || 'プロジェクト保存に失敗しました');
       }
+      
       setIsProjectSaveOpen(false);
       // 簡易通知
       alert('プロジェクトに保存しました。');
@@ -617,6 +635,18 @@ export default function Header() {
             ))
           )}
         </select>
+
+        {/* 新規プロジェクト作成ボタン */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsProjectCreateModalOpen(true)}
+          disabled={projectLoading}
+          className="w-full border-dashed border-2 border-primary/30 hover:border-primary/50 hover:bg-primary/5 dark:border-primary/40 dark:hover:border-primary/60 dark:hover:bg-primary/10"
+        >
+          <Plus size={16} className="mr-2" />
+          新規プロジェクトを作成
+        </Button>
       </div>
     </Modal>
 
@@ -662,6 +692,13 @@ export default function Header() {
         </div>
       )}
     </Modal>
+
+    {/* プロジェクト作成モーダル */}
+    <ProjectCreateModal
+      isOpen={isProjectCreateModalOpen}
+      onClose={() => setIsProjectCreateModalOpen(false)}
+      onSuccess={handleProjectCreated}
+    />
     </>
   );
 }
