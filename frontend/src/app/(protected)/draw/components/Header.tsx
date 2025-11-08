@@ -11,9 +11,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDrawingStore } from '@/stores/drawingStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Upload, Image as ImageIcon } from 'lucide-react';
+import { Undo2, Redo2, Save, Eye, EyeOff, Sun, Moon, RotateCcw, FileJson, Upload, Image as ImageIcon, FileText } from 'lucide-react';
 import { ConfirmModal, Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ const toError = (error: unknown): Error => (error instanceof Error ? error : new
  * 作図画面上部のナビゲーションとコントロール
  */
 export default function Header() {
+  const router = useRouter();
   const { underbarVisible, toggleUnderbar, undo, redo, resetDrawing, exportToJSON, scaffoldGroups, memos } = useDrawingStore();
   const { theme, toggleTheme } = useTheme();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -48,6 +50,10 @@ export default function Header() {
   // JSONインポート用のinput参照
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // 見積もり作成用のプロジェクト選択モーダル
+  const [isEstimateModalOpen, setIsEstimateModalOpen] = useState(false);
+  const [estimateProjects, setEstimateProjects] = useState<Project[]>([]);
+  const [estimateProjectsLoading, setEstimateProjectsLoading] = useState(false);
   const tooltipCls = `pointer-events-none absolute left-full top-1/2 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-50 ${
     isDark ? 'border-slate-700 bg-black text-white' : 'border-slate-300 bg-white text-black'
   }`;
@@ -183,6 +189,43 @@ export default function Header() {
     },
     []
   );
+
+  /**
+   * 見積もり作成ボタンのクリック処理
+   */
+  const handleEstimateClick = useCallback(() => {
+    if (currentProject?.id) {
+      // プロジェクトIDがある場合は直接見積もりページへ遷移
+      router.push(`/projects/${currentProject.id}/estimate`);
+    } else {
+      // プロジェクトIDがない場合はプロジェクト選択モーダルを表示
+      setIsEstimateModalOpen(true);
+      setEstimateProjectsLoading(true);
+      getProjects(1, 100)
+        .then((response) => {
+          if (response.data) {
+            setEstimateProjects(response.data.projects);
+          } else {
+            setEstimateProjects([]);
+          }
+        })
+        .catch((error) => {
+          console.error('プロジェクト取得エラー:', error);
+          setEstimateProjects([]);
+        })
+        .finally(() => {
+          setEstimateProjectsLoading(false);
+        });
+    }
+  }, [currentProject, router]);
+
+  /**
+   * プロジェクトを選択して見積もりページへ遷移
+   */
+  const handleSelectEstimateProject = useCallback((projectId: string) => {
+    setIsEstimateModalOpen(false);
+    router.push(`/projects/${projectId}/estimate`);
+  }, [router]);
 
   /**
    * APIベースURL解決
@@ -325,6 +368,16 @@ export default function Header() {
             >
               <Upload size={18} />
               <div className={tooltipCls} role="tooltip">インポート（JSON）</div>
+            </button>
+
+            {/* 見積もり作成 */}
+            <button
+              onClick={handleEstimateClick}
+              className="group relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all"
+              aria-label="見積もり作成"
+            >
+              <FileText size={18} />
+              <div className={tooltipCls} role="tooltip">見積もり作成</div>
             </button>
 
             {/* 区切り線 */}
@@ -565,6 +618,49 @@ export default function Header() {
           )}
         </select>
       </div>
+    </Modal>
+
+    {/* 見積もり作成用プロジェクト選択モーダル */}
+    <Modal
+      isOpen={isEstimateModalOpen}
+      onClose={() => setIsEstimateModalOpen(false)}
+      title="見積もりを作成"
+      description="プロジェクトを選択してください"
+      size="md"
+    >
+      {estimateProjectsLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-sm text-muted-foreground">プロジェクトを読み込み中...</span>
+        </div>
+      ) : estimateProjects.length === 0 ? (
+        <div className="py-8 text-center">
+          <p className="text-sm text-muted-foreground mb-4">プロジェクトが見つかりませんでした</p>
+          <Button
+            onClick={() => {
+              setIsEstimateModalOpen(false);
+              router.push('/dashboard/projects');
+            }}
+          >
+            プロジェクトを作成
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+          {estimateProjects.map((project) => (
+            <button
+              key={project.id}
+              onClick={() => handleSelectEstimateProject(project.id)}
+              className="w-full text-left p-4 rounded-lg border border-white/20 dark:border-slate-700/50 hover:bg-white/10 dark:hover:bg-slate-800/50 transition-colors"
+            >
+              <div className="font-medium text-card-foreground">{project.name}</div>
+              {project.description && (
+                <div className="text-sm text-muted-foreground mt-1">{project.description}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </Modal>
     </>
   );

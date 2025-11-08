@@ -244,7 +244,7 @@ const Modal: React.FC<ModalProps> = ({
         {(title || description || showCloseButton) && (
           <div
             className={cn(
-              'flex items-start justify-between border-b border-white/30 dark:border-slate-700/50 p-4',
+              'modal-header flex items-start justify-between border-b border-white/30 dark:border-slate-700/50 p-4',
               headerClassName
             )}
           >

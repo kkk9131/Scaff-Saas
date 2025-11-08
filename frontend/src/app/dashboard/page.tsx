@@ -16,6 +16,10 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
 import { BentoGrid, BentoCard } from '@/components/dashboard/BentoGrid'
 import { Muted, GradientText, Eyebrow } from '@/components/ui'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { getProjects } from '@/lib/api/projects'
+import type { Project } from '@/types/project'
 
 // モックデータ型定義
 // （削除）最近のプロジェクト・稼働中現場の型は不要になったため除去
@@ -39,6 +43,11 @@ export default function DashboardPage() {
 
   // チャットメッセージの状態管理
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+
+  // 見積もり作成用のプロジェクト選択モーダル
+  const [isEstimateModalOpen, setIsEstimateModalOpen] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
 
   // ライト/ダークで見た目を切替（lightは白カード/ darkは白10%ガラス）
   const glassCardClass = isDark
@@ -117,6 +126,57 @@ export default function DashboardPage() {
       }
       setChatMessages((prev) => [...prev, aiResponse])
     }, 1000)
+  }
+
+  /**
+   * 見積もり作成ボタンのクリック処理
+   */
+  const handleEstimateClick = async () => {
+    setIsEstimateModalOpen(true)
+    setProjectsLoading(true)
+    try {
+      const response = await getProjects(1, 100)
+      if (response.data) {
+        setProjects(response.data.projects)
+      } else {
+        setProjects([])
+      }
+    } catch (error) {
+      console.error('プロジェクト取得エラー:', error)
+      setProjects([])
+    } finally {
+      setProjectsLoading(false)
+    }
+  }
+
+  /**
+   * プロジェクトを選択して見積もりページへ遷移
+   */
+  const handleSelectProject = (projectId: string) => {
+    setIsEstimateModalOpen(false)
+    router.push(`/projects/${projectId}/estimate`)
+  }
+
+  /**
+   * クイックアクションのクリック処理
+   */
+  const handleQuickAction = (actionId: string) => {
+    switch (actionId) {
+      case 'new-project':
+        router.push('/dashboard/projects')
+        break
+      case 'drawing':
+        router.push('/draw')
+        break
+      case 'estimate':
+        handleEstimateClick()
+        break
+      case 'revenue':
+        // 売上確認は今後実装
+        break
+      default:
+        break
+    }
   }
 
   // ローディング中の表示
@@ -267,7 +327,12 @@ export default function DashboardPage() {
               >
                 <div className="grid grid-cols-2 gap-4">
                   {quickActions.map((action) => (
-                    <button key={action.id} className={`${glassCardClass} p-6 ${glassHoverOverlayBase} ${action.overlayGradientClass}`} type="button">
+                    <button
+                      key={action.id}
+                      onClick={() => handleQuickAction(action.id)}
+                      className={`${glassCardClass} p-6 ${glassHoverOverlayBase} ${action.overlayGradientClass}`}
+                      type="button"
+                    >
                       <div className="flex flex-col items-center gap-3">
                         <div className={`${iconWrapperBase} ${action.iconBackgroundClass}`}>
                           <span className="text-3xl" role="img" aria-label={action.label}>{action.icon}</span>
@@ -293,6 +358,49 @@ export default function DashboardPage() {
           messages={chatMessages}
           onSendMessage={handleSendMessage}
         />
+
+        {/* 見積もり作成用プロジェクト選択モーダル */}
+        <Modal
+          isOpen={isEstimateModalOpen}
+          onClose={() => setIsEstimateModalOpen(false)}
+          title="見積もりを作成"
+          description="プロジェクトを選択してください"
+          size="md"
+        >
+          {projectsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-sm text-muted-foreground">プロジェクトを読み込み中...</span>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-muted-foreground mb-4">プロジェクトが見つかりませんでした</p>
+              <Button
+                onClick={() => {
+                  setIsEstimateModalOpen(false)
+                  router.push('/dashboard/projects')
+                }}
+              >
+                プロジェクトを作成
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {projects.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => handleSelectProject(project.id)}
+                  className="w-full text-left p-4 rounded-lg border border-white/20 dark:border-slate-700/50 hover:bg-white/10 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="font-medium text-card-foreground">{project.name}</div>
+                  {project.description && (
+                    <div className="text-sm text-muted-foreground mt-1">{project.description}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </Modal>
       </div>
     </div>
   )

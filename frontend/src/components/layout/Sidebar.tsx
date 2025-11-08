@@ -2,8 +2,12 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { getProjects } from '@/lib/api/projects';
+import type { Project } from '@/types/project';
 
 /**
  * ナビゲーションアイテムの型定義
@@ -230,6 +234,41 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
     ref
   ) => {
     const pathname = usePathname();
+    const router = useRouter();
+    const [isEstimateModalOpen, setIsEstimateModalOpen] = React.useState(false);
+    const [projects, setProjects] = React.useState<Project[]>([]);
+    const [projectsLoading, setProjectsLoading] = React.useState(false);
+
+    /**
+     * 見積もり作成ボタンのクリック処理
+     */
+    const handleEstimateClick = React.useCallback(async (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsEstimateModalOpen(true);
+      setProjectsLoading(true);
+      try {
+        const response = await getProjects(1, 100);
+        if (response.data) {
+          setProjects(response.data.projects);
+        } else {
+          setProjects([]);
+        }
+      } catch (error) {
+        console.error('プロジェクト取得エラー:', error);
+        setProjects([]);
+      } finally {
+        setProjectsLoading(false);
+      }
+    }, []);
+
+    /**
+     * プロジェクトを選択して見積もりページへ遷移
+     */
+    const handleSelectProject = React.useCallback((projectId: string) => {
+      setIsEstimateModalOpen(false);
+      onClose?.();
+      router.push(`/projects/${projectId}/estimate`);
+    }, [router, onClose]);
 
     return (
       <>
@@ -276,6 +315,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
                 isOpen={isOpen}
                 currentPath={pathname ?? ''}
                 onClose={onClose}
+                onEstimateClick={item.href === '/estimates' ? handleEstimateClick : undefined}
               />
             ))}
           </nav>
@@ -295,6 +335,49 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
             </div>
           )}
         </aside>
+
+        {/* 見積もり作成用プロジェクト選択モーダル */}
+        <Modal
+          isOpen={isEstimateModalOpen}
+          onClose={() => setIsEstimateModalOpen(false)}
+          title="見積もりを作成"
+          description="プロジェクトを選択してください"
+          size="md"
+        >
+          {projectsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-sm text-muted-foreground">プロジェクトを読み込み中...</span>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-muted-foreground mb-4">プロジェクトが見つかりませんでした</p>
+              <Button
+                onClick={() => {
+                  setIsEstimateModalOpen(false);
+                  router.push('/dashboard/projects');
+                }}
+              >
+                プロジェクトを作成
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {projects.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => handleSelectProject(project.id)}
+                  className="w-full text-left p-4 rounded-lg border border-white/20 dark:border-slate-700/50 hover:bg-white/10 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="font-medium text-card-foreground">{project.name}</div>
+                  {project.description && (
+                    <div className="text-sm text-muted-foreground mt-1">{project.description}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </Modal>
       </>
     );
   }
@@ -311,6 +394,7 @@ interface NavItemComponentProps {
   isOpen: boolean;
   currentPath: string;
   onClose?: () => void;
+  onEstimateClick?: (e: React.MouseEvent) => void;
 }
 
 const NavItemComponent: React.FC<NavItemComponentProps> = ({
@@ -319,6 +403,7 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
   isOpen,
   currentPath,
   onClose,
+  onEstimateClick,
 }) => {
   const hasChildren = item.children && item.children.length > 0;
   const childHrefs = React.useMemo(
@@ -354,18 +439,24 @@ const NavItemComponent: React.FC<NavItemComponentProps> = ({
     }
   }, [childHrefs, currentPath, hasChildren, item.href]);
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (onEstimateClick) {
+      onEstimateClick(e);
+      return;
+    }
+    if (hasChildren) {
+      setIsExpanded(!isExpanded);
+    } else {
+      onClose?.();
+    }
+  };
+
   return (
     <div>
       {/* メインアイテム */}
       <Link
         href={item.href}
-        onClick={() => {
-          if (hasChildren) {
-            setIsExpanded(!isExpanded);
-          } else {
-            onClose?.();
-          }
-        }}
+        onClick={handleClick}
         className={cn(
           // 基本スタイル
           'flex items-center rounded-lg py-3 font-medium transition-all duration-200 touch-target',

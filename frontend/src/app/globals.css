@@ -499,6 +499,23 @@
   html:not(.dark) .save-modal-card button .text-gray-900 {
     color: #1e293b !important;
   }
+  /* Modalコンポーネント: ライトモード時に透過背景を強制 */
+  html:not(.dark) [role="dialog"] > div {
+    background-color: transparent !important;
+  }
+  /* Modalヘッダー: ライトモード時に透過背景と黒文字を強制 */
+  html:not(.dark) .modal-header {
+    background-color: transparent !important;
+  }
+  html:not(.dark) .modal-header * {
+    color: #000 !important;
+  }
+  html:not(.dark) .modal-header h2 {
+    color: #000 !important;
+  }
+  html:not(.dark) .modal-header p {
+    color: #1e293b !important;
+  }
   /* PillarQuantityCard: 数量表と同じようにライトモード時に白背景を強制 */
   html:not(.dark) .pillar-quantity-card .rounded-xl {
     background-color: rgba(255, 255, 255, 0.6) !important;
