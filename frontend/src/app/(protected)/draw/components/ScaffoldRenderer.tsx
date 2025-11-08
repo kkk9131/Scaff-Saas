@@ -645,11 +645,11 @@ export default function ScaffoldRenderer({
   // canvasScaleが大きいときは発光半径を小さく、逆に小さいときは大きくする
   const invScale = Math.max(0.5, Math.min(2, 1 / canvasScale));
   const GLOW = {
-    gradRadius: 12 * invScale,
-    ringRadius: 9 * invScale,
-    ringStroke: 6 * invScale,
-    coreRadius: 5 * invScale,
-    shadowBlur: 14 * invScale,
+    gradRadius: 16 * invScale, // 12 -> 16 (約33%増)
+    ringRadius: 12 * invScale, // 9 -> 12 (約33%増)
+    ringStroke: 8 * invScale, // 6 -> 8 (約33%増)
+    coreRadius: 6.5 * invScale, // 5 -> 6.5 (約30%増)
+    shadowBlur: 18 * invScale, // 14 -> 18 (約29%増)
   } as const;
 
   // 画面内判定（キャンバス座標→スクリーン座標へ変換して可視チェック）
@@ -698,26 +698,26 @@ export default function ScaffoldRenderer({
     }
   };
 
-  // パルスアニメーション（編集モード中のみ駆動、約30fps）
-  const [pulseTime, setPulseTime] = React.useState(0);
-  React.useEffect(() => {
-    if (currentMode !== 'edit' && currentMode !== 'view') {
-      return undefined;
-    }
-    let raf = 0;
-    let last = performance.now();
-    const loop = (t: number) => {
-      const elapsed = t - last;
-      // document.hidden 中は描画を止める（バックグラウンドでの無駄な再描画を抑制）
-      if (!document.hidden && elapsed >= 120) {
-        setPulseTime((prev) => prev + elapsed / 1000);
-        last = t;
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [currentMode]);
+  // パルスアニメーション（無効化: パフォーマンス向上のため）
+  // const [pulseTime, setPulseTime] = React.useState(0);
+  // React.useEffect(() => {
+  //   if (currentMode !== 'edit' && currentMode !== 'view') {
+  //     return undefined;
+  //   }
+  //   let raf = 0;
+  //   let last = performance.now();
+  //   const loop = (t: number) => {
+  //     const elapsed = t - last;
+  //     // document.hidden 中は描画を止める（バックグラウンドでの無駄な再描画を抑制）
+  //     if (!document.hidden && elapsed >= 120) {
+  //       setPulseTime((prev) => prev + elapsed / 1000);
+  //       last = t;
+  //     }
+  //     raf = requestAnimationFrame(loop);
+  //   };
+  //   raf = requestAnimationFrame(loop);
+  //   return () => cancelAnimationFrame(raf);
+  // }, [currentMode]);
 
   // スペースキー: 階段（1800）矢印ホバー中に数量を+1
   React.useEffect(() => {
@@ -747,57 +747,54 @@ export default function ScaffoldRenderer({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [hoveredStair, currentMode, editTargetType]);
 
-  // パルスから不透明度・半径スケールを算出
+  // パルスから不透明度・半径スケールを算出（アニメーション無効化: 固定値を返す）
   const getPulseOpacity = (base: number, id: string, anchor: { x: number; y: number }) => {
-    if (!isOnScreenPoint(anchor.x, anchor.y)) return base;
-    const off = hash01(id) * Math.PI * 2;
-    const wave = 0.7 + 0.3 * Math.sin(pulseTime * 2.0 + off);
-    return Math.max(0, Math.min(1, base * wave));
+    // アニメーション無効化: 固定値を返す
+    return base;
   };
   const getRadiusScale = (id: string, anchor: { x: number; y: number }) => {
-    if (!isOnScreenPoint(anchor.x, anchor.y)) return 1;
-    const off = hash01(id) * Math.PI * 2;
-    return 0.95 + 0.10 * Math.sin(pulseTime * 1.6 + off);
+    // アニメーション無効化: 固定値を返す
+    return 1;
   };
   const TIP_GLOW = {
-    gradRadius: 9 * invScale,
-    ringRadius: 6.5 * invScale,
-    ringStroke: 4 * invScale,
-    coreRadius: 4 * invScale,
-    shadowBlur: 12 * invScale,
+    gradRadius: 12 * invScale, // 9 -> 12 (約33%増)
+    ringRadius: 8.5 * invScale, // 6.5 -> 8.5 (約31%増)
+    ringStroke: 5.5 * invScale, // 4 -> 5.5 (約38%増)
+    coreRadius: 5.5 * invScale, // 4 -> 5.5 (約38%増)
+    shadowBlur: 16 * invScale, // 12 -> 16 (約33%増)
   } as const;
   // 布材（ライン）用の発光設定（ズーム追従）
   const CLOTH_GLOW = {
-    glowWidth: 10 * invScale,
-    shadowBlur: 18 * invScale,
+    glowWidth: 13 * invScale, // 10 -> 13 (約30%増)
+    shadowBlur: 24 * invScale, // 18 -> 24 (約33%増)
   } as const;
   // ブラケット（ライン）用の発光設定（ズーム追従）
   const BRACKET_GLOW = {
-    glowWidth: 9 * invScale,
-    shadowBlur: 16 * invScale,
+    glowWidth: 12 * invScale, // 9 -> 12 (約33%増)
+    shadowBlur: 21 * invScale, // 16 -> 21 (約31%増)
   } as const;
   // 布材の中点発光（青）設定
   const CLOTH_MID_GLOW = {
-    gradRadius: 9.5 * invScale,
-    ringRadius: 7.5 * invScale,
-    ringStroke: 4.5 * invScale,
-    coreRadius: 4 * invScale,
-    shadowBlur: 12 * invScale,
+    gradRadius: 12.5 * invScale, // 9.5 -> 12.5 (約32%増)
+    ringRadius: 10 * invScale, // 7.5 -> 10 (約33%増)
+    ringStroke: 6 * invScale, // 4.5 -> 6 (約33%増)
+    coreRadius: 5.5 * invScale, // 4 -> 5.5 (約38%増)
+    shadowBlur: 16 * invScale, // 12 -> 16 (約33%増)
     colorCore: 'rgba(59,130,246,0.9)', // blue-500 近似
     colorRing: '#60A5FA', // blue-400
   } as const;
   // アンチ（矩形）用の発光設定（ズーム追従）
   const ANTI_GLOW = {
-    ringStroke: 8 * invScale,
-    shadowBlur: 20 * invScale,
+    ringStroke: 10.5 * invScale, // 8 -> 10.5 (約31%増)
+    shadowBlur: 26 * invScale, // 20 -> 26 (約30%増)
   } as const;
   // アンチ中点（青）の発光設定
   const ANTI_MID_GLOW = {
-    gradRadius: 10 * invScale,
-    ringRadius: 8 * invScale,
-    ringStroke: 5 * invScale,
-    coreRadius: 4.5 * invScale,
-    shadowBlur: 14 * invScale,
+    gradRadius: 13 * invScale, // 10 -> 13 (約30%増)
+    ringRadius: 10.5 * invScale, // 8 -> 10.5 (約31%増)
+    ringStroke: 6.5 * invScale, // 5 -> 6.5 (約30%増)
+    coreRadius: 6 * invScale, // 4.5 -> 6 (約33%増)
+    shadowBlur: 18 * invScale, // 14 -> 18 (約29%増)
     colorCore: 'rgba(59,130,246,0.9)',
     colorRing: '#60A5FA',
   } as const;
