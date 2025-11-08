@@ -48,10 +48,10 @@ const buttonVariants = cva(
 
         // アウトライン: 枠線のみ（副次アクション）
         outline: cn(
-          'border-2 border-gray-300 bg-transparent text-gray-900',
-          'hover:bg-[#06B6D4]/10 hover:border-[#06B6D4] hover:text-[#06B6D4]',
+          'border-2 border-gray-300 bg-transparent !text-gray-900',
+          'hover:bg-[#06B6D4]/10 hover:border-[#06B6D4] hover:!text-[#06B6D4]',
           'hover:scale-105',
-          'dark:border-gray-600 dark:text-gray-100 dark:hover:bg-[#06B6D4]/20'
+          'dark:border-gray-600 dark:!text-gray-100 dark:hover:bg-[#06B6D4]/20'
         ),
 
         // セカンダリ: パープル（補助アクション）

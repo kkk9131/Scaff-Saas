@@ -131,6 +131,17 @@
   /* （削除）kanban-panel は不要。検索ツールの3カードのみ調整対象。 */
   /* プロジェクト一覧ページの検索ボタンと列ヘッダーをライトモード時のみ黒に */
   :not(.dark) .dashboard-scope button span,
+  /* ライトモード時のoutlineボタンの文字色を黒に強制 */
+  html:not(.dark) button[class*="outline"],
+  html:not(.dark) button[class*="outline"] *,
+  html:not(.dark) .Button[class*="outline"],
+  html:not(.dark) .Button[class*="outline"] * {
+    color: #111827 !important;
+  }
+  html:not(.dark) button[class*="outline"]:hover,
+  html:not(.dark) button[class*="outline"]:hover * {
+    color: #06B6D4 !important;
+  }
   :not(.dark) .dashboard-scope h3 {
     color: black !important;
   }

@@ -23,6 +23,8 @@ import {
   ChevronRight,
   ArrowLeftRight,
   Square,
+  Box,
+  Layers,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { scaffoldPartIconMap } from '@/components/draw/ScaffoldPartIcons';
@@ -226,6 +228,35 @@ function LeftSidebar() {
               <Swatch color="blue" label="Blue" />
               <Swatch color="green" label="Green" />
             </div>
+
+            {/* ビューモード時のみ: 立面/3D切り替え */}
+            {currentMode === 'view' && (
+              <>
+                {/* 区切り */}
+                <div className="my-2 h-px bg-white/20 dark:bg-slate-700/50" />
+                {/* セクション見出し（視覚的な説明） */}
+                <div className="mb-1 text-[10px] font-semibold tracking-wider text-slate-600 dark:text-slate-400 text-center">表示モード</div>
+                {/* 立面/3D切り替えボタン */}
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    className="group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-gradient-to-br from-blue-400/20 via-indigo-400/20 to-purple-500/20 text-blue-400"
+                    aria-label="立面表示"
+                    title="立面表示"
+                  >
+                    <Layers size={18} />
+                    <div className={tooltipCls} role="tooltip">立面表示</div>
+                  </button>
+                  <button
+                    className="group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all text-slate-700 hover:bg-white/10 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    aria-label="3D表示"
+                    title="3D表示"
+                  >
+                    <Box size={18} />
+                    <div className={tooltipCls} role="tooltip">3D表示</div>
+                  </button>
+                </div>
+              </>
+            )}
 
             {/* 編集モード時のみ: 編集対象の部材選択 */}
             {currentMode === 'edit' && (
